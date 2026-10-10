@@ -201,3 +201,32 @@ test('searches the whole history and steps through matches', async () => {
     await app.close()
   }
 })
+
+test('View > Theme switches between dark and light and persists', async () => {
+  const userData = makeTempDir('gitbob-ud-')
+  const clickTheme = (app: ElectronApplication, label: string) =>
+    app.evaluate(({ Menu }, l) => {
+      const view = Menu.getApplicationMenu()!.items.find((i) => i.label === 'View')!
+      const theme = view.submenu!.items.find((i) => i.label === 'Theme')!
+      theme.submenu!.items.find((i) => i.label === l)!.click()
+    }, label)
+  const bg = (page: Page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+
+  let { app, page } = await launch({ userData })
+  try {
+    await expect(page.getByText('No recent repositories.')).toBeVisible()
+    await clickTheme(app, 'Dark')
+    await expect.poll(() => bg(page)).toBe('rgb(15, 17, 21)')
+    await clickTheme(app, 'Light')
+    await expect.poll(() => bg(page)).toBe('rgb(255, 255, 255)')
+  } finally {
+    await app.close()
+  }
+  // The choice survives a restart.
+  ;({ app, page } = await launch({ userData }))
+  try {
+    await expect.poll(() => bg(page)).toBe('rgb(255, 255, 255)')
+  } finally {
+    await app.close()
+  }
+})

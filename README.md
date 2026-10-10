@@ -150,6 +150,27 @@ GitBob never overwrites your uncommitted changes when switching. If Git would ha
 
 If the server needs a username and password (or token), GitBob asks for it in a dialog. Long operations show their progress and can be cancelled. SSH keys and Git credential helpers you already use keep working.
 
+### 6. Undo, park and reuse work
+
+Right-click any commit for the time-travel tools:
+
+<p align="center">
+  <img src="docs/images/gitbob-history-menu.png" alt="The commit context menu with Create branch, Create tag, Cherry-pick, Revert, three Reset options and Checkout" width="100%">
+</p>
+
+- **Cherry-pick** copies that commit onto your current branch.
+- **Revert** adds a new commit that undoes it (safe for shared branches).
+- **Reset** moves your branch back to that commit. *Soft* keeps the changes staged, *mixed* keeps them as unstaged edits, *hard* throws them away. Before a hard reset GitBob asks you, and saves your uncommitted work as a backup stash so it can come back.
+- **Create tag** marks a release, with an optional message. Push or delete tags from the sidebar.
+
+Need to switch tasks with half-finished work? Click **Stash…** in Working changes. Your edits are put aside and the working tree is clean. They wait under **Stashes** in the sidebar, where **Pop** brings them back.
+
+<p align="center">
+  <img src="docs/images/gitbob-stash.png" alt="A stash selected in the sidebar, with its files and Pop, Apply and Delete buttons" width="100%">
+</p>
+
+If a cherry-pick, revert, merge or rebase stops because of a conflict, a yellow banner tells you how many files need attention and offers **Continue**, **Skip** and **Abort**. Nothing is left half-done without you knowing.
+
 <br>
 
 ## Features
@@ -185,6 +206,18 @@ Every screenshot in this README is the real app working on a real Git repository
       Create, switch, rename and delete branches, track remote branches, and see ahead/behind counts. Add and remove remotes. Fetch (with pruning), pull (fast-forward, merge or rebase) and push with clear explanations when the server rejects something, for example "Pull first" instead of a wall of Git output.
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/images/gitbob-search.png" alt="Searching the history for forecast: matching commits are highlighted and the rest are dimmed" width="100%">
+      <h3>Find anything</h3>
+      <kbd>⌘F</kbd> searches the whole history (not just what's on screen) by message, author, committer or commit id. Matches light up, everything else fades, and <kbd>Enter</kbd> jumps to the next one, loading older history when needed.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/gitbob-light.png" alt="GitBob in the light theme" width="100%">
+      <h3>Light or dark</h3>
+      Pick Light, Dark or Match System under View → Theme. Graph colors, diffs and labels are tuned for both.
+    </td>
+  </tr>
 </table>
 
 <br>
@@ -208,6 +241,15 @@ Every screenshot in this README is the real app working on a real Git repository
   </tr>
   <tr>
     <td width="33%" valign="top">
+      <h4>⏪ Undo &amp; reuse</h4>
+      Cherry-pick · revert (merge commits too) · reset soft/mixed/hard with automatic backup · continue/skip/abort for stopped merges, rebases, cherry-picks and reverts
+    </td>
+    <td width="33%" valign="top">
+      <h4>📦 Stash &amp; tags</h4>
+      Stash with message (untracked files included) · pop · apply · delete · see stashed files · annotated and lightweight tags · push and delete tags
+    </td>
+  <tr>
+    <td width="33%" valign="top">
       <h4>🎨 Comfortable</h4>
       Light, dark or match-system theme (View → Theme) · native menus · keyboard navigation · remembers recent repositories
     </td>
@@ -216,7 +258,7 @@ Every screenshot in this README is the real app working on a real Git repository
 
 ### On the roadmap
 
-Stash, tags management, reset, revert and cherry-pick from the UI, interactive rebase, a side-by-side diff with syntax highlighting, line-by-line staging, a three-way merge conflict editor, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux. Progress is tracked in [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md).
+Interactive rebase, a side-by-side diff with syntax highlighting, line-by-line staging, a three-way merge conflict editor, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux. Progress is tracked in [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md).
 
 <br>
 
@@ -261,7 +303,8 @@ npm run screenshots  # regenerate the README screenshots
 npm run dist:mac     # package for macOS (dmg + zip)
 ```
 
-- **Tested against real Git:** about 240 integration tests create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
+- **Fast on big repositories:** measured on a generated 100,000-commit repository: the full history loads in about 3 seconds and the graph layout takes about 40 ms ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)).
+- **Tested against real Git:** more than 300 integration tests create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
 - **Secure by default:** sandboxed renderer without Node access, context isolation, strict Content Security Policy, schema-validated IPC, and Git can only be run on repositories you opened.
 - **Architecture and decisions:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Current status and test results: [`docs/PROGRESS.md`](docs/PROGRESS.md).
 

@@ -85,7 +85,12 @@ void app.whenReady().then(async () => {
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(iconPath)
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false))
 
+  const settings = new SettingsStore(app.getPath('userData'))
+  // nativeTheme.themeSource themes native dialogs/menus; the renderer gets the choice via IPC.
+  nativeTheme.themeSource = (await settings.load()).theme
+
   const ctx: IpcContext = {
+    getSettings: () => settings.get(),
     recent: new RecentRepositoryStore(app.getPath('userData')),
     isTrustedSender,
     network,
@@ -100,14 +105,12 @@ void app.whenReady().then(async () => {
   }
   registerIpc(ctx)
 
-  // nativeTheme.themeSource drives prefers-color-scheme in the renderer and native UI.
-  const settings = new SettingsStore(app.getPath('userData'))
-  nativeTheme.themeSource = (await settings.load()).theme
   const rebuildMenu = (): void =>
     buildMenu(() => mainWindow, {
       theme: settings.get().theme,
       onThemeChange: (theme) => {
         nativeTheme.themeSource = theme
+        for (const w of BrowserWindow.getAllWindows()) w.webContents.send('theme:changed', { theme })
         void settings.update({ theme }).then(rebuildMenu)
       },
     })

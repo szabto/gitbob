@@ -60,7 +60,7 @@ export function GraphSearch({
   }
 
   return (
-    <div className="ml-auto flex items-center gap-1 pr-2 font-normal" data-testid="graph-search">
+    <div className="ml-auto flex min-w-0 items-center gap-1 pl-2 font-normal" data-testid="graph-search">
       <input
         ref={inputRef}
         value={input}
@@ -76,10 +76,10 @@ export function GraphSearch({
         }}
         placeholder="Search history  ⌘F"
         aria-label="Search history"
-        className="h-5 w-56 rounded border border-border bg-bg px-2 text-xs text-fg outline-none placeholder:text-muted focus:border-accent"
+        className="h-5 w-52 min-w-16 shrink rounded border border-border bg-bg px-2 text-xs text-fg outline-none placeholder:text-muted focus:border-accent"
       />
       {query && (
-        <span className="w-24 text-right text-[11px] text-muted" data-testid="search-count">
+        <span className="shrink-0 text-right text-[11px] whitespace-nowrap text-muted" data-testid="search-count">
           {search.isFetching && !search.data
             ? 'Searching…'
             : shas.length === 0

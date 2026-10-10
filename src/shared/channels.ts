@@ -46,6 +46,7 @@ export const IPC_CHANNELS = [
   'op:abort',
   'op:skip',
   'reflog:get',
+  'settings:get',
   'credentials:respond',
   'op:cancel',
 ] as const
@@ -58,5 +59,6 @@ export const IPC_EVENTS = [
   'credentials:request',
   'credentials:cancel',
   'op:progress',
+  'theme:changed',
 ] as const
 export type IpcEventName = (typeof IPC_EVENTS)[number]

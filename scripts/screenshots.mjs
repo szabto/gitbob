@@ -2,7 +2,7 @@
 // Renders README / website screenshots of the real app against a generated demo repository.
 // Usage: npm run build && node scripts/screenshots.mjs
 import { _electron as electron } from '@playwright/test'
-import { mkdirSync, mkdtempSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { buildDemoRepo } from './demo-repo.mjs'
@@ -13,6 +13,8 @@ mkdirSync(outDir, { recursive: true })
 
 const demo = buildDemoRepo()
 const userData = mkdtempSync(join(tmpdir(), 'gitbob-shot-ud-'))
+// README/site screenshots use the dark theme regardless of the OS appearance.
+writeFileSync(join(userData, 'settings.json'), JSON.stringify({ theme: 'dark' }))
 
 async function launch(args) {
   const app = await electron.launch({
@@ -82,6 +84,38 @@ try {
   await page.getByTestId('context-menu').waitFor()
   await shot(page, 'gitbob-branches')
   await page.keyboard.press('Escape')
+
+  // Commit history menu (cherry-pick, revert, reset).
+  await page.locator('[data-testid="commit-row"]', { hasText: 'Clamp chart bars' }).click({ button: 'right' })
+  await page.getByTestId('context-menu').waitFor()
+  await shot(page, 'gitbob-history-menu')
+  await page.keyboard.press('Escape')
+
+  // Whole-history search.
+  await page.getByLabel('Search history').fill('forecast')
+  await page.getByTestId('search-count').filter({ hasText: 'of' }).waitFor()
+  await page.getByLabel('Search history').press('Enter')
+  await page.getByTestId('details-subject').waitFor()
+  await shot(page, 'gitbob-search')
+  await page.getByLabel('Search history').press('Escape')
+
+  // Stash panel.
+  await page.getByTestId('stash-item').first().click()
+  await page.getByTestId('stash-panel').waitFor()
+  await shot(page, 'gitbob-stash')
+
+  // Light theme.
+  await app.evaluate(({ nativeTheme, BrowserWindow }) => {
+    nativeTheme.themeSource = 'light'
+    BrowserWindow.getAllWindows()[0].webContents.send('theme:changed', { theme: 'light' })
+  })
+  await page.locator('[data-testid="commit-row"]', { hasText: 'Merge branch feature/city-search' }).click()
+  await page.getByTestId('details-subject').waitFor()
+  await shot(page, 'gitbob-light')
+  await app.evaluate(({ nativeTheme, BrowserWindow }) => {
+    nativeTheme.themeSource = 'dark'
+    BrowserWindow.getAllWindows()[0].webContents.send('theme:changed', { theme: 'dark' })
+  })
 
   await app.close()
 

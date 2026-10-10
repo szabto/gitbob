@@ -42,6 +42,7 @@ export interface IpcContext {
   /** Called whenever a repository is opened (e.g. to start watching it). */
   onRepositoryOpened?: (info: RepositoryInfo) => void
   network: NetworkSession
+  getSettings: () => { theme: 'system' | 'light' | 'dark' }
 }
 
 /**
@@ -237,6 +238,7 @@ export function registerIpc(ctx: IpcContext): void {
     },
     'op:skip': ({ repoPath }) => skipOperation(requireOpened(repoPath)),
     'reflog:get': ({ repoPath, limit }) => getReflog(requireOpened(repoPath), 'HEAD', limit),
+    'settings:get': async () => ctx.getSettings(),
     'credentials:respond': async ({ id, answer }) => ctx.network.respond(id, answer),
     'op:cancel': async () => ctx.network.cancel(),
   }

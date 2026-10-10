@@ -99,7 +99,7 @@ export function CommitGraph({
         <div style={{ width: graphColumnWidth }} className="shrink-0 pl-3">
           Graph
         </div>
-        <div className="flex flex-1 items-center px-2">
+        <div className="flex min-w-0 flex-1 items-center px-2">
           Message
           <GraphSearch repoPath={repoPath} onMatchesChange={setMatches} />
         </div>

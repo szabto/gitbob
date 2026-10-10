@@ -116,6 +116,10 @@ export function buildDemoRepo() {
   commit(0, 'Document the forecast API', { 'README.md': '+\n## Forecast API\n\n`getForecast(city)` returns the 7 day forecast for a city.\n' })
   git('push', '-q', 'origin', 'main')
 
+  // A stash with an experiment
+  write('src/components/WeatherIcon.tsx', "export function WeatherIcon({ kind }: { kind: 'sun' | 'rain' }) {\n  return <span className={`icon icon-${kind}`} />\n}\n")
+  git('stash', 'push', '--include-untracked', '-m', 'Experiment: animated weather icons')
+
   // Local, unpushed commit + working changes
   commit(2, 'Polish search empty state', { 'src/components/CitySearch.tsx': "export function CitySearch({ onSelect }: { onSelect: (city: string) => void }) {\n  return (\n    <label className=\"search\">\n      <span>City</span>\n      <input placeholder=\"Search a city…\" onChange={(e) => onSelect(e.target.value)} />\n    </label>\n  )\n}\n" })
   write('src/App.tsx', "import { CitySearch } from './components/CitySearch'\nimport { HourlyChart } from './components/HourlyChart'\n\nexport function App() {\n  return (\n    <main>\n      <h1>Aurora</h1>\n      <CitySearch onSelect={() => {}} />\n      <HourlyChart temps={[12, 14, 17, 19, 18, 15]} />\n    </main>\n  )\n}\n")

@@ -48,6 +48,15 @@ export function App() {
     [handleOpened, showError],
   )
 
+  // Theme: "system" follows prefers-color-scheme in CSS; light/dark are forced via data-theme.
+  useEffect(() => {
+    const apply = (theme: string): void => {
+      document.documentElement.dataset.theme = theme
+    }
+    void call('settings:get', {}).then((s) => apply(s.theme))
+    return subscribe('theme:changed', ({ theme }) => apply(theme))
+  }, [])
+
   useEffect(() => subscribe('repo:opened', handleOpened), [handleOpened])
   useEffect(() => subscribe('menu:open-repository', () => void pickRepository()), [pickRepository])
 

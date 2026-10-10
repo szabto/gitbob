@@ -128,6 +128,7 @@ export const ipcInputSchemas = {
   'op:abort': z.object({ repoPath: absolutePath }),
   'op:skip': z.object({ repoPath: absolutePath }),
   'reflog:get': z.object({ repoPath: absolutePath, limit: z.number().int().min(1).max(10_000).default(200) }),
+  'settings:get': z.object({}).strict(),
   'credentials:respond': z.object({
     id: z.string().regex(/^[0-9a-f]{32}$/),
     answer: z.string().max(4096).nullable(),

@@ -32,8 +32,40 @@
   color-scheme: dark;
 }
 
+/* Light tokens: explicit choice (data-theme=light, set from View → Theme) or the OS
+   preference when the user picked "Match System" (no attribute / data-theme=system). */
+:root[data-theme='light'] {
+  --gb-bg: #ffffff;
+  --gb-panel: #f6f7f9;
+  --gb-panel-2: #eceef2;
+  --gb-border: #dcdfe5;
+  --gb-fg: #1d2330;
+  --gb-muted: #626b7c;
+  --gb-accent: #0aa5c0;
+  --gb-accent-2: #8b46e8;
+  --gb-danger: #d42f2f;
+  --gb-ok: #138a43;
+  --gb-warn: #a86a00;
+  --gb-err: #c92a2a;
+  --gb-info: #0b6fb8;
+  --gb-purple: #6d3fd1;
+  --gb-scroll: #c8ccd4;
+  --lane-0: #0aa5c0;
+  --lane-1: #8b46e8;
+  --lane-2: #1f9d5c;
+  --lane-3: #c98a00;
+  --lane-4: #c03aa8;
+  --lane-5: #e0473d;
+  --lane-6: #5b4fd6;
+  --lane-7: #138e9c;
+  --lane-8: #a46b2d;
+  --lane-9: #5f9a14;
+  --lane-10: #e0702a;
+  color-scheme: light;
+}
+
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme='dark']) {
     --gb-bg: #ffffff;
     --gb-panel: #f6f7f9;
     --gb-panel-2: #eceef2;

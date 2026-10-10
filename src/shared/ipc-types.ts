@@ -70,6 +70,7 @@ export interface IpcOutputs {
   'op:abort': { operation: string | null }
   'op:skip': { operation: string }
   'reflog:get': ReflogEntry[]
+  'settings:get': { theme: 'system' | 'light' | 'dark' }
   'credentials:respond': void
   /** True if a running network operation was cancelled. */
   'op:cancel': boolean
@@ -97,6 +98,8 @@ export interface IpcEvents {
   'credentials:cancel': { id: string }
   /** Progress of the running network operation. */
   'op:progress': { phase: string; percent: number }
+  /** The user picked a theme in View → Theme. */
+  'theme:changed': { theme: 'system' | 'light' | 'dark' }
 }
 
 type _EventsExhaustive = [IpcEventName] extends [keyof IpcEvents]
