@@ -1,12 +1,68 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { getCommitPage, LOG_FORMAT, parseLog } from '@git-core/log'
+import { clearLogCache, getCommitPage, LOG_FORMAT, parseLog } from '@git-core/log'
 import { runGit } from '@git-core/runner'
 import type { CommitSummary } from '@shared/types'
 import { cleanupFixtures, cloneFixtureRepo, createFixtureRepo } from '../helpers/fixture'
 
 afterEach(() => {
+  clearLogCache()
   cleanupFixtures()
 })
+
+/** Load every page with the given size, like the renderer's infinite query. */
+async function pagedLog(dir: string, limit: number): Promise<CommitSummary[]> {
+  const out: CommitSummary[] = []
+  for (;;) {
+    const page = await getCommitPage(dir, { skip: out.length, limit })
+    out.push(...page.commits)
+    if (!page.hasMore) return out
+    expect(page.commits).toHaveLength(limit)
+  }
+}
+
+/** One `git log --date-order` run over the same revisions (the pre-cache implementation). */
+async function gitLogAll(dir: string): Promise<CommitSummary[]> {
+  const { stdout } = await runGit(
+    ['log', '-z', '--date-order', `--format=${LOG_FORMAT}`, '--branches', '--remotes', '--tags', 'HEAD', '--'],
+    { cwd: dir },
+  )
+  return parseLog(stdout)
+}
+
+/** A history with merges, several roots, skewed dates, tags and unmerged branches. */
+function buildTangledRepo(): ReturnType<typeof createFixtureRepo> {
+  const repo = createFixtureRepo()
+  repo.commit('root')
+  for (let i = 0; i < 6; i++) {
+    repo.branch(`f${i}`)
+    repo.checkout(`f${i}`)
+    repo.commit(`f${i} a`)
+    if (i % 2) repo.commit(`f${i} b`)
+    repo.checkout('main')
+    repo.commit(`main ${i}`)
+    if (i % 3 !== 2) repo.merge(`f${i}`)
+  }
+  // Second and third roots, one merged into main, one only reachable from a tag.
+  repo.git(['checkout', '-q', '--orphan', 'other'])
+  repo.git(['rm', '-rq', '--cached', '--ignore-unmatch', '.'])
+  repo.commit('other root')
+  repo.commit('other 2')
+  repo.checkout('main')
+  repo.git(['merge', '-q', '--no-ff', '--allow-unrelated-histories', '-m', 'merge other', 'other'])
+  repo.git(['checkout', '-q', '--orphan', 'lonely'])
+  repo.commit('lonely root')
+  repo.tag('lonely-tag')
+  repo.checkout('main')
+  repo.git(['branch', '-D', 'lonely'])
+  // Out-of-order committer dates.
+  repo.git(['commit', '--allow-empty', '-q', '-m', 'old-dated'], {
+    GIT_AUTHOR_DATE: '1000000000 +0000',
+    GIT_COMMITTER_DATE: '1000000000 +0000',
+  })
+  repo.commit('after old')
+  repo.tag('v1', { annotated: true })
+  return repo
+}
 
 async function fullLog(dir: string): Promise<CommitSummary[]> {
   const page = await getCommitPage(dir, { skip: 0, limit: 10_000 })
@@ -239,5 +295,91 @@ describe('getCommitPage', () => {
     await expect(getCommitPage(repo.dir, { skip: 0, limit: 10, signal: ac.signal })).rejects.toMatchObject({
       code: 'CANCELLED',
     })
+  })
+
+  it('page-by-page loading equals one full git log run (merges, multiple roots, skewed dates)', async () => {
+    const repo = buildTangledRepo()
+    const reference = await gitLogAll(repo.dir)
+    expect(reference.length).toBeGreaterThan(25)
+    expect(reference.filter((c) => c.parents.length === 0)).toHaveLength(3)
+    expect(reference.filter((c) => c.parents.length > 1).length).toBeGreaterThanOrEqual(5)
+    for (const limit of [1, 2, 3, 7, reference.length - 1, reference.length, reference.length + 5]) {
+      clearLogCache()
+      expect(await pagedLog(repo.dir, limit), `limit ${limit}`).toEqual(reference)
+    }
+    // Arbitrary windows (not page-aligned) also match.
+    for (const [skip, limit] of [
+      [5, 4],
+      [11, 9],
+      [reference.length - 2, 10],
+    ] as const) {
+      const page = await getCommitPage(repo.dir, { skip, limit })
+      expect(page.commits).toEqual(reference.slice(skip, skip + limit))
+      expect(page.hasMore).toBe(skip + limit < reference.length)
+    }
+  })
+
+  it('sees new commits and moved refs on later pages (cache invalidation)', async () => {
+    const repo = buildTangledRepo()
+    await pagedLog(repo.dir, 4) // warm the cache
+    const extra = repo.commit('new on main')
+    let all = await pagedLog(repo.dir, 4)
+    expect(all).toEqual(await gitLogAll(repo.dir))
+    expect(all[0]!.sha).toBe(extra)
+
+    // Deleting a branch drops its unmerged commits from later pages.
+    repo.git(['branch', '-D', 'f2'])
+    all = await pagedLog(repo.dir, 4)
+    expect(all).toEqual(await gitLogAll(repo.dir))
+    expect(all.some((c) => c.subject === 'f2 a')).toBe(false)
+
+    // Detached HEAD on a commit no ref points at.
+    repo.checkout('main~1')
+    const detached = repo.commit('detached')
+    all = await pagedLog(repo.dir, 4)
+    expect(all).toEqual(await gitLogAll(repo.dir))
+    expect(all.map((c) => c.sha)).toContain(detached)
+  })
+
+  it('invalidates when a replace ref changes parents', async () => {
+    const repo = createFixtureRepo()
+    for (let i = 0; i < 6; i++) repo.commit(`c${i}`)
+    const before = await pagedLog(repo.dir, 2)
+    expect(before).toHaveLength(6)
+    // Make c3 a root via a replacement object: c0..c2 disappear from the walk.
+    const c3 = repo.rev('HEAD~2')
+    repo.git(['replace', '--graft', c3])
+    const after = await pagedLog(repo.dir, 2)
+    expect(after).toEqual(await gitLogAll(repo.dir))
+    expect(after).toHaveLength(3)
+  })
+
+  it('invalidates when a shallow clone is deepened', async () => {
+    const source = createFixtureRepo()
+    for (let i = 0; i < 8; i++) source.commit(`c${i}`)
+    const clone = cloneFixtureRepo(source)
+    // Re-clone shallowly through file:// (local clones ignore --depth).
+    clone.git(['fetch', '-q', '--depth=2', `file://${source.dir}`, 'main'])
+    clone.git(['reset', '-q', '--hard', 'FETCH_HEAD'])
+    clone.git(['update-ref', '-d', 'refs/remotes/origin/main'])
+    clone.git(['reflog', 'expire', '--expire=now', '--all'])
+    clone.git(['gc', '-q', '--prune=now'])
+    const shallow = await pagedLog(clone.dir, 1)
+    expect(shallow).toHaveLength(2)
+    clone.git(['fetch', '-q', '--deepen=3', `file://${source.dir}`, 'main'])
+    const deeper = await pagedLog(clone.dir, 1)
+    expect(deeper).toEqual(await gitLogAll(clone.dir))
+    expect(deeper).toHaveLength(5)
+  })
+
+  it('honours an AbortSignal on later pages', async () => {
+    const repo = createFixtureRepo()
+    for (let i = 0; i < 5; i++) repo.commit(`c${i}`)
+    const ac = new AbortController()
+    ac.abort()
+    await expect(getCommitPage(repo.dir, { skip: 2, limit: 2, signal: ac.signal })).rejects.toMatchObject({
+      code: 'CANCELLED',
+    })
+    expect((await getCommitPage(repo.dir, { skip: 2, limit: 2 })).commits.map((c) => c.subject)).toEqual(['c2', 'c1'])
   })
 })

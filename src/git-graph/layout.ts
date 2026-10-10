@@ -12,6 +12,12 @@
  *   - incoming: a lane expecting this commit, drawn top(lane) -> node.
  *   - outgoing: one per parent, drawn node -> bottom(lane of that parent).
  * Lanes keep their column for their whole lifetime, so rows tile seamlessly.
+ *
+ * Performance notes (see docs/BENCHMARKS.md): a wide graph emits one
+ * pass-through segment per active lane per row, millions for 100k commits.
+ * A lane's pass-through segment never changes while the lane lives, so one
+ * Segment object is shared by every row the lane passes through; segments
+ * are therefore immutable. Lane lookup by sha is a Map instead of a scan.
  */
 
 export interface LayoutCommit {
@@ -19,12 +25,13 @@ export interface LayoutCommit {
   parents: readonly string[]
 }
 
+/** Segments may be shared between rows; treat them as immutable. */
 export interface Segment {
   /** Column at the start of the segment (top of row, or node column). */
-  from: number
+  readonly from: number
   /** Column at the end of the segment (node column, or bottom of row). */
-  to: number
-  color: number
+  readonly to: number
+  readonly color: number
 }
 
 export interface GraphRow {
@@ -49,11 +56,15 @@ export interface GraphLayout {
 interface Lane {
   sha: string
   color: number
+  /** The vertical segment {from: column, to: column} shared by every row this lane passes through. */
+  straight: Segment
 }
 
 /** Incremental layout state so pages of history can be appended without recomputing. */
 export class GraphLayoutBuilder {
   private lanes: (Lane | null)[] = []
+  /** sha -> index of the lane expecting it. A sha is expected by at most one lane. */
+  private readonly expected = new Map<string, number>()
   private nextColor = 0
   private readonly rows: GraphRow[] = []
   private width = 0
@@ -74,69 +85,68 @@ export class GraphLayoutBuilder {
     return this.lanes.length - 1
   }
 
-  private find(sha: string): number {
-    return this.lanes.findIndex((l) => l !== null && l.sha === sha)
+  private open(index: number, sha: string, color: number): Lane {
+    const lane: Lane = { sha, color, straight: { from: index, to: index, color } }
+    this.lanes[index] = lane
+    this.expected.set(sha, index)
+    return lane
   }
 
   private place(commit: LayoutCommit): GraphRow {
-    const incoming: Segment[] = []
-    const passThrough: Segment[] = []
+    const lanes = this.lanes
+    const startWidth = lanes.length
 
-    // Lanes that expect this commit converge into its node.
-    const matching: number[] = []
-    this.lanes.forEach((l, i) => {
-      if (l && l.sha === commit.sha) matching.push(i)
-    })
-
+    // The lane (if any) expecting this commit converges into its node.
+    const matched = this.expected.get(commit.sha)
     let column: number
     let color: number
-    if (matching.length > 0) {
-      column = matching[0]!
-      color = this.lanes[column]!.color
+    const incoming: Segment[] = []
+    if (matched !== undefined) {
+      column = matched
+      color = lanes[matched]!.color
+      incoming.push(lanes[matched]!.straight)
+      lanes[matched] = null
+      this.expected.delete(commit.sha)
     } else {
       // A branch tip not referenced by any child we've seen.
       column = this.alloc()
       color = this.nextColor++
     }
 
-    this.lanes.forEach((l, i) => {
-      if (!l) return
-      if (l.sha === commit.sha) incoming.push({ from: i, to: column, color: l.color })
-      else passThrough.push({ from: i, to: i, color: l.color })
-    })
-    for (const i of matching) this.lanes[i] = null
+    const passThrough: Segment[] = []
+    for (let i = 0; i < startWidth; i++) {
+      const l = lanes[i]
+      if (l) passThrough.push(l.straight)
+    }
 
+    const parents = commit.parents
     const outgoing: Segment[] = []
-    commit.parents.forEach((parent, idx) => {
-      const existing = this.find(parent)
-      if (existing !== -1) {
+    for (let idx = 0; idx < parents.length; idx++) {
+      const parent = parents[idx]!
+      const existing = this.expected.get(parent)
+      if (existing !== undefined) {
         // Parent is already expected by another lane: join it.
-        outgoing.push({ from: column, to: existing, color: idx === 0 ? color : this.lanes[existing]!.color })
-        return
-      }
-      if (idx === 0) {
-        this.lanes[column] = { sha: parent, color }
-        outgoing.push({ from: column, to: column, color })
+        outgoing.push({ from: column, to: existing, color: idx === 0 ? color : lanes[existing]!.color })
+      } else if (idx === 0) {
+        outgoing.push(this.open(column, parent, color).straight)
       } else {
         const lane = this.alloc()
         const laneColor = this.nextColor++
-        this.lanes[lane] = { sha: parent, color: laneColor }
+        this.open(lane, parent, laneColor)
         outgoing.push({ from: column, to: lane, color: laneColor })
       }
-    })
+    }
 
     // Trim trailing empty lanes so the graph narrows again.
-    while (this.lanes.length > 0 && this.lanes[this.lanes.length - 1] === null) this.lanes.pop()
+    while (lanes.length > 0 && lanes[lanes.length - 1] === null) lanes.pop()
 
-    const used = Math.max(
-      column + 1,
-      this.lanes.length,
-      ...incoming.map((s) => s.from + 1),
-      ...passThrough.map((s) => s.from + 1),
-    )
-    this.width = Math.max(this.width, used)
+    // Trailing lanes are trimmed after every row, so the last lane entering
+    // this row was occupied: startWidth is the widest incoming/pass-through
+    // column + 1.
+    const used = Math.max(column + 1, startWidth, lanes.length)
+    if (used > this.width) this.width = used
 
-    return { sha: commit.sha, column, color, incoming, outgoing, passThrough, isMerge: commit.parents.length > 1 }
+    return { sha: commit.sha, column, color, incoming, outgoing, passThrough, isMerge: parents.length > 1 }
   }
 }
 

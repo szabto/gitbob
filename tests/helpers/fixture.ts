@@ -168,3 +168,20 @@ export function makeMergeConflict(repo: FixtureRepo, path = 'conflict.txt'): str
   }
   return path
 }
+
+/**
+ * Give `path` conflicting edits on `main` ("ours") and on a new branch `other` ("theirs"),
+ * both based on a common commit, and leave `main` checked out with a clean tree.
+ */
+export function makeDivergedBranches(
+  repo: FixtureRepo,
+  path = 'conflict.txt',
+): { base: string; ours: string; theirs: string; path: string } {
+  const base = repo.commit('base', { [path]: 'base\n' })
+  repo.branch('other')
+  const ours = repo.commit('ours', { [path]: 'ours\n' })
+  repo.checkout('other')
+  const theirs = repo.commit('theirs', { [path]: 'theirs\n' })
+  repo.checkout('main')
+  return { base, ours, theirs, path }
+}

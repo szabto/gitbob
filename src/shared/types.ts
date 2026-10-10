@@ -174,3 +174,60 @@ export interface RemoteInfo {
   fetchUrl: string
   pushUrl: string
 }
+
+// ---------------------------------------------------------------------------
+// Stash, tags, history operations, reflog (M5)
+
+export interface StashEntry {
+  index: number
+  /** `stash@{n}` */
+  ref: string
+  sha: string
+  /**
+   * The user's message for named stashes (`On <branch>: <message>`), otherwise git's
+   * full default subject (`WIP on <branch>: <sha> <subject>`).
+   */
+  message: string
+  /** Branch the stash was created on; null when created on a detached HEAD. */
+  branch: string | null
+  /** Creation time, epoch seconds. */
+  time: number
+}
+
+export interface TagInfo {
+  /** Short tag name (without `refs/tags/`). */
+  name: string
+  /** Fully peeled target object (a commit for ordinary tags). */
+  target: string
+  annotated: boolean
+  /** Annotation message (subject + body, signature excluded); '' for lightweight tags. */
+  message: string
+  /** Tagger of annotated tags; null for lightweight tags. */
+  taggerName: string | null
+  /** Tagger date (epoch s) of annotated tags; null for lightweight tags. */
+  time: number | null
+}
+
+export interface ResetResult {
+  /**
+   * Commit id of the safety stash created before a hard reset (also stored as `stash@{0}`),
+   * or null when there was nothing to back up. Recover with `git stash apply <id>`; untracked
+   * or ignored files that the reset overwrote are kept in the stash's third parent.
+   */
+  backupStash: string | null
+}
+
+export interface ReflogEntry {
+  /** Commit the ref pointed to after this update. */
+  sha: string
+  /** Selector usable with git, e.g. `HEAD@{3}` or `refs/heads/main@{0}`. */
+  selector: string
+  /** Kind of update, e.g. "commit", "commit (amend)", "checkout", "reset", "rebase (finish)". */
+  action: string
+  /** Rest of the reflog message, e.g. "moving from main to topic". */
+  message: string
+  /** Time of the ref update, epoch seconds. */
+  time: number
+}
+
+export type ResetMode = 'soft' | 'mixed' | 'hard'

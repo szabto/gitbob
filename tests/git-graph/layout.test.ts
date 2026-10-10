@@ -113,6 +113,29 @@ describe('computeGraphLayout', () => {
     }
   })
 
+  it('matches the original (pre-optimisation) algorithm exactly on random DAGs', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const commits = randomDag(300, seed)
+      const ref = referenceLayout(commits)
+      const got = computeGraphLayout(commits)
+      expect(got.width, `seed ${seed}`).toBe(ref.width)
+      expect(JSON.parse(JSON.stringify(got.rows))).toEqual(ref.rows)
+    }
+    // Duplicate parents, parentless tips and parents outside the page.
+    const odd = [c('x', 'a', 'a'), c('t'), c('y', 'q', 'a'), c('z', 'a', 'q', 'r'), c('a')]
+    expect(JSON.parse(JSON.stringify(computeGraphLayout(odd)))).toEqual(referenceLayout(odd))
+  })
+
+  it('shares one pass-through segment object per lane lifetime', () => {
+    const commits = [c('x', 'a'), c('y1', 'y2'), c('y2', 'y3'), c('y3'), c('a')]
+    const { rows } = computeGraphLayout(commits)
+    // Lane 0 (x -> a) passes through rows 1..3 as one shared object.
+    expect(rows[1]!.passThrough[0]).toEqual({ from: 0, to: 0, color: rows[0]!.color })
+    expect(rows[1]!.passThrough[0]).toBe(rows[2]!.passThrough[0])
+    expect(rows[1]!.passThrough[0]).toBe(rows[3]!.passThrough[0])
+    expect(rows[0]!.outgoing[0]).toBe(rows[1]!.passThrough[0])
+  })
+
   it('stays consistent on a real repository history', async () => {
     const repo = createFixtureRepo()
     repo.commit('root', { 'a.txt': '1' })
@@ -152,4 +175,65 @@ function randomDag(n: number, seed: number): LayoutCommit[] {
     out.push({ sha: `c${i}`, parents })
   }
   return out.reverse()
+}
+
+/** Verbatim copy of the original lane algorithm, used as an oracle for the optimised builder. */
+function referenceLayout(commits: readonly LayoutCommit[]): GraphLayout {
+  type Seg = { from: number; to: number; color: number }
+  let lanes: ({ sha: string; color: number } | null)[] = []
+  let nextColor = 0
+  let width = 0
+  const alloc = (): number => {
+    const free = lanes.indexOf(null)
+    if (free !== -1) return free
+    lanes.push(null)
+    return lanes.length - 1
+  }
+  const find = (sha: string): number => lanes.findIndex((l) => l !== null && l.sha === sha)
+  const rows = commits.map((commit) => {
+    const incoming: Seg[] = []
+    const passThrough: Seg[] = []
+    const matching: number[] = []
+    lanes.forEach((l, i) => {
+      if (l && l.sha === commit.sha) matching.push(i)
+    })
+    let column: number
+    let color: number
+    if (matching.length > 0) {
+      column = matching[0]!
+      color = lanes[column]!.color
+    } else {
+      column = alloc()
+      color = nextColor++
+    }
+    lanes.forEach((l, i) => {
+      if (!l) return
+      if (l.sha === commit.sha) incoming.push({ from: i, to: column, color: l.color })
+      else passThrough.push({ from: i, to: i, color: l.color })
+    })
+    for (const i of matching) lanes[i] = null
+    const outgoing: Seg[] = []
+    commit.parents.forEach((parent, idx) => {
+      const existing = find(parent)
+      if (existing !== -1) {
+        outgoing.push({ from: column, to: existing, color: idx === 0 ? color : lanes[existing]!.color })
+        return
+      }
+      if (idx === 0) {
+        lanes[column] = { sha: parent, color }
+        outgoing.push({ from: column, to: column, color })
+      } else {
+        const lane = alloc()
+        const laneColor = nextColor++
+        lanes[lane] = { sha: parent, color: laneColor }
+        outgoing.push({ from: column, to: lane, color: laneColor })
+      }
+    })
+    while (lanes.length > 0 && lanes[lanes.length - 1] === null) lanes.pop()
+    lanes = [...lanes]
+    const used = Math.max(column + 1, lanes.length, ...incoming.map((s) => s.from + 1), ...passThrough.map((s) => s.from + 1))
+    width = Math.max(width, used)
+    return { sha: commit.sha, column, color, incoming, outgoing, passThrough, isMerge: commit.parents.length > 1 }
+  })
+  return { rows, width }
 }
