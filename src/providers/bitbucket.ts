@@ -24,6 +24,7 @@ import {
   validateCreateInput,
   type CheckItem,
   type CheckItemState,
+  safeWebUrl,
 } from './util'
 
 const LABEL = 'Bitbucket'
@@ -139,7 +140,7 @@ function mapPull(raw: unknown): PullRequest {
     draft: p.draft === true,
     sourceBranch: str(obj(obj(p.source).branch).name),
     targetBranch: str(obj(obj(p.destination).branch).name),
-    url: str(obj(obj(p.links).html).href),
+    url: safeWebUrl(str(obj(obj(p.links).html).href)) ?? '',
     createdAt: str(p.created_on),
     updatedAt: str(p.updated_on),
   }

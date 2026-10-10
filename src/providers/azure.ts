@@ -25,6 +25,7 @@ import {
   validateCreateInput,
   type CheckItem,
   type CheckItemState,
+  safeWebUrl,
 } from './util'
 
 const LABEL = 'Azure DevOps'
@@ -148,7 +149,7 @@ function mapPull(raw: unknown, repo: RepoRef): PullRequest {
     draft: p.isDraft === true,
     sourceBranch: stripHeads(str(p.sourceRefName)),
     targetBranch: stripHeads(str(p.targetRefName)),
-    url: `${repoWeb}/pullrequest/${id}`,
+    url: safeWebUrl(`${repoWeb}/pullrequest/${id}`) ?? '',
     createdAt,
     // Azure exposes no last-updated time; closedDate is the best available signal.
     updatedAt: str(p.closedDate) || createdAt,

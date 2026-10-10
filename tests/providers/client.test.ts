@@ -211,3 +211,16 @@ describe('assertAllowedBaseUrl', () => {
     },
   )
 })
+
+describe('safeWebUrl', () => {
+  it('keeps only http(s) links from providers', async () => {
+    const { safeWebUrl } = await import('../../src/providers/util')
+    expect(safeWebUrl('https://ci.example/1')).toBe('https://ci.example/1')
+    expect(safeWebUrl('http://ci.example/1')).toBe('http://ci.example/1')
+    expect(safeWebUrl('javascript:alert(1)')).toBeUndefined()
+    expect(safeWebUrl('file:///etc/passwd')).toBeUndefined()
+    expect(safeWebUrl('data:text/html,x')).toBeUndefined()
+    expect(safeWebUrl('not a url')).toBeUndefined()
+    expect(safeWebUrl(null)).toBeUndefined()
+  })
+})

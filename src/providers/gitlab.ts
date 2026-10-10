@@ -26,6 +26,7 @@ import {
   validateCreateInput,
   type CheckItem,
   type CheckItemState,
+  safeWebUrl,
 } from './util'
 
 const LABEL = 'GitLab'
@@ -132,7 +133,7 @@ function mapMergeRequest(raw: unknown): PullRequest {
     draft: m.draft === true || m.work_in_progress === true,
     sourceBranch: str(m.source_branch),
     targetBranch: str(m.target_branch),
-    url: str(m.web_url),
+    url: safeWebUrl(str(m.web_url)) ?? '',
     createdAt: str(m.created_at),
     updatedAt: str(m.updated_at),
   }

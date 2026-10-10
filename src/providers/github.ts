@@ -26,6 +26,7 @@ import {
   validateCreateInput,
   type CheckItem,
   type CheckItemState,
+  safeWebUrl,
 } from './util'
 
 const LABEL = 'GitHub'
@@ -137,7 +138,7 @@ function mapPull(raw: unknown): PullRequest {
     draft: p.draft === true,
     sourceBranch: str(obj(p.head).ref),
     targetBranch: str(obj(p.base).ref),
-    url: str(p.html_url),
+    url: safeWebUrl(str(p.html_url)) ?? '',
     createdAt: str(p.created_at),
     updatedAt: str(p.updated_at),
   }

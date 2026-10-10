@@ -129,11 +129,11 @@ export function PullRequestsSection({
                     <button
                       data-testid="pull-request"
                       title={`${pr.title}\n${pr.sourceBranch} → ${pr.targetBranch} · ${pr.author}`}
-                      onClick={() => window.open(pr.url, '_blank')}
+                      onClick={() => /^https?:\/\//i.test(pr.url) && window.open(pr.url, '_blank')}
                       onContextMenu={(e) => {
                         e.preventDefault()
                         openMenu(e.clientX, e.clientY, [
-                          { label: 'Open in browser', onSelect: () => window.open(pr.url, '_blank') },
+                          { label: 'Open in browser', disabled: !/^https?:\/\//i.test(pr.url), onSelect: () => window.open(pr.url, '_blank') },
                           {
                             label: `Check out ${pr.sourceBranch}`,
                             disabled: !remoteRef,
@@ -208,7 +208,7 @@ export function CreatePullRequestDialog({
       const pr = await call('provider:create-pr', { repoPath, title, body, sourceBranch: branch, targetBranch: target, draft })
       void qc.invalidateQueries({ queryKey: ['pulls', repoPath] })
       showNotice(`Pull request #${pr.number} created.`)
-      window.open(pr.url, '_blank')
+      if (/^https?:\/\//i.test(pr.url)) window.open(pr.url, '_blank')
       onClose()
     } catch (e) {
       showError(e)

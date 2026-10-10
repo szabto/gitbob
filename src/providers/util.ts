@@ -152,11 +152,25 @@ export function summarizeChecks(items: CheckItem[]): CheckStatus {
   const state: CheckStatus['state'] =
     total === 0 ? 'none' : failed.length > 0 ? 'failure' : pending.length > 0 ? 'pending' : 'success'
   const pick = failed[0] ?? pending[0] ?? items[0]
-  const url = [pick, ...items].find((i) => i?.url)?.url ?? undefined
+  const url = [pick, ...items].map((i) => safeWebUrl(i?.url)).find(Boolean)
   return { state, total, failed: failed.length, pending: pending.length, ...(url ? { url } : {}) }
 }
 
 /** Encode each path segment of a branch name (keeps `/` separators). */
 export function encodeBranchPath(branch: string): string {
   return branch.split('/').map(encodeURIComponent).join('/')
+}
+
+/**
+ * Provider-supplied links (CI target URLs can be set by anyone allowed to post a commit status)
+ * are only kept if they are http(s); anything else (javascript:, file:, data:) becomes undefined.
+ */
+export function safeWebUrl(u: string | null | undefined): string | undefined {
+  if (!u) return undefined
+  try {
+    const p = new URL(u)
+    return p.protocol === 'https:' || p.protocol === 'http:' ? p.href : undefined
+  } catch {
+    return undefined
+  }
 }

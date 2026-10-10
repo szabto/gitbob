@@ -90,9 +90,7 @@ export function CommitDetailsPanel({
                 <dt className="text-muted">CI</dt>
                 <dd data-testid="ci-status">
                   <a
-                    href={checks.data.url ?? '#'}
-                    target="_blank"
-                    rel="noreferrer"
+                    {...(isWebUrl(checks.data.url) ? { href: checks.data.url, target: '_blank', rel: 'noreferrer' } : {})}
                     className={
                       checks.data.state === 'success' ? 'text-ok' : checks.data.state === 'failure' ? 'text-err' : 'text-warn'
                     }
@@ -165,4 +163,9 @@ export function CommitDetailsPanel({
       )}
     </aside>
   )
+}
+
+/** Only http(s) links from providers are clickable (defense in depth; adapters sanitize too). */
+function isWebUrl(u: string | undefined): u is string {
+  return !!u && /^https?:\/\//i.test(u)
 }
