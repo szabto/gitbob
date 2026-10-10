@@ -157,9 +157,13 @@ GitBob never overwrites your uncommitted changes when switching. If Git would ha
 | **Pull** | Brings the server's new commits into your current branch. By default it only fast-forwards; use the ▾ menu to merge or rebase when histories have diverged. |
 | **Push** | Uploads your commits. A brand-new branch is published and linked to the server automatically. |
 
-If the server needs a username and password (or token), GitBob asks for it in a dialog. Long operations show their progress and can be cancelled. SSH keys and Git credential helpers you already use keep working.
+If the server needs a username and password (or token), GitBob asks for it in a dialog; tick **Remember in my system keychain** and it's saved securely once the sign-in works. SSH keys with a passphrase and first connections to a new server are handled in dialogs too (you see the server's fingerprint before trusting it). Long operations show their progress and can be cancelled.
 
-### 6. Undo, park and reuse work
+### 6. Pull requests and CI
+
+Working with GitHub, GitLab, Bitbucket or Azure DevOps? Open **Pull requests** in the sidebar and click **Connect**. GitBob opens the page where you create a personal access token; paste it, and GitBob stores it encrypted by your operating system. Then you see the open pull requests of the repository, whether the selected commit's CI checks passed, and you can right-click a pushed branch → **Create pull request…**.
+
+### 7. Undo, park and reuse work
 
 Right-click any commit for the time-travel tools:
 
@@ -282,7 +286,7 @@ Every screenshot in this README is the real app working on a real Git repository
     </td>
     <td width="33%" valign="top">
       <h4>🌿 Branches &amp; sync</h4>
-      Create · checkout (local, remote-tracking, detached) · rename · delete (with unmerged protection) · upstream and ahead/behind · remotes add/remove · fetch with prune · pull ff-only/merge/rebase · push with upstream · force-with-lease · HTTPS credential prompt · progress and cancel
+      Create · checkout (local, remote-tracking, detached) · rename · delete (with unmerged protection) · upstream and ahead/behind · remotes add/remove · fetch with prune · pull ff-only/merge/rebase · push with upstream · force-with-lease · HTTPS credential prompt (optionally remembered in the OS keychain) · SSH passphrase and host-key prompts · progress and cancel
     </td>
   </tr>
   <tr>
@@ -296,6 +300,12 @@ Every screenshot in this README is the real app working on a real Git repository
     </td>
   <tr>
     <td width="33%" valign="top">
+      <h4>🔗 Hosting services</h4>
+      GitHub, GitLab, Bitbucket and Azure DevOps via personal access tokens (stored encrypted by the OS) · open pull requests · CI status per commit · create pull requests, also as drafts
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
       <h4>🎨 Comfortable</h4>
       Repository tabs (restored on restart) · clone with progress · new repository · light, dark or match-system theme · blame · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories
     </td>
@@ -304,7 +314,7 @@ Every screenshot in this README is the real app working on a real Git repository
 
 ### On the roadmap
 
-Git LFS, remembering HTTPS passwords in the system keychain, SSH passphrase prompts, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux.
+Git LFS, sign in with OAuth (instead of tokens), reviewing and merging pull requests in the app, and signed installers for macOS, Windows and Linux.
 
 <br>
 
@@ -331,7 +341,7 @@ Git LFS, remembering HTTPS passwords in the system keychain, SSH passphrase prom
 
 **Will it mess up my repository?** GitBob only does what you ask, through Git itself. Anything that can lose work asks for confirmation first (made by the app itself, so nothing can skip it), and discarded new files go to the Trash.
 
-**Where are my passwords stored?** GitBob doesn't store them. When Git asks for credentials, GitBob shows a dialog and passes your answer to Git for that one operation. If you use a Git credential helper (for example the macOS Keychain helper), that helper may remember it, exactly as it does on the command line.
+**Where are my passwords stored?** Never in a file by GitBob. When Git asks for credentials, GitBob shows a dialog and passes your answer to Git. If you tick *Remember*, they go to your system's secure credential store (macOS Keychain, Windows Credential Manager, or libsecret on Linux) through Git's own credential helpers. Access tokens for GitHub and the like are encrypted with your operating system's keychain.
 
 **Does it send data anywhere?** No telemetry, no analytics. The only network traffic is Git talking to your remotes when you fetch, pull or push.
 
@@ -352,7 +362,7 @@ npm run dist:mac     # package for macOS (dmg + zip)
 ```
 
 - **Fast on big repositories:** measured on a generated 100,000-commit repository: the full history loads in about 3 seconds and the graph layout takes about 40 ms ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)).
-- **Tested against real Git:** about 500 integration tests (including randomized partial-staging checks) create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
+- **Tested against real Git:** more than 600 integration tests (including fake GitHub, GitLab, Bitbucket and Azure DevOps API servers) (including randomized partial-staging checks) create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
 - **Secure by default:** sandboxed renderer without Node access, context isolation, strict Content Security Policy, schema-validated IPC, and Git can only be run on repositories you opened.
 
 <br>
