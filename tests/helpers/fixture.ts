@@ -204,3 +204,17 @@ export const ALLOW_FILE_PROTOCOL_ENV: Record<string, string> = {
   GIT_CONFIG_KEY_0: 'protocol.file.allow',
   GIT_CONFIG_VALUE_0: 'always',
 }
+
+/**
+ * A bare repository seeded with `commits` linear commits on `main` (plus a `feature` branch and a
+ * `v1` tag), for clone tests. Returns the bare repository and the seed work tree it was pushed from.
+ */
+export function createSeededBareRepo(commits = 3): { bare: FixtureRepo; seed: FixtureRepo } {
+  const seed = createFixtureRepo()
+  for (let i = 0; i < commits; i++) seed.commit(`c${i}`, { [`f${i}.txt`]: `${i}\n` })
+  seed.tag('v1')
+  seed.branch('feature')
+  const bare = createFixtureRepo({ bare: true })
+  seed.git(['push', '-q', bare.dir, 'main', 'feature', 'v1'])
+  return { bare, seed }
+}

@@ -30,6 +30,39 @@ export function App() {
     [setRepo, queryClient, clearError],
   )
 
+  const setBusy = useUiStore((s) => s.setBusy)
+  const setProgress = useUiStore((s) => s.setProgress)
+  const ask = useUiStore((s) => s.ask)
+  useEffect(() => subscribe('op:progress', (p) => setProgress(p)), [setProgress])
+
+  const cloneRepository = useCallback(async () => {
+    const url = await ask({
+      title: 'Clone a repository',
+      label: 'Repository URL',
+      placeholder: 'https://github.com/owner/repo.git',
+      confirmLabel: 'Choose folder…',
+    })
+    if (!url) return
+    setBusy('Cloning…')
+    try {
+      const info = await call('repo:clone', { url })
+      if (info) handleOpened(info)
+    } catch (e) {
+      if (!(e instanceof Error && 'code' in e && (e as { code: string }).code === 'CANCELLED')) showError(e)
+    } finally {
+      setBusy(null)
+    }
+  }, [ask, setBusy, handleOpened, showError])
+
+  const initRepository = useCallback(async () => {
+    try {
+      const info = await call('repo:init', {})
+      if (info) handleOpened(info)
+    } catch (e) {
+      showError(e)
+    }
+  }, [handleOpened, showError])
+
   const pickRepository = useCallback(async () => {
     try {
       const info = await call('repo:pick', {})
@@ -106,6 +139,8 @@ export function App() {
 
   useEffect(() => subscribe('repo:opened', handleOpened), [handleOpened])
   useEffect(() => subscribe('menu:open-repository', () => void pickRepository()), [pickRepository])
+  useEffect(() => subscribe('menu:clone-repository', () => void cloneRepository()), [cloneRepository])
+  useEffect(() => subscribe('menu:init-repository', () => void initRepository()), [initRepository])
 
   return (
     <div className="flex h-full flex-col">
@@ -119,14 +154,38 @@ export function App() {
         </div>
       )}
       <TabBar />
+      {!repo && <GlobalBusy />}
       {repo ? (
         <RepositoryView key={repo.root} repo={repo} onOpen={pickRepository} onClose={() => setRepo(null)} />
       ) : (
-        <Welcome onPick={pickRepository} onOpenPath={openPath} />
+        <Welcome onPick={pickRepository} onOpenPath={openPath} onClone={cloneRepository} onInit={initRepository} />
       )}
       <ContextMenu />
       <PromptDialog />
       <CredentialDialog />
+    </div>
+  )
+}
+
+/** Progress for operations started without an open repository (e.g. clone). */
+function GlobalBusy() {
+  const busy = useUiStore((s) => s.busy)
+  const progress = useUiStore((s) => s.progress)
+  if (!busy) return null
+  return (
+    <div role="status" data-testid="global-busy" className="flex items-center gap-3 border-b border-border bg-panel px-4 py-2 text-sm">
+      <span className="animate-pulse text-accent">
+        {busy}
+        {progress ? ` ${progress.phase} ${progress.percent}%` : ''}
+      </span>
+      {progress && (
+        <span className="h-1 w-40 overflow-hidden rounded bg-panel-2">
+          <span className="block h-full bg-gradient-to-r from-accent to-accent-2" style={{ width: `${progress.percent}%` }} />
+        </span>
+      )}
+      <button className="ml-auto rounded border border-border px-2 text-xs text-muted hover:text-fg" onClick={() => void call('op:cancel', {})}>
+        Cancel
+      </button>
     </div>
   )
 }

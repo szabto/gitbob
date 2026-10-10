@@ -31,7 +31,8 @@ interface Props {
 export function RepositoryView({ repo, onOpen, onClose }: Props) {
   const refs = useRefs(repo.root)
   const head = useHead(repo.root)
-  const history = useHistory(repo.root)
+  const historyFilter = useAppStore((s) => s.historyFilter)
+  const history = useHistory(repo.root, historyFilter)
   const status = useStatus(repo.root)
   const selectedSha = useAppStore((s) => s.selectedSha)
   const wipSelected = useAppStore((s) => s.wipSelected)
@@ -90,8 +91,6 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
   const remotes = useRemotes(repo.root)
   const busy = useUiStore((s) => s.busy)
   const progress = useUiStore((s) => s.progress)
-  const setProgress = useUiStore((s) => s.setProgress)
-  useEffect(() => subscribe('op:progress', (p) => setProgress(p)), [setProgress])
   const openMenu = useUiStore((s) => s.openMenu)
   const currentRefObj = refs.data?.find((r) => r.name === head.data?.ref)
   const remoteNames = (remotes.data ?? []).map((r) => r.name)
@@ -210,6 +209,8 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
             <div className="p-6 text-danger">Failed to load history: {history.error.message}</div>
           ) : history.isPending ? (
             <div className="p-6 text-muted">Loading history…</div>
+          ) : commits.length === 0 && historyFilter ? (
+            <FilteredEmpty />
           ) : commits.length === 0 && changeCount.unstaged + changeCount.staged === 0 ? (
             <div className="p-6 text-muted" data-testid="empty-history">
               This repository has no commits yet.
@@ -224,7 +225,8 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
               hasMore={!!history.hasNextPage}
               loadingMore={history.isFetchingNextPage}
               onLoadMore={() => void history.fetchNextPage()}
-              wip={repo.bare ? null : changeCount}
+              wip={repo.bare || historyFilter ? null : changeCount}
+              refs={refs.data ?? []}
               onRowMenu={(e, commit) =>
                 openMenu(e.clientX, e.clientY, [
                   { label: 'Create branch here…', onSelect: () => void actions.createBranch(commit.sha) },
@@ -326,4 +328,16 @@ function ToolbarButton({
 
 function currentBranchName(ref: string | null): string {
   return ref?.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : 'HEAD'
+}
+
+function FilteredEmpty() {
+  const setHistoryFilter = useAppStore((s) => s.setHistoryFilter)
+  return (
+    <div className="p-6 text-muted" data-testid="filtered-empty">
+      No commits match the filter.{' '}
+      <button className="text-accent hover:underline" onClick={() => setHistoryFilter(null)}>
+        Clear filter
+      </button>
+    </div>
+  )
 }

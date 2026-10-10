@@ -8,6 +8,7 @@ import { GitError, toAppError } from '@git-core/errors'
 import { openRepository } from '@git-core/repository'
 import { getHead, listRefs } from '@git-core/refs'
 import { getCommitPage } from '@git-core/log'
+import { cloneRepository, initRepository } from '@git-core/create'
 import { getCommitDetails } from '@git-core/details'
 import { searchCommits } from '@git-core/search'
 import { getStatus } from '@git-core/status'
@@ -77,6 +78,14 @@ export async function openAndRegister(path: string, ctx: IpcContext): Promise<Re
   return info
 }
 
+async function pickFolder(event: IpcMainInvokeEvent, title: string, buttonLabel: string): Promise<string | null> {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  const opts = { title, buttonLabel, properties: ['openDirectory' as const, 'createDirectory' as const] }
+  const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+  const picked = res.filePaths[0]
+  return res.canceled || !picked ? null : picked
+}
+
 async function confirmDestructive(
   event: IpcMainInvokeEvent,
   opts: { message: string; detail: string; confirmLabel: string },
@@ -107,6 +116,19 @@ export function registerIpc(ctx: IpcContext): void {
       return openAndRegister(picked, ctx)
     },
     'repo:recent': () => ctx.recent.list(),
+    'repo:clone': async ({ url }, event) => {
+      // Where to clone is chosen in a native dialog, never sent by the renderer.
+      const parent = await pickFolder(event, 'Choose where to clone the repository', 'Clone here')
+      if (!parent) return null
+      const { path } = await ctx.network.run(event.sender, (net) => cloneRepository(url, parent, net))
+      return openAndRegister(path, ctx)
+    },
+    'repo:init': async (_input, event) => {
+      const dir = await pickFolder(event, 'Choose a folder for the new repository', 'Create repository')
+      if (!dir) return null
+      await initRepository(dir, { initialBranch: 'main' })
+      return openAndRegister(dir, ctx)
+    },
     'repo:activate': async ({ repoPath }) => {
       // Switching tabs: watch the now-visible repository.
       const info = openedRepos.get(requireOpened(repoPath))!
@@ -114,7 +136,8 @@ export function registerIpc(ctx: IpcContext): void {
     },
     'repo:refs': ({ repoPath }) => listRefs(requireOpened(repoPath)),
     'repo:head': ({ repoPath }) => getHead(requireOpened(repoPath)),
-    'log:page': ({ repoPath, skip, limit }) => getCommitPage(requireOpened(repoPath), { skip, limit }),
+    'log:page': ({ repoPath, skip, limit, filter }) =>
+      getCommitPage(requireOpened(repoPath), { skip, limit, ...(filter ? { filter } : {}) }),
     'log:search': ({ repoPath, query }) => searchCommits(requireOpened(repoPath), query),
     'commit:details': ({ repoPath, sha }) => getCommitDetails(requireOpened(repoPath), sha),
     'status:get': ({ repoPath }) => getStatus(requireOpened(repoPath)),

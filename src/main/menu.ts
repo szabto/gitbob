@@ -15,6 +15,8 @@ export function buildMenu(getWindow: () => BrowserWindow | null, opts: MenuOptio
       label: 'File',
       submenu: [
         { label: 'Open Repository…', accelerator: 'CmdOrCtrl+O', click: () => send('menu:open-repository') },
+        { label: 'Clone Repository…', accelerator: 'CmdOrCtrl+Shift+O', click: () => send('menu:clone-repository') },
+        { label: 'New Repository…', accelerator: 'CmdOrCtrl+Alt+N', click: () => send('menu:init-repository') },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],

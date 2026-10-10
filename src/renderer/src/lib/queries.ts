@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { DiffTarget } from '@shared/types'
+import type { DiffTarget, HistoryFilter } from '@shared/types'
 import { call } from './api'
 
 export const PAGE_SIZE = 2000
@@ -13,11 +13,12 @@ export function useHead(repoPath: string) {
   return useQuery({ queryKey: ['head', repoPath], queryFn: () => call('repo:head', { repoPath }) })
 }
 
-export function useHistory(repoPath: string) {
+export function useHistory(repoPath: string, filter: HistoryFilter | null = null) {
   return useInfiniteQuery({
-    queryKey: ['log', repoPath],
+    queryKey: ['log', repoPath, filter],
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => call('log:page', { repoPath, skip: pageParam, limit: PAGE_SIZE }),
+    queryFn: ({ pageParam }) =>
+      call('log:page', { repoPath, skip: pageParam, limit: PAGE_SIZE, ...(filter ? { filter } : {}) }),
     getNextPageParam: (last, pages) => (last.hasMore ? pages.length * PAGE_SIZE : undefined),
   })
 }

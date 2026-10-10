@@ -7,6 +7,7 @@ import { formatShortDate, shortSha } from '../lib/format'
 import { GraphCell, LANE_WIDTH, ROW_HEIGHT } from './GraphCell'
 import { RefBadge } from './RefBadge'
 import { GraphSearch } from './GraphSearch'
+import { GraphFilter } from './GraphFilter'
 
 interface Props {
   repoPath: string
@@ -20,6 +21,8 @@ interface Props {
   /** Working tree change counts, or null when the repository has no work tree. */
   wip: { unstaged: number; staged: number } | null
   onRowMenu?: (e: React.MouseEvent, commit: CommitSummary) => void
+  /** All refs, for the filter's branch picker. */
+  refs: GitRef[]
 }
 
 const MAX_GRAPH_LANES = 24
@@ -35,6 +38,7 @@ export function CommitGraph({
   onLoadMore,
   wip,
   onRowMenu,
+  refs: allRefs,
 }: Props) {
   const parentRef = useRef<HTMLDivElement>(null)
   const selectedSha = useAppStore((s) => s.selectedSha)
@@ -100,7 +104,8 @@ export function CommitGraph({
           Graph
         </div>
         <div className="flex min-w-0 flex-1 items-center px-2">
-          Message
+          <span className="mr-2">Message</span>
+          <GraphFilter refs={allRefs} />
           <GraphSearch repoPath={repoPath} onMatchesChange={setMatches} />
         </div>
         <div className="w-40 shrink-0 px-2">Author</div>

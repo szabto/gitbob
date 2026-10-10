@@ -1,7 +1,17 @@
 import { useRecent } from '../lib/queries'
 import logoUrl from '../assets/logo.png'
 
-export function Welcome({ onPick, onOpenPath }: { onPick: () => void; onOpenPath: (path: string) => void }) {
+export function Welcome({
+  onPick,
+  onOpenPath,
+  onClone,
+  onInit,
+}: {
+  onPick: () => void
+  onOpenPath: (path: string) => void
+  onClone: () => void
+  onInit: () => void
+}) {
   const recent = useRecent()
 
   return (
@@ -21,6 +31,14 @@ export function Welcome({ onPick, onOpenPath }: { onPick: () => void; onOpenPath
         >
           Open Repository…
         </button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button onClick={onClone} className="rounded-md border border-border px-4 py-2 hover:bg-panel-2">
+            Clone…
+          </button>
+          <button onClick={onInit} className="rounded-md border border-border px-4 py-2 hover:bg-panel-2">
+            New repository…
+          </button>
+        </div>
 
         <h2 className="mt-8 mb-2 text-xs font-semibold tracking-wider text-muted uppercase">Recent repositories</h2>
         <div className="rounded-md border border-border bg-panel">

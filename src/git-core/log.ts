@@ -2,8 +2,10 @@ import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { CommitPage, CommitSummary } from '@shared/types'
 import { GitError } from './errors'
+import { LITERAL_PATHSPECS_ENV, resolveRepoPath } from './paths'
 import { getHead } from './refs'
 import { runGit } from './runner'
+import type { HistoryFilter } from '@shared/types'
 
 /** Fields emitted per commit, NUL separated; with -z commits are also NUL separated. */
 const LOG_FIELDS = ['%H', '%P', '%an', '%ae', '%at', '%cn', '%ce', '%ct', '%s'] as const
@@ -36,10 +38,14 @@ export function parseLog(stdout: string): CommitSummary[] {
   return commits
 }
 
+/** Graph filter; see HistoryFilter in @shared/types. */
+export type LogFilter = HistoryFilter
+
 export interface LogPageOptions {
   skip: number
   limit: number
   signal?: AbortSignal
+  filter?: LogFilter
 }
 
 /**
@@ -175,9 +181,70 @@ function trimPage(commits: CommitSummary[], limit: number): CommitPage {
   return { commits, hasMore }
 }
 
+const FILTER_REF_RE = /^refs\/(?:heads|remotes|tags)\/[^\0\s~^:?*[\\]+$/
+const MAX_FILTER_REFS = 500
+const MAX_AUTHOR_LENGTH = 200
+
+interface NormalizedFilter {
+  refs: string[]
+  author: string
+  path: string
+}
+
+/** Validate a filter; returns null when it restricts nothing. */
+async function normalizeFilter(repoPath: string, filter: LogFilter | undefined, signal?: AbortSignal): Promise<NormalizedFilter | null> {
+  if (!filter) return null
+  const refs = filter.refs ?? []
+  const author = filter.author ?? ''
+  const path = filter.path ?? ''
+  if (!Array.isArray(refs) || typeof author !== 'string' || typeof path !== 'string') {
+    throw new GitError('INVALID_ARGUMENT', 'Invalid history filter')
+  }
+  if (refs.length > MAX_FILTER_REFS) throw new GitError('INVALID_ARGUMENT', 'Too many refs in history filter')
+  for (const ref of refs) {
+    if (typeof ref !== 'string' || !FILTER_REF_RE.test(ref) || ref.includes('..') || ref.includes('@{')) {
+      throw new GitError('INVALID_ARGUMENT', `Invalid ref in history filter: ${String(ref)}`)
+    }
+  }
+  if (author.length > MAX_AUTHOR_LENGTH || author.includes('\0')) {
+    throw new GitError('INVALID_ARGUMENT', 'Invalid author filter')
+  }
+  if (path) resolveRepoPath(repoPath, path)
+  if (!refs.length && !author && !path) return null
+  if (refs.length) {
+    const r = await runGit(['show-ref', '--verify', '--quiet', ...refs], { cwd: repoPath, signal, okExitCodes: [0, 1, 128] })
+    if (r.exitCode !== 0) throw new GitError('INVALID_ARGUMENT', 'A ref in the history filter does not exist')
+  }
+  return { refs: [...new Set(refs)], author, path }
+}
+
+/**
+ * Filtered pages use a plain positional walk (`--skip`) rather than the cached
+ * walk order: filtered result sets are usually small, a cache keyed by filter
+ * would rarely be reused, and the walk is then trivially identical to one full
+ * `git log --date-order` with the same arguments.
+ *
+ * `--parents` turns on parent rewriting, so with a path filter `%P` lists the
+ * nearest ancestors that are themselves part of the filtered history and the
+ * graph stays connected. Default history simplification applies (TREESAME
+ * merges are followed along one parent, no `--full-history`), renames are not
+ * followed, and the path is matched literally (GIT_LITERAL_PATHSPECS=1).
+ * `--author` is matched as a fixed string (`-F`), case-insensitively (`-i`).
+ */
+function filteredLogArgs(filter: NormalizedFilter, skip: number, maxCount: number, unbornHead: boolean): string[] {
+  const args = ['log', '-z', '--date-order', '--parents', `--format=${LOG_FORMAT}`, `--skip=${skip}`, `--max-count=${maxCount}`]
+  if (filter.author) args.push('-F', '-i', `--author=${filter.author}`)
+  if (filter.refs.length) args.push(...filter.refs)
+  else args.push('--branches', '--remotes', '--tags', ...(unbornHead ? [] : ['HEAD']))
+  args.push('--')
+  if (filter.path) args.push(filter.path)
+  return args
+}
+
 /**
  * Load one page of history across all local branches, remote branches, tags
- * and HEAD, in date order (children always before parents).
+ * and HEAD (or, with `filter`, the filtered history), in date order (children
+ * always before parents).
  *
  * Pages are positional (`skip`/`limit`) and concatenate to exactly one full
  * `git log --date-order` run as long as the repository's refs do not change
@@ -185,6 +252,21 @@ function trimPage(commits: CommitSummary[], limit: number): CommitPage {
  */
 export async function getCommitPage(repoPath: string, opts: LogPageOptions): Promise<CommitPage> {
   const { signal } = opts
+  const filter = await normalizeFilter(repoPath, opts.filter, signal)
+  if (filter) {
+    const head = filter.refs.length ? null : await getHead(repoPath)
+    if (head?.unborn) {
+      const refs = await runGit(['for-each-ref', '--format=%(objectname) %(refname)', ...WALK_REFS], { cwd: repoPath, signal })
+      if (!VISIBLE_REF.test(refs.stdout)) return { commits: [], hasMore: false }
+    }
+    const { stdout } = await runGit(filteredLogArgs(filter, opts.skip, opts.limit + 1, head?.unborn ?? false), {
+      cwd: repoPath,
+      signal,
+      timeoutMs: 120_000,
+      env: LITERAL_PATHSPECS_ENV,
+    })
+    return trimPage(parseLog(stdout), opts.limit)
+  }
   const [head, refs, shallow] = await Promise.all([
     getHead(repoPath),
     runGit(['for-each-ref', '--format=%(objectname) %(refname)', ...WALK_REFS], { cwd: repoPath, signal }),

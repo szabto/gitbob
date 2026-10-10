@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { DiffTarget, RepositoryInfo } from '@shared/types'
+import type { DiffTarget, HistoryFilter, RepositoryInfo } from '@shared/types'
 
 interface AppState {
   /** Open repositories, one per tab. */
@@ -16,6 +16,9 @@ interface AppState {
   revealSha: string | null
   /** File diff shown in the main area instead of the graph. */
   diffTarget: DiffTarget | null
+  /** Active graph filter (branch/author/path); null shows everything. */
+  historyFilter: HistoryFilter | null
+  setHistoryFilter: (filter: HistoryFilter | null) => void
   /** File shown in the blame view (replaces the graph). */
   blame: { path: string; rev?: string } | null
   openBlame: (blame: { path: string; rev?: string } | null) => void
@@ -45,6 +48,7 @@ const RESET = {
   conflictPath: null,
   blame: null,
   rebaseBase: null,
+  historyFilter: null,
 } as const
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -56,6 +60,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   diffTarget: null,
   selectedStash: null,
   conflictPath: null,
+  historyFilter: null,
+  setHistoryFilter: (historyFilter) => set({ historyFilter, selectedSha: null }),
   blame: null,
   openBlame: (blame) => set({ blame, diffTarget: null, conflictPath: null }),
   rebaseBase: null,

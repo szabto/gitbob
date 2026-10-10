@@ -383,3 +383,217 @@ describe('getCommitPage', () => {
     expect((await getCommitPage(repo.dir, { skip: 2, limit: 2 })).commits.map((c) => c.subject)).toEqual(['c2', 'c1'])
   })
 })
+
+describe('getCommitPage with a filter', () => {
+  type Filter = NonNullable<Parameters<typeof getCommitPage>[1]['filter']>
+
+  /** One plain `git log` with the equivalent arguments: the reference every filtered paging must equal. */
+  async function gitLogFiltered(dir: string, revs: string[], extra: string[], path?: string): Promise<CommitSummary[]> {
+    const { stdout } = await runGit(
+      ['log', '-z', '--date-order', '--parents', `--format=${LOG_FORMAT}`, ...extra, ...revs, '--', ...(path ? [path] : [])],
+      { cwd: dir, env: { GIT_LITERAL_PATHSPECS: '1' } },
+    )
+    return parseLog(stdout)
+  }
+
+  async function pagedFiltered(dir: string, filter: Filter, limit: number): Promise<CommitSummary[]> {
+    const out: CommitSummary[] = []
+    for (;;) {
+      const page = await getCommitPage(dir, { skip: out.length, limit, filter })
+      out.push(...page.commits)
+      if (!page.hasMore) return out
+      expect(page.commits).toHaveLength(limit)
+    }
+  }
+
+  let clock = 1_750_000_000
+  function commitAs(repo: ReturnType<typeof createFixtureRepo>, msg: string, name: string, email: string, files: Record<string, string> = {}): string {
+    for (const [p, c] of Object.entries(files)) repo.write(p, c)
+    if (Object.keys(files).length) repo.git(['add', '-A'])
+    clock += 60
+    const t = `${clock} +0000`
+    repo.git(['commit', '--allow-empty', '-q', '-m', msg], {
+      GIT_AUTHOR_NAME: name,
+      GIT_AUTHOR_EMAIL: email,
+      GIT_AUTHOR_DATE: t,
+      GIT_COMMITTER_DATE: t,
+    })
+    return repo.head()
+  }
+
+  /** main and two feature branches with a few authors and paths; returns subject->sha. */
+  function buildFilterRepo() {
+    const repo = createFixtureRepo()
+    const s: Record<string, string> = {}
+    s.root = commitAs(repo, 'root', 'Alice Smith', 'alice@example.com', { 'README.md': 'r\n', 'src/a.ts': '1\n' })
+    repo.branch('feat')
+    repo.branch('docs')
+    s.m1 = commitAs(repo, 'm1', 'Bob (a.k.a. B*b)', 'bob@corp.test', { 'src/m.ts': '2\n' })
+    s.m2 = commitAs(repo, 'm2', 'alice smith', 'ALICE@example.com', { 'other.txt': 'o\n' })
+    repo.checkout('feat')
+    s.f1 = commitAs(repo, 'f1', 'Carol', 'carol@example.com', { 'src/b.ts': 'b\n' })
+    s.f2 = commitAs(repo, 'f2', 'Alice Smith', 'alice@example.com', { 'src/a.ts': 'f\n' })
+    repo.checkout('docs')
+    s.d1 = commitAs(repo, 'd1', 'Dan', 'dan@example.com', { 'docs/x.md': 'x\n' })
+    repo.tag('docs-tag')
+    s.d2 = commitAs(repo, 'd2', 'Dan', 'dan@example.com', { 'docs/y.md': 'y\n' })
+    repo.checkout('main')
+    clock += 60
+    repo.git(['merge', '--no-ff', '-q', '-m', 'merge feat', 'feat'], {
+      GIT_AUTHOR_DATE: `${clock} +0000`,
+      GIT_COMMITTER_DATE: `${clock} +0000`,
+    })
+    s.merge = repo.head()
+    s.m3 = commitAs(repo, 'm3', 'Bob (a.k.a. B*b)', 'bob@corp.test', { 'README.md': 'r2\n' })
+    return { repo, s }
+  }
+
+  const subjects = (cs: CommitSummary[]): string[] => cs.map((c) => c.subject)
+
+  it('restricts to one branch, several branches or a tag', async () => {
+    const { repo } = buildFilterRepo()
+    const docs = await pagedFiltered(repo.dir, { refs: ['refs/heads/docs'] }, 50)
+    expect(subjects(docs)).toEqual(['d2', 'd1', 'root'])
+    const feat = await pagedFiltered(repo.dir, { refs: ['refs/heads/feat'] }, 50)
+    expect(subjects(feat)).toEqual(['f2', 'f1', 'root'])
+    const both = await pagedFiltered(repo.dir, { refs: ['refs/heads/feat', 'refs/heads/docs'] }, 50)
+    expect(both).toEqual(await gitLogFiltered(repo.dir, ['refs/heads/feat', 'refs/heads/docs'], []))
+    expect(new Set(subjects(both))).toEqual(new Set(['d2', 'd1', 'f2', 'f1', 'root']))
+    const tag = await pagedFiltered(repo.dir, { refs: ['refs/tags/docs-tag'] }, 50)
+    expect(subjects(tag)).toEqual(['d1', 'root'])
+    assertTopological(both)
+  })
+
+  it('works with remote-tracking refs', async () => {
+    const { repo } = buildFilterRepo()
+    const clone = cloneFixtureRepo(repo)
+    const page = await getCommitPage(clone.dir, { skip: 0, limit: 50, filter: { refs: ['refs/remotes/origin/docs'] } })
+    expect(subjects(page.commits)).toEqual(['d2', 'd1', 'root'])
+  })
+
+  it('filters by author name or email, case-insensitively and literally', async () => {
+    const { repo } = buildFilterRepo()
+    const alice = await pagedFiltered(repo.dir, { author: 'ALICE smith' }, 50)
+    expect(subjects(alice)).toEqual(['f2', 'm2', 'root'])
+    expect(subjects(await pagedFiltered(repo.dir, { author: 'Alice@Example' }, 50))).toEqual(['f2', 'm2', 'root'])
+    // Regex metacharacters are taken literally.
+    expect(subjects(await pagedFiltered(repo.dir, { author: '(a.k.a. b*b)' }, 50))).toEqual(['m3', 'm1'])
+    expect(await pagedFiltered(repo.dir, { author: 'a.ice' }, 50)).toEqual([])
+    expect(await pagedFiltered(repo.dir, { author: '.*' }, 50)).toEqual([])
+    expect(await pagedFiltered(repo.dir, { author: '[' }, 50)).toEqual([])
+    expect(subjects(await pagedFiltered(repo.dir, { author: 'corp.test' }, 50))).toEqual(['m3', 'm1'])
+  })
+
+  it('filters by path with rewritten parents that keep the graph connected', async () => {
+    const { repo, s } = buildFilterRepo()
+    const a = await pagedFiltered(repo.dir, { path: 'src/a.ts' }, 50)
+    expect(subjects(a)).toEqual(['f2', 'root'])
+    expect(a).toEqual(await gitLogFiltered(repo.dir, ['--branches', '--remotes', '--tags', 'HEAD'], [], 'src/a.ts'))
+    // Parents are rewritten to the nearest commit in the filtered history (f2's real parent is f1).
+    expect(repo.rev(`${s.f2}^`)).toBe(s.f1)
+    expect(a.find((c) => c.subject === 'f2')!.parents).toEqual([s.root])
+    // src/ changed on both sides, so the merge is kept, with both (rewritten) parents.
+    const src = await pagedFiltered(repo.dir, { path: 'src' }, 50)
+    expect(subjects(src)).toEqual(['merge feat', 'f2', 'f1', 'm1', 'root'])
+    expect(src[0]!.parents).toEqual([s.m1, s.f2])
+    expect(src.find((c) => c.subject === 'm1')!.parents).toEqual([s.root])
+    // src/a.ts only changed on feat: the merge is TREESAME to that parent and simplified away.
+    expect(a.some((c) => c.sha === s.merge)).toBe(false)
+    const ids = new Set(a.map((c) => c.sha))
+    for (const c of a) for (const p of c.parents) expect(ids.has(p), `parent ${p} of ${c.subject}`).toBe(true)
+    assertTopological(a)
+
+    // A directory and the root-level README.
+    expect(subjects(await pagedFiltered(repo.dir, { path: 'docs' }, 50))).toEqual(['d2', 'd1'])
+    expect(subjects(await pagedFiltered(repo.dir, { path: 'README.md' }, 50))).toEqual(['m3', 'root'])
+    // Paths are literal: glob characters do not match.
+    expect(await pagedFiltered(repo.dir, { path: 'src/*.ts' }, 50)).toEqual([])
+  })
+
+  it('does not follow renames (history before the rename is not included)', async () => {
+    const repo = createFixtureRepo()
+    repo.commit('add old', { 'old.txt': 'content that is long enough to be a rename\n' })
+    repo.git(['mv', 'old.txt', 'new.txt'])
+    repo.commit('rename')
+    repo.commit('edit new', { 'new.txt': 'content that is long enough to be a rename\nmore\n' })
+    const page = await getCommitPage(repo.dir, { skip: 0, limit: 50, filter: { path: 'new.txt' } })
+    expect(subjects(page.commits)).toEqual(['edit new', 'rename'])
+    // The rename commit becomes a root of the filtered graph.
+    expect(page.commits[1]!.parents).toEqual([])
+  })
+
+  it('combines refs, author and path filters (AND)', async () => {
+    const { repo } = buildFilterRepo()
+    const filter: Filter = { refs: ['refs/heads/feat', 'refs/heads/docs'], author: 'alice', path: 'src' }
+    const got = await pagedFiltered(repo.dir, filter, 50)
+    expect(subjects(got)).toEqual(['f2', 'root'])
+    expect(got).toEqual(
+      await gitLogFiltered(repo.dir, ['refs/heads/feat', 'refs/heads/docs'], ['-F', '-i', '--author=alice'], 'src'),
+    )
+    expect(subjects(await pagedFiltered(repo.dir, { refs: ['refs/heads/main'], author: 'bob' }, 50))).toEqual(['m3', 'm1'])
+  })
+
+  it('pages filtered history equal to one full filtered git log for any page size', async () => {
+    const repo = buildTangledRepo()
+    for (let i = 0; i < 6; i++) commitAs(repo, `alice ${i}`, 'Alice', 'alice@x.test', { [`p/${i % 2}.txt`]: `${i}\n` })
+    const cases: { filter: Filter; revs: string[]; extra: string[]; path?: string }[] = [
+      { filter: { refs: ['refs/heads/main', 'refs/tags/lonely-tag'] }, revs: ['refs/heads/main', 'refs/tags/lonely-tag'], extra: [] },
+      { filter: { author: 'test author' }, revs: ['--branches', '--remotes', '--tags', 'HEAD'], extra: ['-F', '-i', '--author=test author'] },
+      { filter: { path: 'p/0.txt' }, revs: ['--branches', '--remotes', '--tags', 'HEAD'], extra: [], path: 'p/0.txt' },
+    ]
+    for (const { filter, revs, extra, path } of cases) {
+      const reference = await gitLogFiltered(repo.dir, revs, extra, path)
+      expect(reference.length).toBeGreaterThan(2)
+      for (const limit of [1, 2, 3, 7, reference.length - 1, reference.length, reference.length + 5]) {
+        expect(await pagedFiltered(repo.dir, filter, limit), `${JSON.stringify(filter)} limit ${limit}`).toEqual(reference)
+      }
+      const exact = await getCommitPage(repo.dir, { skip: 0, limit: reference.length, filter })
+      expect(exact.hasMore).toBe(false)
+      const past = await getCommitPage(repo.dir, { skip: reference.length + 3, limit: 5, filter })
+      expect(past).toEqual({ commits: [], hasMore: false })
+    }
+  })
+
+  it('treats an empty filter like no filter', async () => {
+    const repo = buildTangledRepo()
+    const reference = await gitLogAll(repo.dir)
+    const page = await getCommitPage(repo.dir, { skip: 0, limit: 10_000, filter: { refs: [], author: '', path: '' } })
+    expect(page.commits).toEqual(reference)
+    expect((await getCommitPage(repo.dir, { skip: 3, limit: 4, filter: {} })).commits).toEqual(reference.slice(3, 7))
+  })
+
+  it('filters by author/path in a repository whose HEAD is unborn', async () => {
+    const repo = createFixtureRepo()
+    expect(await getCommitPage(repo.dir, { skip: 0, limit: 10, filter: { author: 'x' } })).toEqual({ commits: [], hasMore: false })
+    repo.commit('one', { 'a.txt': '1' })
+    repo.git(['checkout', '-q', '--orphan', 'empty'])
+    const page = await getCommitPage(repo.dir, { skip: 0, limit: 10, filter: { path: 'a.txt' } })
+    expect(subjects(page.commits)).toEqual(['one'])
+  })
+
+  it('rejects invalid filters', async () => {
+    const { repo } = buildFilterRepo()
+    const bad: Filter[] = [
+      { refs: ['main'] },
+      { refs: ['HEAD'] },
+      { refs: ['refs/heads/nope'] },
+      { refs: ['refs/notes/commits'] },
+      { refs: ['refs/heads/main', 'refs/heads/missing'] },
+      { refs: ['refs/heads/main~1'] },
+      { refs: ['refs/heads/main@{1}'] },
+      { refs: ['refs/heads/a..b'] },
+      { refs: ['--all'] },
+      { refs: ['refs/heads/main\0x'] },
+      { author: 'x'.repeat(201) },
+      { author: 'a\0b' },
+      { path: '../outside' },
+      { path: '/etc/passwd' },
+      { path: 'a\0b' },
+    ]
+    for (const filter of bad) {
+      await expect(getCommitPage(repo.dir, { skip: 0, limit: 10, filter }), JSON.stringify(filter)).rejects.toMatchObject({
+        code: 'INVALID_ARGUMENT',
+      })
+    }
+  })
+})

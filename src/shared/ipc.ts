@@ -36,6 +36,10 @@ const branchName = z
   .max(255)
   .refine((n) => !n.startsWith('-') && !n.includes('\0'), 'invalid branch name')
 const remoteName = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/, 'invalid remote name')
+const fullRefName = z
+  .string()
+  .max(300)
+  .regex(/^refs\/(heads|remotes|tags)\/[^\0]+$/, 'expected refs/heads/*, refs/remotes/* or refs/tags/*')
 const fullBranchRef = z
   .string()
   .max(300)
@@ -62,12 +66,21 @@ export const ipcInputSchemas = {
   'repo:pick': z.object({}).strict(),
   'repo:recent': z.object({}).strict(),
   'repo:activate': z.object({ repoPath: absolutePath }),
+  'repo:clone': z.object({ url: z.string().trim().min(1).max(2048) }),
+  'repo:init': z.object({}).strict(),
   'repo:refs': z.object({ repoPath: absolutePath }),
   'repo:head': z.object({ repoPath: absolutePath }),
   'log:page': z.object({
     repoPath: absolutePath,
     skip: z.number().int().min(0).max(10_000_000),
     limit: z.number().int().min(1).max(10_000),
+    filter: z
+      .object({
+        refs: z.array(fullRefName).min(1).max(1000).optional(),
+        author: z.string().trim().min(1).max(200).optional(),
+        path: repoPathSchema.optional(),
+      })
+      .optional(),
   }),
   'commit:details': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'log:search': z.object({ repoPath: absolutePath, query: z.string().trim().min(1).max(200) }),

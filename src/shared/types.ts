@@ -317,3 +317,13 @@ export interface SignatureInfo {
   signer: string | null
   key: string | null
 }
+
+/** Narrow the history graph. All fields optional; combined with AND. */
+export interface HistoryFilter {
+  /** Full ref names (refs/heads/x, refs/remotes/o/x, refs/tags/t): only commits reachable from these. */
+  refs?: string[]
+  /** Author name or email contains this text (case-insensitive, literal). */
+  author?: string
+  /** Only commits touching this repository-relative path. */
+  path?: string
+}

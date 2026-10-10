@@ -5,6 +5,8 @@ export const IPC_CHANNELS = [
   'repo:pick',
   'repo:recent',
   'repo:activate',
+  'repo:clone',
+  'repo:init',
   'repo:refs',
   'repo:head',
   'log:page',
@@ -74,5 +76,7 @@ export const IPC_EVENTS = [
   'credentials:cancel',
   'op:progress',
   'theme:changed',
+  'menu:clone-repository',
+  'menu:init-repository',
 ] as const
 export type IpcEventName = (typeof IPC_EVENTS)[number]

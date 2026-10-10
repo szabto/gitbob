@@ -30,6 +30,9 @@ export interface IpcOutputs {
   'repo:pick': RepositoryInfo | null
   'repo:recent': RecentRepository[]
   'repo:activate': void
+  /** null if the user cancelled the folder picker. */
+  'repo:clone': RepositoryInfo | null
+  'repo:init': RepositoryInfo | null
   'repo:refs': GitRef[]
   'repo:head': HeadState
   'log:page': CommitPage
@@ -124,6 +127,8 @@ export interface IpcEvents {
   'op:progress': { phase: string; percent: number }
   /** The user picked a theme in View → Theme. */
   'theme:changed': { theme: 'system' | 'light' | 'dark' }
+  'menu:clone-repository': void
+  'menu:init-repository': void
 }
 
 type _EventsExhaustive = [IpcEventName] extends [keyof IpcEvents]
