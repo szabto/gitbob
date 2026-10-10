@@ -125,6 +125,15 @@ try {
   await shot(page, 'gitbob-search')
   await page.getByLabel('Search history').press('Escape')
 
+  // Graph filter by author.
+  await page.getByTestId('filter-button').click()
+  await page.getByLabel('Author').fill('Kenji')
+  await shot(page, 'gitbob-filter-form')
+  await page.getByRole('button', { name: 'Apply filter' }).click()
+  await page.getByTestId('filter-summary').waitFor()
+  await shot(page, 'gitbob-filter')
+  await page.getByRole('button', { name: 'Clear filter' }).first().click()
+
   // Stash panel.
   await page.getByTestId('stash-item').first().click()
   await page.getByTestId('stash-panel').waitFor()
@@ -159,8 +168,9 @@ try {
     conflict.cleanup()
   }
 
-  // Welcome screen with the repository in recents.
+  // Welcome screen (in a new tab) with the repository in recents.
   ;({ app, page } = await launch([]))
+  await page.getByRole('button', { name: 'New tab' }).click()
   await page.getByText('Recent repositories').waitFor()
   await shot(page, 'gitbob-welcome')
   await app.close()

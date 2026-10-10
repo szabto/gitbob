@@ -51,7 +51,7 @@ export function Welcome({
                     className="flex w-full flex-col items-start border-b border-border px-3 py-2 text-left last:border-b-0 hover:bg-panel-2"
                   >
                     <span className="font-medium">{r.name}</span>
-                    <span className="truncate text-xs text-muted">{r.path}</span>
+                    <span className="w-full truncate text-xs text-muted">{r.path}</span>
                   </button>
                 </li>
               ))}

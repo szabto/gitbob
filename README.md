@@ -92,9 +92,13 @@ Want a real app bundle instead? `npm run dist:mac` builds an (unsigned) `.dmg` i
 
 New to Git, or just new to GitBob? This is the whole tour.
 
-### 1. Open a project
+### 1. Open, clone or create a project
 
-Click **Open Repository…** (or press <kbd>⌘O</kbd> / <kbd>Ctrl+O</kbd>) and pick your project folder. GitBob remembers it, so next time it's one click away on the start screen.
+- **Open Repository…** (<kbd>⌘O</kbd> / <kbd>Ctrl+O</kbd>) opens a project folder that already uses Git.
+- **Clone…** (<kbd>⇧⌘O</kbd>) downloads a project from a URL such as `https://github.com/owner/repo.git`; you pick where it goes, and GitBob shows the progress.
+- **New repository…** starts version control in a folder.
+
+Every project opens in its own **tab**, so you can keep several open at once. GitBob remembers your tabs and recent projects for next time.
 
 <p align="center">
   <img src="docs/images/gitbob-welcome.png" alt="The GitBob start screen with the panda logo, an Open Repository button and a list of recent repositories" width="80%">
@@ -108,6 +112,8 @@ Each row is a **commit**, a saved snapshot of your project, newest at the top.
 - **Labels** next to a message show where branches point: <code>main</code> is a local branch, <code>origin/main</code> is the same branch on the server, and 🏷 marks a tag such as a release.
 - The **ringed dot** is where you are right now (HEAD). The ● in the left sidebar marks your current branch, and arrows like ↑1 ↓2 tell you how many commits you are ahead of or behind the server.
 - Click a commit to see its full message, author, parents and changed files. Click a file to see exactly what changed.
+
+Too busy to read? Click **Filter** above the commit list to show only certain branches, one author's commits, or the history of a file or folder.
 
 Looking for something? Press <kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd> and type part of a message, an author's name or a commit id. GitBob searches the **entire** history, highlights the matches and jumps between them with <kbd>Enter</kbd>.
 
@@ -268,7 +274,7 @@ Every screenshot in this README is the real app working on a real Git repository
   <tr>
     <td width="33%" valign="top">
       <h4>📜 History</h4>
-      Commit graph across all branches, remotes and tags · merge and octopus-merge lanes · branch/tag/HEAD labels · commit details · whole-history search by message, author or id · keyboard navigation · incremental loading
+      Commit graph across all branches, remotes and tags · filters by branch, author and path · merge and octopus-merge lanes · branch/tag/HEAD labels · commit details · whole-history search by message, author or id · keyboard navigation · incremental loading
     </td>
     <td width="33%" valign="top">
       <h4>🧩 Working tree</h4>
@@ -291,14 +297,14 @@ Every screenshot in this README is the real app working on a real Git repository
   <tr>
     <td width="33%" valign="top">
       <h4>🎨 Comfortable</h4>
-      Light, dark or match-system theme (View → Theme) · blame · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories
+      Repository tabs (restored on restart) · clone with progress · new repository · light, dark or match-system theme · blame · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories
     </td>
   </tr>
 </table>
 
 ### On the roadmap
 
-Clone and init, repository tabs, graph filters, Git LFS, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux.
+Git LFS, remembering HTTPS passwords in the system keychain, SSH passphrase prompts, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux.
 
 <br>
 
@@ -307,6 +313,8 @@ Clone and init, repository tabs, graph filters, Git LFS, GitHub/GitLab/Bitbucket
 | Action | macOS | Windows / Linux |
 |---|---|---|
 | Open repository | <kbd>⌘O</kbd> | <kbd>Ctrl+O</kbd> |
+| Clone repository | <kbd>⇧⌘O</kbd> | <kbd>Ctrl+Shift+O</kbd> |
+| New repository | <kbd>⌥⌘N</kbd> | <kbd>Ctrl+Alt+N</kbd> |
 | Search history | <kbd>⌘F</kbd> | <kbd>Ctrl+F</kbd> |
 | Next / previous match | <kbd>Enter</kbd> / <kbd>⇧Enter</kbd> | <kbd>Enter</kbd> / <kbd>Shift+Enter</kbd> |
 | Move through commits | <kbd>↑</kbd> <kbd>↓</kbd> | <kbd>↑</kbd> <kbd>↓</kbd> |
@@ -344,7 +352,7 @@ npm run dist:mac     # package for macOS (dmg + zip)
 ```
 
 - **Fast on big repositories:** measured on a generated 100,000-commit repository: the full history loads in about 3 seconds and the graph layout takes about 40 ms ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)).
-- **Tested against real Git:** more than 400 integration tests (including randomized partial-staging checks) create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
+- **Tested against real Git:** about 500 integration tests (including randomized partial-staging checks) create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
 - **Secure by default:** sandboxed renderer without Node access, context isolation, strict Content Security Policy, schema-validated IPC, and Git can only be run on repositories you opened.
 
 <br>
