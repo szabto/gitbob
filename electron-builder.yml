@@ -42,4 +42,4 @@ publish:
   owner: szabto
   repo: gitbob
   releaseType: release
-artifactName: GitBob-${version}-${os}-${arch}.${ext}
+artifactName: GitBob-${os}-${arch}.${ext}

@@ -1,6 +1,6 @@
 # Releasing GitBob
 
-Releases are built by GitHub Actions (`.github/workflows/release.yml`) on macOS, Windows and Linux runners and published to [GitHub Releases](https://github.com/szabto/gitbob/releases) as pre-releases while GitBob is in alpha.
+Releases are built by GitHub Actions (`.github/workflows/release.yml`) on macOS, Windows and Linux runners and published to [GitHub Releases](https://github.com/szabto/gitbob/releases). They are regular releases (so `latest` links and the in-app update check work); alpha status is stated in the release title and notes.
 
 ## Cut a release
 
@@ -15,9 +15,11 @@ Releases are built by GitHub Actions (`.github/workflows/release.yml`) on macOS,
 
    | Platform | Files |
    |---|---|
-   | macOS (Apple Silicon and Intel) | `GitBob-<version>-mac-arm64.dmg`, `GitBob-<version>-mac-x64.dmg`, plus `.zip` |
-   | Windows (x64) | `GitBob-<version>-win-x64.exe` (installer) |
-   | Linux (x64) | `GitBob-<version>-linux-x86_64.AppImage`, `GitBob-<version>-linux-amd64.deb` |
+   | macOS (Apple Silicon and Intel) | `GitBob-mac-arm64.dmg`, `GitBob-mac-x64.dmg`, plus `.zip` |
+   | Windows (x64) | `GitBob-win-x64.exe` (installer) |
+   | Linux (x64) | `GitBob-linux-x86_64.AppImage`, `GitBob-linux-amd64.deb` |
+
+   File names carry no version, so `https://github.com/szabto/gitbob/releases/latest/download/<file>` always serves the newest release (the website links there).
 
 5. Check the release page, edit the notes if needed.
 
