@@ -53,6 +53,8 @@ test('side-by-side diff renders both versions with Monaco', async () => {
   try {
     await page.getByTestId('wip-row').click()
     await fileRow(page, 'unstaged-files', 'app.ts').click()
+    // Side by side needs room; CI screens can be small, so size the window explicitly.
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1600, 1000))
     await page.getByRole('button', { name: 'Side by side' }).click()
     const editor = page.getByTestId('side-by-side-diff')
     await expect(editor.locator('.monaco-diff-editor')).toBeVisible()

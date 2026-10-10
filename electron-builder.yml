@@ -16,9 +16,12 @@ mac:
   category: public.app-category.developer-tools
   icon: resources/icon.png
   target: [dmg, zip]
-  # Signing/notarization are configured in CI with Developer ID credentials (not set up yet).
-  identity: null
-  hardenedRuntime: true
+  # Until a Developer ID certificate is configured (see docs/RELEASING.md), sign ad-hoc ("-"):
+  # electron-builder modifies the bundle, and an unsigned/stale signature makes macOS on Apple
+  # Silicon kill the app at launch. Hardened runtime needs a real identity plus entitlements,
+  # so it is enabled together with Developer ID signing.
+  identity: '-'
+  hardenedRuntime: false
 dmg:
   title: GitBob ${version}
 win:
