@@ -25,6 +25,8 @@ interface UiState {
   prompt: (PromptOptions & { resolve: (value: string | null) => void }) | null
   /** Label of the currently running long operation (fetch/pull/push), if any. */
   busy: string | null
+  progress: { phase: string; percent: number } | null
+  setProgress: (p: { phase: string; percent: number } | null) => void
   showError: (err: unknown) => void
   clearError: () => void
   openMenu: (x: number, y: number, items: MenuEntry[]) => void
@@ -44,6 +46,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   menu: null,
   prompt: null,
   busy: null,
+  progress: null,
+  setProgress: (progress) => set({ progress }),
   showError: (err) => set({ error: toApiError(err) }),
   clearError: () => set({ error: null }),
   openMenu: (x, y, items) => set({ menu: { x, y, items } }),
@@ -57,5 +61,5 @@ export const useUiStore = create<UiState>((set, get) => ({
     get().prompt?.resolve(value)
     set({ prompt: null })
   },
-  setBusy: (busy) => set({ busy }),
+  setBusy: (busy) => set({ busy, progress: null }),
 }))

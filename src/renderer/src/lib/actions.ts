@@ -19,7 +19,8 @@ export function useRepoActions(repoPath: string) {
       try {
         return await fn()
       } catch (e) {
-        showError(e)
+        // A user-initiated cancel is not an error worth a banner.
+        if (!(e instanceof Error && 'code' in e && (e as { code: string }).code === 'CANCELLED')) showError(e)
         return undefined
       } finally {
         if (label) setBusy(null)

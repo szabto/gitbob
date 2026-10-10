@@ -5,6 +5,7 @@ import { registerIpc, openAndRegister, type IpcContext } from './ipc'
 import { buildMenu } from './menu'
 import { RecentRepositoryStore } from './recent'
 import { RepositoryWatcher } from './watcher'
+import { NetworkSession } from './network'
 
 // Allow tests to isolate persisted state.
 if (process.env.GITBOB_USER_DATA) app.setPath('userData', resolve(process.env.GITBOB_USER_DATA))
@@ -17,6 +18,7 @@ const iconPath = join(import.meta.dirname, '../../resources/icon.png')
 
 let mainWindow: BrowserWindow | null = null
 let activeWatcher: RepositoryWatcher | null = null
+const network = new NetworkSession()
 
 function isTrustedUrl(url: string): boolean {
   if (rendererDevUrl && url.startsWith(rendererDevUrl)) return true
@@ -83,6 +85,7 @@ void app.whenReady().then(async () => {
   const ctx: IpcContext = {
     recent: new RecentRepositoryStore(app.getPath('userData')),
     isTrustedSender,
+    network,
     onRepositoryOpened: (info) => {
       // One window shows one repository at a time: watch only the most recently opened one.
       activeWatcher?.stop()
@@ -111,7 +114,10 @@ void app.whenReady().then(async () => {
   })
 })
 
-app.on('will-quit', () => activeWatcher?.stop())
+app.on('will-quit', () => {
+  activeWatcher?.stop()
+  void network.dispose()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

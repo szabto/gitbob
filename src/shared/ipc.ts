@@ -62,6 +62,7 @@ export const ipcInputSchemas = {
     limit: z.number().int().min(1).max(10_000),
   }),
   'commit:details': z.object({ repoPath: absolutePath, sha: shaSchema }),
+  'log:search': z.object({ repoPath: absolutePath, query: z.string().trim().min(1).max(200) }),
   'status:get': z.object({ repoPath: absolutePath }),
   'index:stage': z.object({ repoPath: absolutePath, paths: repoPaths }),
   'index:unstage': z.object({ repoPath: absolutePath, paths: repoPaths }),
@@ -95,6 +96,11 @@ export const ipcInputSchemas = {
   'remote:remove': z.object({ repoPath: absolutePath, name: remoteName }),
   'remote:fetch': z.object({ repoPath: absolutePath, remote: remoteName.optional(), prune: z.boolean().default(true) }),
   'remote:pull': z.object({ repoPath: absolutePath, mode: z.enum(['ff-only', 'merge', 'rebase']) }),
+  'credentials:respond': z.object({
+    id: z.string().regex(/^[0-9a-f]{32}$/),
+    answer: z.string().max(4096).nullable(),
+  }),
+  'op:cancel': z.object({}).strict(),
   'remote:push': z.object({
     repoPath: absolutePath,
     branch: branchName,

@@ -1,6 +1,7 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { cleanupFixtures, cloneFixtureRepo, createFixtureRepo, makeTempDir, type FixtureRepo } from '../helpers/fixture'
+import { startHttpGitServer } from '../helpers/http-git-server'
 
 const appDir = resolve(import.meta.dirname, '../..')
 
@@ -138,5 +139,48 @@ test('checks out a remote branch as a tracking branch and a commit detached', as
     await expect(page.getByTestId('head-label')).toHaveText(`HEAD detached at ${seed.slice(0, 7)}`)
   } finally {
     await app.close()
+  }
+})
+
+test('prompts for HTTPS credentials and can cancel the prompt', async () => {
+  test.skip(process.platform === 'win32', 'askpass helper test is POSIX-only for now')
+  const seed = createFixtureRepo()
+  seed.commit('seed', { 'f.txt': '1\n' })
+  seed.branch('from-server')
+  const bare = createFixtureRepo({ bare: true })
+  seed.git(['push', '-q', bare.dir, 'main', 'from-server'])
+  const server = await startHttpGitServer({ projectRoot: dirname(bare.dir), username: 'alice', password: 'hunter2' })
+  const work = createFixtureRepo()
+  work.commit('local', { 'l.txt': 'l' })
+  work.git(['remote', 'add', 'origin', `${server.url}/${basename(bare.dir)}`])
+
+  const { app, page } = await launch(work.dir)
+  try {
+    await expect(page.getByTestId('commit-row')).toHaveCount(1)
+
+    // Cancelling the username prompt aborts the fetch with an explanation.
+    await page.getByRole('button', { name: 'Fetch' }).click()
+    await expect(page.getByTestId('credential-dialog')).toContainText('Username for')
+    await page.getByTestId('credential-dialog').getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.getByTestId('error-message')).toContainText('Authentication failed')
+    await page.getByRole('button', { name: 'Dismiss error' }).click()
+
+    // Answering both prompts lets the fetch succeed.
+    await page.getByRole('button', { name: 'Fetch' }).click()
+    const dialog = page.getByTestId('credential-dialog')
+    await expect(dialog).toContainText('Username for')
+    await dialog.locator('input').fill('alice')
+    await dialog.getByRole('button', { name: 'Continue' }).click()
+    await expect(dialog).toContainText('Password for')
+    await expect(dialog.locator('input')).toHaveAttribute('type', 'password')
+    await dialog.locator('input').fill('hunter2')
+    await dialog.getByRole('button', { name: 'Continue' }).click()
+
+    await expect(page.locator('[data-testid="ref-item"][data-ref="refs/remotes/origin/from-server"]')).toBeVisible()
+    await expect(page.getByTestId('credential-dialog')).toHaveCount(0)
+    expect(work.git(['rev-parse', 'origin/main'])).toBe(seed.rev('main'))
+  } finally {
+    await app.close()
+    await server.close()
   }
 })

@@ -9,6 +9,7 @@ import { openRepository } from '@git-core/repository'
 import { getHead, listRefs } from '@git-core/refs'
 import { getCommitPage } from '@git-core/log'
 import { getCommitDetails } from '@git-core/details'
+import { searchCommits } from '@git-core/search'
 import { getStatus } from '@git-core/status'
 import { discardPaths, stageAll, stagePaths, unstageAll, unstagePaths } from '@git-core/staging'
 import { getFileDiff } from '@git-core/diff'
@@ -21,7 +22,8 @@ import {
   renameBranch,
   setUpstream,
 } from '@git-core/branches'
-import { addRemote, fetch, listRemotes, pull, push, removeRemote } from '@git-core/remotes'
+import { addRemote, fetch, listRemotes, pull, push, removeRemote, type NetworkOptions } from '@git-core/remotes'
+import type { NetworkSession } from './network'
 import type { RecentRepositoryStore } from './recent'
 import { z } from 'zod'
 
@@ -35,6 +37,7 @@ export interface IpcContext {
   isTrustedSender: (event: IpcMainInvokeEvent) => boolean
   /** Called whenever a repository is opened (e.g. to start watching it). */
   onRepositoryOpened?: (info: RepositoryInfo) => void
+  network: NetworkSession
 }
 
 /**
@@ -94,6 +97,7 @@ export function registerIpc(ctx: IpcContext): void {
     'repo:refs': ({ repoPath }) => listRefs(requireOpened(repoPath)),
     'repo:head': ({ repoPath }) => getHead(requireOpened(repoPath)),
     'log:page': ({ repoPath, skip, limit }) => getCommitPage(requireOpened(repoPath), { skip, limit }),
+    'log:search': ({ repoPath, query }) => searchCommits(requireOpened(repoPath), query),
     'commit:details': ({ repoPath, sha }) => getCommitDetails(requireOpened(repoPath), sha),
     'status:get': ({ repoPath }) => getStatus(requireOpened(repoPath)),
     'index:stage': ({ repoPath, paths }) => stagePaths(requireOpened(repoPath), paths),
@@ -148,9 +152,12 @@ export function registerIpc(ctx: IpcContext): void {
       await removeRemote(repoPath, name)
       return { removed: true }
     },
-    'remote:fetch': ({ repoPath, remote, prune }) =>
-      fetch(requireOpened(repoPath), { prune, ...(remote ? { remote } : {}) }),
-    'remote:pull': ({ repoPath, mode }) => pull(requireOpened(repoPath), { mode }),
+    'remote:fetch': ({ repoPath, remote, prune }, event) =>
+      ctx.network.run(event.sender, (net: NetworkOptions) =>
+        fetch(requireOpened(repoPath), { ...net, prune, ...(remote ? { remote } : {}) }),
+      ),
+    'remote:pull': ({ repoPath, mode }, event) =>
+      ctx.network.run(event.sender, (net) => pull(requireOpened(repoPath), { ...net, mode })),
     'remote:push': async ({ repoPath, branch, remote, setUpstream: track, force }, event) => {
       requireOpened(repoPath)
       if (force !== 'none') {
@@ -162,9 +169,11 @@ export function registerIpc(ctx: IpcContext): void {
         })
         if (!confirmed) return { pushed: false }
       }
-      await push(repoPath, { branch, remote, setUpstream: track, force })
+      await ctx.network.run(event.sender, (net) => push(repoPath, { ...net, branch, remote, setUpstream: track, force }))
       return { pushed: true }
     },
+    'credentials:respond': async ({ id, answer }) => ctx.network.respond(id, answer),
+    'op:cancel': async () => ctx.network.cancel(),
   }
 
   for (const channel of IPC_CHANNELS) {

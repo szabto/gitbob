@@ -20,6 +20,7 @@ export interface IpcOutputs {
   'repo:refs': GitRef[]
   'repo:head': HeadState
   'log:page': CommitPage
+  'log:search': { shas: string[]; truncated: boolean }
   'commit:details': CommitDetails
   'status:get': WorkingTreeStatus
   'index:stage': void
@@ -46,6 +47,9 @@ export interface IpcOutputs {
   'remote:pull': void
   /** False if the user declined the force-push confirmation. */
   'remote:push': { pushed: boolean }
+  'credentials:respond': void
+  /** True if a running network operation was cancelled. */
+  'op:cancel': boolean
 }
 
 // Compile-time check that IpcOutputs covers exactly the declared channels.
@@ -64,6 +68,12 @@ export interface IpcEvents {
   'repo:opened': RepositoryInfo
   /** The working tree, index or refs of an opened repository changed on disk (debounced). */
   'repo:changed': { repoPath: string }
+  /** Git needs a username/password/token; answer with credentials:respond. */
+  'credentials:request': { id: string; prompt: string; secret: boolean }
+  /** A pending credentials request is no longer needed (operation finished or cancelled). */
+  'credentials:cancel': { id: string }
+  /** Progress of the running network operation. */
+  'op:progress': { phase: string; percent: number }
 }
 
 type _EventsExhaustive = [IpcEventName] extends [keyof IpcEvents]

@@ -59,7 +59,10 @@ export function useInvalidateRepo(repoPath: string) {
       void qc.invalidateQueries({ queryKey: ['head', repoPath] })
       void qc.invalidateQueries({ queryKey: ['refs', repoPath] })
       void qc.invalidateQueries({ queryKey: ['remotes', repoPath] })
-      if (opts.history !== false) void qc.invalidateQueries({ queryKey: ['log', repoPath] })
+      if (opts.history !== false) {
+        void qc.invalidateQueries({ queryKey: ['log', repoPath] })
+        void qc.invalidateQueries({ queryKey: ['search', repoPath] })
+      }
     },
     [qc, repoPath],
   )
@@ -77,4 +80,13 @@ export function useRepoMutation<TVars, TData>(
 
 export function useRemotes(repoPath: string) {
   return useQuery({ queryKey: ['remotes', repoPath], queryFn: () => call('remote:list', { repoPath }) })
+}
+
+export function useHistorySearch(repoPath: string, query: string) {
+  return useQuery({
+    queryKey: ['search', repoPath, query],
+    queryFn: () => call('log:search', { repoPath, query }),
+    enabled: query.trim().length > 0,
+    placeholderData: (prev) => prev,
+  })
 }

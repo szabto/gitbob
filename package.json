@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "electron-vite build && playwright test",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "screenshots": "electron-vite build && node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",

@@ -2,6 +2,7 @@ import type { RemoteInfo } from '@shared/types'
 import { GitError } from './errors'
 import { runGit, type RunOptions } from './runner'
 import { assertValidBranchName } from './branches'
+import { parseProgress } from './askpass'
 
 const REMOTE_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
@@ -14,8 +15,17 @@ export function assertValidRemoteName(name: string): void {
 /** Network operations can take long and must never wait for interactive input. */
 const NETWORK_TIMEOUT = 10 * 60_000
 
-async function networkEnv(repoPath: string): Promise<Record<string, string>> {
-  const env: Record<string, string> = {}
+/** Options shared by all network operations. */
+export interface NetworkOptions {
+  signal?: AbortSignal
+  /** Extra environment, e.g. the GIT_ASKPASS bridge. */
+  env?: Record<string, string>
+  /** Receives progress parsed from git's --progress output. */
+  onProgress?: (p: { phase: string; percent: number }) => void
+}
+
+async function networkEnv(repoPath: string, extra: Record<string, string> = {}): Promise<Record<string, string>> {
+  const env: Record<string, string> = { ...extra }
   // Make ssh fail fast instead of hanging on a host-key or passphrase prompt nobody can see,
   // unless the user configured their own ssh command.
   if (!process.env.GIT_SSH_COMMAND && !process.env.GIT_SSH) {
@@ -28,7 +38,11 @@ async function networkEnv(repoPath: string): Promise<Record<string, string>> {
 function networkError(e: unknown): never {
   if (e instanceof GitError && e.code === 'GIT_FAILED') {
     const d = e.detail ?? ''
-    if (/terminal prompts disabled|could not read Username|Authentication failed|Permission denied \(publickey/i.test(d)) {
+    if (
+      /terminal prompts disabled|could not read Username|could not read Password|Authentication failed|Permission denied \(publickey/i.test(
+        d,
+      )
+    ) {
       throw new GitError('GIT_FAILED', 'Authentication failed. Configure an SSH key or a Git credential helper.', {
         detail: d,
       })
@@ -70,21 +84,18 @@ export async function removeRemote(repoPath: string, name: string): Promise<void
   await runGit(['remote', 'remove', name], { cwd: repoPath })
 }
 
-export async function fetch(
-  repoPath: string,
-  opts: { remote?: string; prune: boolean; signal?: AbortSignal },
-): Promise<void> {
+export async function fetch(repoPath: string, opts: NetworkOptions & { remote?: string; prune: boolean }): Promise<void> {
   if (opts.remote) assertValidRemoteName(opts.remote)
-  const args = ['fetch', '--no-progress', ...(opts.prune ? ['--prune'] : []), ...(opts.remote ? [opts.remote] : ['--all'])]
-  await runGit(args, run(repoPath, await networkEnv(repoPath), opts.signal)).catch(networkError)
+  const args = ['fetch', progressFlag(opts), ...(opts.prune ? ['--prune'] : []), ...(opts.remote ? [opts.remote] : ['--all'])]
+  await runGit(args, await run(repoPath, opts)).catch(networkError)
 }
 
 export type PullMode = 'ff-only' | 'merge' | 'rebase'
 
 /** Pull the current branch from its upstream. */
-export async function pull(repoPath: string, opts: { mode: PullMode; signal?: AbortSignal }): Promise<void> {
+export async function pull(repoPath: string, opts: NetworkOptions & { mode: PullMode }): Promise<void> {
   const modeArg = opts.mode === 'ff-only' ? '--ff-only' : opts.mode === 'rebase' ? '--rebase' : '--no-rebase'
-  await runGit(['pull', '--no-progress', '--no-edit', modeArg], run(repoPath, await networkEnv(repoPath), opts.signal)).catch(
+  await runGit(['pull', progressFlag(opts), '--no-edit', modeArg], await run(repoPath, opts)).catch(
     (e: unknown) => {
       if (e instanceof GitError && /no tracking information|There is no tracking information/i.test(e.detail ?? '')) {
         throw new GitError('GIT_FAILED', 'The current branch has no upstream branch to pull from.', { detail: e.detail })
@@ -101,19 +112,19 @@ export async function pull(repoPath: string, opts: { mode: PullMode; signal?: Ab
 
 export async function push(
   repoPath: string,
-  opts: { branch: string; remote: string; setUpstream: boolean; force: 'none' | 'with-lease'; signal?: AbortSignal },
+  opts: NetworkOptions & { branch: string; remote: string; setUpstream: boolean; force: 'none' | 'with-lease' },
 ): Promise<void> {
   assertValidRemoteName(opts.remote)
   await assertValidBranchName(repoPath, opts.branch)
   const args = [
     'push',
-    '--no-progress',
+    progressFlag(opts),
     ...(opts.setUpstream ? ['--set-upstream'] : []),
     ...(opts.force === 'with-lease' ? ['--force-with-lease'] : []),
     opts.remote,
     `refs/heads/${opts.branch}:refs/heads/${opts.branch}`,
   ]
-  await runGit(args, run(repoPath, await networkEnv(repoPath), opts.signal)).catch((e: unknown) => {
+  await runGit(args, await run(repoPath, opts)).catch((e: unknown) => {
     if (e instanceof GitError && /\[rejected\]|non-fast-forward|fetch first/i.test(`${e.detail ?? ''}`)) {
       throw new GitError('GIT_FAILED', 'Push rejected: the remote has changes you do not have. Pull first.', {
         detail: e.detail,
@@ -123,6 +134,24 @@ export async function push(
   })
 }
 
-function run(cwd: string, env: Record<string, string>, signal?: AbortSignal): RunOptions {
-  return { cwd, env, timeoutMs: NETWORK_TIMEOUT, ...(signal ? { signal } : {}) }
+function progressFlag(opts: NetworkOptions): string {
+  return opts.onProgress ? '--progress' : '--no-progress'
+}
+
+async function run(cwd: string, opts: NetworkOptions): Promise<RunOptions> {
+  const onProgress = opts.onProgress
+  return {
+    cwd,
+    env: await networkEnv(cwd, opts.env),
+    timeoutMs: NETWORK_TIMEOUT,
+    ...(opts.signal ? { signal: opts.signal } : {}),
+    ...(onProgress
+      ? {
+          onStderr: (chunk: string) => {
+            const p = parseProgress(chunk)
+            if (p) onProgress(p)
+          },
+        }
+      : {}),
+  }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { CommitSummary, GitRef } from '@shared/types'
 import { computeGraphLayout } from '@git-graph/layout'
@@ -6,8 +6,10 @@ import { useAppStore } from '../state/store'
 import { formatShortDate, shortSha } from '../lib/format'
 import { GraphCell, LANE_WIDTH, ROW_HEIGHT } from './GraphCell'
 import { RefBadge } from './RefBadge'
+import { GraphSearch } from './GraphSearch'
 
 interface Props {
+  repoPath: string
   commits: CommitSummary[]
   refsBySha: Map<string, GitRef[]>
   headSha: string | null
@@ -23,6 +25,7 @@ interface Props {
 const MAX_GRAPH_LANES = 24
 
 export function CommitGraph({
+  repoPath,
   commits,
   refsBySha,
   headSha,
@@ -40,6 +43,7 @@ export function CommitGraph({
   const selectWip = useAppStore((s) => s.selectWip)
   const wipSelected = useAppStore((s) => s.wipSelected)
   const hasWip = !!wip && wip.unstaged + wip.staged > 0
+  const [matches, setMatches] = useState<Set<string> | null>(null)
   const clearReveal = useAppStore((s) => s.clearReveal)
 
   const layout = useMemo(() => computeGraphLayout(commits), [commits])
@@ -95,7 +99,10 @@ export function CommitGraph({
         <div style={{ width: graphColumnWidth }} className="shrink-0 pl-3">
           Graph
         </div>
-        <div className="flex-1 px-2">Message</div>
+        <div className="flex flex-1 items-center px-2">
+          Message
+          <GraphSearch repoPath={repoPath} onMatchesChange={setMatches} />
+        </div>
         <div className="w-40 shrink-0 px-2">Author</div>
         <div className="w-28 shrink-0 px-2">Date</div>
         <div className="w-20 shrink-0 px-2">SHA</div>
@@ -143,6 +150,7 @@ export function CommitGraph({
             const row = layout.rows[item.index]!
             const refs = refsBySha.get(commit.sha)
             const selected = commit.sha === selectedSha
+            const dimmed = matches !== null && !matches.has(commit.sha)
             return (
               <div
                 key={commit.sha}
@@ -156,9 +164,10 @@ export function CommitGraph({
                   select(commit.sha)
                   onRowMenu?.(e, commit)
                 }}
+                data-match={matches?.has(commit.sha) ? 'true' : undefined}
                 className={`absolute left-0 flex w-full cursor-default items-center ${
                   selected ? 'bg-accent/20' : 'hover:bg-white/[0.03]'
-                }`}
+                } ${dimmed ? 'opacity-35' : ''}`}
                 style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
               >
                 <div className="shrink-0 overflow-hidden pl-3" style={{ width: graphColumnWidth }}>

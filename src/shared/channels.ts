@@ -7,6 +7,7 @@ export const IPC_CHANNELS = [
   'repo:refs',
   'repo:head',
   'log:page',
+  'log:search',
   'commit:details',
   'status:get',
   'index:stage',
@@ -29,8 +30,17 @@ export const IPC_CHANNELS = [
   'remote:fetch',
   'remote:pull',
   'remote:push',
+  'credentials:respond',
+  'op:cancel',
 ] as const
 export type IpcChannel = (typeof IPC_CHANNELS)[number]
 
-export const IPC_EVENTS = ['menu:open-repository', 'repo:opened', 'repo:changed'] as const
+export const IPC_EVENTS = [
+  'menu:open-repository',
+  'repo:opened',
+  'repo:changed',
+  'credentials:request',
+  'credentials:cancel',
+  'op:progress',
+] as const
 export type IpcEventName = (typeof IPC_EVENTS)[number]

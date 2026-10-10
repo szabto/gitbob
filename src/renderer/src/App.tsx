@@ -6,6 +6,7 @@ import { Welcome } from './components/Welcome'
 import { RepositoryView } from './components/RepositoryView'
 import { ErrorBanner } from './components/ErrorBanner'
 import { ContextMenu, PromptDialog } from './components/Overlays'
+import { CredentialDialog } from './components/CredentialDialog'
 import { useUiStore } from './state/ui'
 
 export function App() {
@@ -58,6 +59,7 @@ export function App() {
       )}
       <ContextMenu />
       <PromptDialog />
+      <CredentialDialog />
     </div>
   )
 }

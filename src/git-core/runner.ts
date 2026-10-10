@@ -17,6 +17,8 @@ export interface RunOptions {
   env?: Record<string, string>
   /** Data written to stdin. */
   input?: string | Buffer
+  /** Receives stderr as it arrives (e.g. for --progress output). */
+  onStderr?: (chunk: string) => void
   /** Exit codes that are not treated as failures. Default [0]. */
   okExitCodes?: number[]
 }
@@ -129,7 +131,9 @@ export function runGit(args: readonly string[], opts: RunOptions): Promise<RunRe
       out.push(chunk)
     })
     child.stderr.on('data', (chunk: Buffer) => {
-      if (err.length < MAX_STDERR) err += chunk.toString('utf8')
+      const text = chunk.toString('utf8')
+      if (err.length < MAX_STDERR) err += text
+      opts.onStderr?.(text)
     })
 
     child.on('error', (e: NodeJS.ErrnoException) => {

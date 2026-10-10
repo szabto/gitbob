@@ -169,3 +169,35 @@ test('renderer is sandboxed with no Node access', async () => {
     await app.close()
   }
 })
+
+test('searches the whole history and steps through matches', async () => {
+  const { repo, shas } = buildRepo()
+  const { app, page } = await launch({ repo: repo.dir, userData: makeTempDir('gitbob-ud-') })
+  try {
+    await expect(page.getByTestId('commit-row')).toHaveCount(8)
+    await page.getByTestId('commit-graph').focus()
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+F' : 'Control+F')
+    await expect(page.getByLabel('Search history')).toBeFocused()
+    await page.keyboard.type('feature part')
+    await expect(page.getByTestId('search-count')).toHaveText('1 of 2')
+    await expect(page.locator('[data-testid="commit-row"][data-match="true"]')).toHaveCount(2)
+
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('details-subject')).toHaveText('Feature part two')
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('details-subject')).toHaveText('Feature part one')
+    await expect(page.getByTestId('search-count')).toHaveText('2 of 2')
+    await page.keyboard.press('Shift+Enter')
+    await expect(page.getByTestId('details-sha')).toHaveText(shas.f2!)
+
+    // Author search and no-match state.
+    await page.getByLabel('Search history').fill('test author')
+    await expect(page.getByTestId('search-count')).toHaveText('1 of 8')
+    await page.getByLabel('Search history').fill('zzz-nothing')
+    await expect(page.getByTestId('search-count')).toHaveText('No matches')
+    await page.keyboard.press('Escape')
+    await expect(page.locator('[data-testid="commit-row"][data-match="true"]')).toHaveCount(0)
+  } finally {
+    await app.close()
+  }
+})

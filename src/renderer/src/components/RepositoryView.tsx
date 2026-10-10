@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { GitRef, RepositoryInfo } from '@shared/types'
 import { useHead, useHistory, useInvalidateRepo, useRefs, useStatus } from '../lib/queries'
-import { subscribe } from '../lib/api'
+import { call, subscribe } from '../lib/api'
 import { groupStatus } from '../lib/status'
 import { useAppStore } from '../state/store'
 import { Sidebar } from './Sidebar'
@@ -78,6 +78,9 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
   const actions = useRepoActions(repo.root)
   const remotes = useRemotes(repo.root)
   const busy = useUiStore((s) => s.busy)
+  const progress = useUiStore((s) => s.progress)
+  const setProgress = useUiStore((s) => s.setProgress)
+  useEffect(() => subscribe('op:progress', (p) => setProgress(p)), [setProgress])
   const openMenu = useUiStore((s) => s.openMenu)
   const currentRefObj = refs.data?.find((r) => r.name === head.data?.ref)
   const remoteNames = (remotes.data ?? []).map((r) => r.name)
@@ -109,7 +112,28 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
           </span>
         )}
         <div className="ml-auto flex items-center gap-1.5" data-testid="toolbar">
-          {busy && <span className="mr-2 animate-pulse text-xs text-accent" data-testid="busy">{busy}</span>}
+          {busy && (
+            <span className="mr-2 flex items-center gap-2 text-xs text-accent" data-testid="busy">
+              <span className="animate-pulse">
+                {busy}
+                {progress ? ` ${progress.phase} ${progress.percent}%` : ''}
+              </span>
+              {progress && (
+                <span className="h-1 w-20 overflow-hidden rounded bg-panel-2">
+                  <span
+                    className="block h-full bg-gradient-to-r from-accent to-accent-2"
+                    style={{ width: `${progress.percent}%` }}
+                  />
+                </span>
+              )}
+              <button
+                className="rounded border border-border px-1.5 text-muted hover:text-fg"
+                onClick={() => void call('op:cancel', {})}
+              >
+                Cancel
+              </button>
+            </span>
+          )}
           {!repo.bare && (
             <>
               <ToolbarButton label="Fetch" disabled={!!busy || remoteNames.length === 0} onClick={() => void actions.fetch()} />
@@ -167,6 +191,7 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
             </div>
           ) : (
             <CommitGraph
+              repoPath={repo.root}
               commits={commits}
               refsBySha={refsBySha}
               headSha={head.data?.sha ?? null}
