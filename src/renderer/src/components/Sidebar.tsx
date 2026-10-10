@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useReflog, useSubmodules, useWorktrees } from '../lib/queries'
 import { formatShortDate, shortSha } from '../lib/format'
-import type { GitRef, StashEntry } from '@shared/types'
+import type { GitRef, ProviderStatus, StashEntry } from '@shared/types'
+import { PullRequestsSection } from './PullRequests'
 import { useAppStore } from '../state/store'
 import { useUiStore, type MenuEntry } from '../state/ui'
 import type { useRepoActions } from '../lib/actions'
@@ -16,6 +17,8 @@ export function Sidebar({
   actions,
   repoPath,
   currentBranch,
+  provider,
+  onCreatePullRequest,
 }: {
   refs: GitRef[]
   currentRef: string | null
@@ -24,6 +27,8 @@ export function Sidebar({
   actions: Actions
   repoPath: string
   currentBranch: string | null
+  provider: ProviderStatus | null
+  onCreatePullRequest: (branch: GitRef) => void
 }) {
   const selectStash = useAppStore((s) => s.selectStash)
   const selectedStash = useAppStore((s) => s.selectedStash)
@@ -42,6 +47,9 @@ export function Sidebar({
     r.upstream
       ? { label: 'Unset upstream', onSelect: () => void actions.unsetUpstream(r.shortName) }
       : { label: 'Set upstream…', onSelect: () => void actions.setUpstream(r.shortName, remoteBranchNames) },
+    ...(provider?.connected && r.upstream?.startsWith(`refs/remotes/${provider.remote}/`)
+      ? [{ label: 'Create pull request…', onSelect: () => onCreatePullRequest(r) }]
+      : []),
     ...(r.upstream
       ? [
           {
@@ -78,6 +86,9 @@ export function Sidebar({
           />
         ))}
       </Section>
+      {provider?.repo && (
+        <PullRequestsSection repoPath={repoPath} status={provider} remoteRefs={remote} actions={actions} />
+      )}
       <Section
         title="Remote"
         count={remote.length}

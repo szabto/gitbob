@@ -1,4 +1,7 @@
 import type {
+  CheckStatus,
+  ProviderStatus,
+  PullRequest,
   BlameLine,
   RebaseCommit,
   SignatureInfo,
@@ -98,6 +101,13 @@ export interface IpcOutputs {
   'submodule:update': void
   'commit:signature': SignatureInfo
   'settings:get': { theme: 'system' | 'light' | 'dark' }
+  'provider:status': ProviderStatus
+  'provider:connect': { user: string }
+  'provider:disconnect': { disconnected: boolean }
+  'provider:pulls': PullRequest[]
+  /** null when the repository has no connected provider. */
+  'provider:checks': CheckStatus | null
+  'provider:create-pr': PullRequest
   'credentials:respond': void
   /** True if a running network operation was cancelled. */
   'op:cancel': boolean

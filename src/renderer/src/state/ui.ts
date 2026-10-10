@@ -21,6 +21,10 @@ export interface PromptOptions {
   allowEmpty?: boolean
   /** Render a multi-line text area. */
   multiline?: boolean
+  /** Mask the input (tokens, passwords). */
+  secret?: boolean
+  /** Extra explanation under the field. */
+  help?: string
 }
 
 interface UiState {

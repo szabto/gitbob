@@ -28,6 +28,7 @@ import {
 } from '@git-core/branches'
 import { addRemote, fetch, listRemotes, pull, push, removeRemote, type NetworkOptions } from '@git-core/remotes'
 import type { NetworkSession } from './network'
+import type { ProviderService } from './providers'
 import { applyStash, createStash, dropStash, getStashFiles, listStashes } from '@git-core/stash'
 import { createTag, deleteTag, listTags, pushTag } from '@git-core/tags'
 import { abortOperation, cherryPick, continueOperation, reset, revert, skipOperation } from '@git-core/history'
@@ -52,6 +53,7 @@ export interface IpcContext {
   onRepositoryOpened?: (info: RepositoryInfo) => void
   network: NetworkSession
   getSettings: () => { theme: 'system' | 'light' | 'dark' }
+  providers: ProviderService
 }
 
 /**
@@ -346,7 +348,26 @@ export function registerIpc(ctx: IpcContext): void {
         repoPath,
       ),
     'commit:signature': ({ repoPath, sha }) => getSignature(requireOpened(repoPath), sha),
-    'settings:get': async () => ctx.getSettings(),
+    'settings:get': async () => {
+      const { theme } = ctx.getSettings()
+      return { theme }
+    },
+    'provider:status': ({ repoPath }) => ctx.providers.status(requireOpened(repoPath)),
+    'provider:connect': ({ repoPath, token }) => ctx.providers.connect(requireOpened(repoPath), token),
+    'provider:disconnect': async ({ repoPath }, event) => {
+      requireOpened(repoPath)
+      const confirmed = await confirmDestructive(event, {
+        message: 'Disconnect this account?',
+        detail: 'The stored access token is deleted from this computer. You can connect again with a new token.',
+        confirmLabel: 'Disconnect',
+      })
+      if (!confirmed) return { disconnected: false }
+      await ctx.providers.disconnect(repoPath)
+      return { disconnected: true }
+    },
+    'provider:pulls': ({ repoPath, state }) => ctx.providers.pullRequests(requireOpened(repoPath), state),
+    'provider:checks': ({ repoPath, sha }) => ctx.providers.checks(requireOpened(repoPath), sha),
+    'provider:create-pr': ({ repoPath, ...input }) => ctx.providers.createPullRequest(requireOpened(repoPath), input),
     'credentials:respond': async ({ id, answer, remember }) => ctx.network.respond(id, answer, remember),
     'op:cancel': async () => ctx.network.cancel(),
   }

@@ -128,6 +128,8 @@ function PromptForm({
         ) : (
           <input
             autoFocus
+            type={prompt.secret ? 'password' : 'text'}
+            autoComplete="off"
             value={value}
             placeholder={prompt.placeholder}
             onChange={(e) => setValue(e.target.value)}
@@ -135,6 +137,7 @@ function PromptForm({
             className="w-full rounded border border-border bg-bg px-2 py-1.5 font-mono outline-none focus:border-accent"
           />
         )}
+        {prompt.help && <p className="mt-2 text-xs text-muted">{prompt.help}</p>}
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" className="rounded border border-border px-3 py-1 hover:bg-panel-2" onClick={() => onClose(null)}>
             Cancel

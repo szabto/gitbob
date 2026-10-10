@@ -193,6 +193,27 @@ export const ipcInputSchemas = {
   'commit:signature': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'reflog:get': z.object({ repoPath: absolutePath, limit: z.number().int().min(1).max(10_000).default(200) }),
   'settings:get': z.object({}).strict(),
+  'provider:status': z.object({ repoPath: absolutePath }),
+  'provider:connect': z.object({
+    repoPath: absolutePath,
+    token: z
+      .string()
+      .trim()
+      .min(1)
+      .max(4096)
+      .refine((t) => !/[\s\0]/.test(t), 'token must not contain whitespace'),
+  }),
+  'provider:disconnect': z.object({ repoPath: absolutePath }),
+  'provider:pulls': z.object({ repoPath: absolutePath, state: z.enum(['open', 'all']).default('open') }),
+  'provider:checks': z.object({ repoPath: absolutePath, sha: shaSchema }),
+  'provider:create-pr': z.object({
+    repoPath: absolutePath,
+    title: z.string().trim().min(1).max(256),
+    body: z.string().max(65_536),
+    sourceBranch: branchName,
+    targetBranch: branchName,
+    draft: z.boolean(),
+  }),
   'credentials:respond': z.object({
     id: z.string().regex(/^[0-9a-f]{32}$/),
     answer: z.string().max(4096).nullable(),

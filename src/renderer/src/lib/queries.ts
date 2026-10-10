@@ -134,3 +134,30 @@ export function useWorktrees(repoPath: string) {
 export function useSubmodules(repoPath: string) {
   return useQuery({ queryKey: ['submodules', repoPath], queryFn: () => call('submodule:list', { repoPath }) })
 }
+
+export function useProviderStatus(repoPath: string) {
+  return useQuery({
+    queryKey: ['provider', repoPath],
+    queryFn: () => call('provider:status', { repoPath }),
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function usePullRequests(repoPath: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['pulls', repoPath],
+    queryFn: () => call('provider:pulls', { repoPath, state: 'open' }),
+    enabled,
+    staleTime: 60_000,
+  })
+}
+
+export function useChecks(repoPath: string, sha: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['checks', repoPath, sha],
+    queryFn: () => call('provider:checks', { repoPath, sha }),
+    enabled,
+    staleTime: 60_000,
+    retry: false,
+  })
+}

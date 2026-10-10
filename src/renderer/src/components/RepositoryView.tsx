@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { GitRef, RepositoryInfo } from '@shared/types'
 import { useHead, useHistory, useInvalidateRepo, useRefs, useStatus } from '../lib/queries'
@@ -17,6 +17,9 @@ import { StashPanel } from './StashPanel'
 import { OperationBanner } from './OperationBanner'
 import { BlameView } from './BlameView'
 import { RebaseDialog } from './RebaseDialog'
+import { CreatePullRequestDialog, PROVIDER_NAMES } from './PullRequests'
+import { useProviderStatus } from '../lib/queries'
+import type { GitRef as GitRefType } from '@shared/types'
 import { useUiStore } from '../state/ui'
 
 // Monaco-based; loaded on first use.
@@ -98,6 +101,8 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
   const selectedStash = useAppStore((s) => s.selectedStash)
   const stashEntry = stashes.data?.find((s) => s.sha === selectedStash?.sha)
   const branchLabel = currentBranchName(head.data?.ref ?? null)
+  const provider = useProviderStatus(repo.root)
+  const [prBranch, setPrBranch] = useState<GitRefType | null>(null)
 
   const currentBranch = head.data?.ref?.startsWith('refs/heads/') ? head.data.ref.slice('refs/heads/'.length) : null
 
@@ -194,6 +199,8 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
           actions={actions}
           repoPath={repo.root}
           currentBranch={currentBranch}
+          provider={provider.data ?? null}
+          onCreatePullRequest={setPrBranch}
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {status.data && <OperationBanner status={status.data} actions={actions} />}
@@ -273,6 +280,19 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
             />
           )}
         </main>
+        {prBranch && provider.data?.repo && (
+          <CreatePullRequestDialog
+            repoPath={repo.root}
+            providerName={PROVIDER_NAMES[provider.data.repo.kind]}
+            branch={prBranch.shortName}
+            targets={(refs.data ?? [])
+              .filter((r) => r.kind === 'remote' && r.shortName.startsWith(`${provider.data!.remote}/`))
+              .map((r) => r.shortName.slice(provider.data!.remote!.length + 1))
+              .filter((b) => b !== prBranch.shortName)}
+            defaultTitle={commits.find((c) => c.sha === prBranch.target)?.subject ?? prBranch.shortName}
+            onClose={() => setPrBranch(null)}
+          />
+        )}
         {rebaseBase && <RebaseDialog repoPath={repo.root} base={rebaseBase} onClose={() => openRebase(null)} />}
         {wipSelected && !repo.bare ? (
           <StagingPanel repo={repo} onStash={() => void actions.stash()} />

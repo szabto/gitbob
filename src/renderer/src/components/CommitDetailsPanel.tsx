@@ -1,5 +1,5 @@
 import type { FileChange, GitRef } from '@shared/types'
-import { useCommitDetails } from '../lib/queries'
+import { useChecks, useCommitDetails, useProviderStatus } from '../lib/queries'
 import { useQuery } from '@tanstack/react-query'
 import { call } from '../lib/api'
 import { useAppStore } from '../state/store'
@@ -27,6 +27,8 @@ export function CommitDetailsPanel({
   refsBySha: Map<string, GitRef[]>
 }) {
   const details = useCommitDetails(repoPath, sha)
+  const provider = useProviderStatus(repoPath)
+  const checks = useChecks(repoPath, sha, !!provider.data?.connected)
   const signature = useQuery({
     queryKey: ['signature', repoPath, sha],
     queryFn: () => call('commit:signature', { repoPath, sha }),
@@ -80,6 +82,27 @@ export function CommitDetailsPanel({
                 <dd>
                   {details.data.committerName} &lt;{details.data.committerEmail}&gt;
                   <div className="text-muted">{formatDate(details.data.commitTime)}</div>
+                </dd>
+              </>
+            )}
+            {checks.data && checks.data.state !== 'none' && (
+              <>
+                <dt className="text-muted">CI</dt>
+                <dd data-testid="ci-status">
+                  <a
+                    href={checks.data.url ?? '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={
+                      checks.data.state === 'success' ? 'text-ok' : checks.data.state === 'failure' ? 'text-err' : 'text-warn'
+                    }
+                  >
+                    {checks.data.state === 'success'
+                      ? `✓ ${checks.data.total} check${checks.data.total === 1 ? '' : 's'} passed`
+                      : checks.data.state === 'failure'
+                        ? `✗ ${checks.data.failed} of ${checks.data.total} failed`
+                        : `● ${checks.data.pending} of ${checks.data.total} running`}
+                  </a>
                 </dd>
               </>
             )}

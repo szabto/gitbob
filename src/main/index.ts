@@ -7,6 +7,8 @@ import { RecentRepositoryStore } from './recent'
 import { RepositoryWatcher } from './watcher'
 import { NetworkSession } from './network'
 import { SettingsStore } from './settings'
+import { TokenStore } from './tokens'
+import { ProviderService } from './providers'
 
 // Allow tests to isolate persisted state.
 if (process.env.GITBOB_USER_DATA) app.setPath('userData', resolve(process.env.GITBOB_USER_DATA))
@@ -108,6 +110,7 @@ void app.whenReady().then(async () => {
 
   const ctx: IpcContext = {
     getSettings: () => settings.get(),
+    providers: new ProviderService(new TokenStore(app.getPath('userData'))),
     recent: new RecentRepositoryStore(app.getPath('userData')),
     isTrustedSender,
     network,

@@ -327,3 +327,63 @@ export interface HistoryFilter {
   /** Only commits touching this repository-relative path. */
   path?: string
 }
+
+// ---------------------------------------------------------------------------
+// Hosting providers (M7)
+
+export type ProviderKind = 'github' | 'gitlab' | 'bitbucket' | 'azure'
+
+export type PullRequestState = 'open' | 'closed' | 'merged'
+
+export interface RepoRef {
+  kind: ProviderKind
+  /** Web host, e.g. `github.com`, `gitlab.example.com:8443`, `dev.azure.com`. */
+  host: string
+  /** GitHub owner, GitLab namespace path (may contain '/'), Bitbucket workspace, Azure organization. */
+  owner: string
+  /** Azure DevOps project. Undefined for other providers. */
+  project?: string
+  repo: string
+  /** Browser URL of the repository (never contains credentials). */
+  webUrl: string
+}
+
+export interface PullRequest {
+  /** Provider-global id (GitHub/GitLab numeric id; Bitbucket/Azure: same as number). */
+  id: number | string
+  /** Per-repository number shown to users (GitHub number, GitLab iid, Bitbucket id, Azure pullRequestId). */
+  number: number
+  title: string
+  author: string
+  state: PullRequestState
+  draft: boolean
+  /** Branch name without `refs/heads/`. */
+  sourceBranch: string
+  /** Branch name without `refs/heads/`. */
+  targetBranch: string
+  /** Browser URL of the pull/merge request. */
+  url: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CheckStatus {
+  state: 'success' | 'failure' | 'pending' | 'none'
+  total: number
+  failed: number
+  pending: number
+  /** Link to the most relevant check (first failing, else first pending, else first). */
+  url?: string
+}
+
+/** Provider connection state for the open repository. */
+export interface ProviderStatus {
+  /** The hosting repository behind the first matching remote, or null if none is recognized. */
+  repo: RepoRef | null
+  remote: string | null
+  connected: boolean
+  /** Login of the connected account. */
+  user: string | null
+  /** Encrypted token storage is available on this system. */
+  canStoreTokens: boolean
+}

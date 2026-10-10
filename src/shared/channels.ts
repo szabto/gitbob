@@ -63,6 +63,12 @@ export const IPC_CHANNELS = [
   'submodule:update',
   'commit:signature',
   'settings:get',
+  'provider:status',
+  'provider:connect',
+  'provider:disconnect',
+  'provider:pulls',
+  'provider:checks',
+  'provider:create-pr',
   'credentials:respond',
   'op:cancel',
 ] as const
