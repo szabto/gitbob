@@ -10,6 +10,9 @@ interface AppState {
   revealSha: string | null
   /** File diff shown in the main area instead of the graph. */
   diffTarget: DiffTarget | null
+  /** Conflicted file open in the conflict editor (replaces the graph). */
+  conflictPath: string | null
+  openConflict: (path: string | null) => void
   /** Stash shown in the right panel. */
   selectedStash: { index: number; sha: string } | null
   selectStash: (stash: { index: number; sha: string } | null) => void
@@ -28,12 +31,14 @@ export const useAppStore = create<AppState>((set) => ({
   revealSha: null,
   diffTarget: null,
   selectedStash: null,
+  conflictPath: null,
+  openConflict: (conflictPath) => set({ conflictPath, diffTarget: null }),
   setRepo: (repo) =>
-    set({ repo, selectedSha: null, wipSelected: false, revealSha: null, diffTarget: null, selectedStash: null }),
+    set({ repo, selectedSha: null, wipSelected: false, revealSha: null, diffTarget: null, selectedStash: null, conflictPath: null }),
   select: (sha) => set({ selectedSha: sha, wipSelected: false, diffTarget: null, selectedStash: null }),
   selectWip: () => set({ selectedSha: null, wipSelected: true, diffTarget: null, selectedStash: null }),
   selectStash: (stash) => set({ selectedStash: stash, selectedSha: null, wipSelected: false, diffTarget: null }),
   reveal: (sha) => set({ selectedSha: sha, wipSelected: false, revealSha: sha, diffTarget: null, selectedStash: null }),
   clearReveal: () => set({ revealSha: null }),
-  showDiff: (target) => set({ diffTarget: target }),
+  showDiff: (target) => set({ diffTarget: target, conflictPath: null }),
 }))

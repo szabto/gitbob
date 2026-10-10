@@ -77,6 +77,30 @@ export const ipcInputSchemas = {
   'index:unstage-all': z.object({ repoPath: absolutePath }),
   'worktree:discard': z.object({ repoPath: absolutePath, paths: repoPaths }),
   'diff:file': z.object({ repoPath: absolutePath, target: diffTargetSchema }),
+  'diff:contents': z.object({ repoPath: absolutePath, target: diffTargetSchema }),
+  'diff:apply-hunks': z.object({
+    repoPath: absolutePath,
+    path: repoPathSchema,
+    source: z.enum(['unstaged', 'staged']),
+    action: z.enum(['stage', 'unstage', 'discard']),
+    selections: z
+      .array(
+        z.object({
+          hunkIndex: z.number().int().min(0).max(100_000),
+          header: z.string().min(1).max(10_000),
+          lines: z.array(z.number().int().min(0).max(10_000_000)).max(1_000_000).optional(),
+        }),
+      )
+      .min(1)
+      .max(10_000),
+  }),
+  'conflict:get': z.object({ repoPath: absolutePath, path: repoPathSchema }),
+  'conflict:save': z.object({
+    repoPath: absolutePath,
+    path: repoPathSchema,
+    content: z.string().max(50 * 1024 * 1024),
+    markResolved: z.boolean(),
+  }),
   'commit:create': z.object({
     repoPath: absolutePath,
     message: z.string().max(1_000_000).refine((m) => m.trim().length > 0, 'commit message must not be empty'),

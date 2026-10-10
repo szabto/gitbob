@@ -231,3 +231,34 @@ export interface ReflogEntry {
 }
 
 export type ResetMode = 'soft' | 'mixed' | 'hard'
+
+// ---------------------------------------------------------------------------
+// Diff and merge (M6)
+
+/** Full contents of both sides of a file diff (null = that side does not exist). */
+export interface FileContents {
+  oldText: string | null
+  newText: string | null
+  binary: boolean
+  tooLarge: boolean
+}
+
+/** A hunk (optionally a subset of its lines) chosen for staging, unstaging or discarding. */
+export interface HunkSelection {
+  hunkIndex: number
+  /** The hunk's "@@ ... @@" header as shown, used to reject stale requests. */
+  header: string
+  /** Indices into hunk.lines; omitted means the whole hunk. */
+  lines?: number[]
+}
+
+/** The three versions of a conflicted file plus its current (marked-up) content. */
+export interface ConflictVersions {
+  base: string | null
+  ours: string | null
+  theirs: string | null
+  merged: string
+  binary: boolean
+  oursLabel: string
+  theirsLabel: string
+}

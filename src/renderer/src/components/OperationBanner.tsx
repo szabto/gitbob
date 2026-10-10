@@ -29,7 +29,7 @@ export function OperationBanner({
       <span className="font-semibold text-warn">{labels[status.operation]} in progress</span>
       <span className="text-muted">
         {conflicts > 0
-          ? `${conflicts} conflicted file${conflicts === 1 ? '' : 's'}. Resolve them in your editor, then mark them resolved in Working changes.`
+          ? `${conflicts} conflicted file${conflicts === 1 ? '' : 's'}. Open Working changes and click a conflicted file to resolve it.`
           : 'No conflicts left. Continue to finish.'}
       </span>
       {status.operation !== 'bisect' && (

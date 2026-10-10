@@ -1,4 +1,6 @@
 import type {
+  ConflictVersions,
+  FileContents,
   FileChange,
   ReflogEntry,
   ResetResult,
@@ -35,6 +37,11 @@ export interface IpcOutputs {
   /** False if the user declined the confirmation dialog. */
   'worktree:discard': { discarded: boolean }
   'diff:file': FileDiff
+  'diff:contents': FileContents
+  /** `applied: false` if the user declined the discard confirmation. */
+  'diff:apply-hunks': { applied: boolean }
+  'conflict:get': ConflictVersions
+  'conflict:save': void
   'commit:create': CommitResult
   /** Full message of HEAD, or null on an unborn branch (used to prefill amend). */
   'commit:last-message': string | null

@@ -56,6 +56,7 @@ export function useInvalidateRepo(repoPath: string) {
     (opts: { history?: boolean } = {}) => {
       void qc.invalidateQueries({ queryKey: ['status', repoPath] })
       void qc.invalidateQueries({ queryKey: ['diff', repoPath] })
+      void qc.invalidateQueries({ queryKey: ['contents', repoPath] })
       void qc.invalidateQueries({ queryKey: ['head', repoPath] })
       void qc.invalidateQueries({ queryKey: ['refs', repoPath] })
       void qc.invalidateQueries({ queryKey: ['remotes', repoPath] })
@@ -102,5 +103,14 @@ export function useStashFiles(repoPath: string, stash: { index: number; sha: str
     queryFn: () => call('stash:files', { repoPath, index: stash!.index, sha: stash!.sha }),
     enabled: !!stash,
     staleTime: Infinity,
+  })
+}
+
+export function useFileContents(repoPath: string, target: DiffTarget | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['contents', repoPath, target],
+    queryFn: () => call('diff:contents', { repoPath, target: target! }),
+    enabled: !!target && enabled,
+    staleTime: target?.kind === 'commit' ? Infinity : 0,
   })
 }

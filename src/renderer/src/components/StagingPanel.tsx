@@ -10,6 +10,8 @@ export function StagingPanel({ repo, onStash }: { repo: RepositoryInfo; onStash:
   const status = useStatus(repoPath)
   const showDiff = useAppStore((s) => s.showDiff)
   const diffTarget = useAppStore((s) => s.diffTarget)
+  const openConflict = useAppStore((s) => s.openConflict)
+  const conflictPath = useAppStore((s) => s.conflictPath)
   const groups = groupStatus(status.data)
 
   const stage = useRepoMutation(repoPath, (paths: string[]) => call('index:stage', { repoPath, paths }), {
@@ -65,8 +67,8 @@ export function StagingPanel({ repo, onStash }: { repo: RepositoryInfo; onStash:
             entries={groups.conflicted}
             side="worktree"
             action={{ label: 'Mark resolved', run: (p) => stage.mutate(p) }}
-            onOpen={(e) => showDiff({ kind: 'unstaged', path: e.path })}
-            isActive={(e) => isActive({ kind: 'unstaged', path: e.path })}
+            onOpen={(e) => openConflict(e.path)}
+            isActive={(e) => conflictPath === e.path}
             disabled={busy}
           />
         )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { GitRef, RepositoryInfo } from '@shared/types'
 import { useHead, useHistory, useInvalidateRepo, useRefs, useStatus } from '../lib/queries'
@@ -17,6 +17,9 @@ import { StashPanel } from './StashPanel'
 import { OperationBanner } from './OperationBanner'
 import { useUiStore } from '../state/ui'
 
+// Monaco-based; loaded on first use.
+const ConflictEditor = lazy(() => import('./ConflictEditor'))
+
 interface Props {
   repo: RepositoryInfo
   onOpen: () => void
@@ -31,6 +34,7 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
   const selectedSha = useAppStore((s) => s.selectedSha)
   const wipSelected = useAppStore((s) => s.wipSelected)
   const diffTarget = useAppStore((s) => s.diffTarget)
+  const conflictPath = useAppStore((s) => s.conflictPath)
   const invalidate = useInvalidateRepo(repo.root)
   const queryClient = useQueryClient()
 
@@ -187,7 +191,11 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {status.data && <OperationBanner status={status.data} actions={actions} />}
-          {diffTarget ? (
+          {conflictPath ? (
+            <Suspense fallback={<div className="p-4 text-xs text-muted">Loading editor…</div>}>
+              <ConflictEditor repoPath={repo.root} path={conflictPath} />
+            </Suspense>
+          ) : diffTarget ? (
             <DiffView repoPath={repo.root} target={diffTarget} />
           ) : history.isError ? (
             <div className="p-6 text-danger">Failed to load history: {history.error.message}</div>

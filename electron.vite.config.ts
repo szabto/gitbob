@@ -23,7 +23,15 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
-    resolve: { alias: { ...alias, '@renderer': resolve(__dirname, 'src/renderer/src') } },
+    resolve: {
+      alias: {
+        ...alias,
+        '@renderer': resolve(__dirname, 'src/renderer/src'),
+        // monaco-editor's package "exports" map appends .js to every subpath, so its CSS
+        // files are only reachable through a direct path.
+        'monaco-esm': resolve(__dirname, 'node_modules/monaco-editor/esm/vs'),
+      },
+    },
     plugins: [react(), tailwindcss()],
   },
 })

@@ -13,6 +13,9 @@ import { searchCommits } from '@git-core/search'
 import { getStatus } from '@git-core/status'
 import { discardPaths, stageAll, stagePaths, unstageAll, unstagePaths } from '@git-core/staging'
 import { getFileDiff } from '@git-core/diff'
+import { getFileContents } from '@git-core/contents'
+import { applyHunks } from '@git-core/patch'
+import { getConflictVersions, saveConflictResolution } from '@git-core/conflicts'
 import { createCommit, getLastCommitMessage } from '@git-core/commit'
 import {
   checkoutDetached,
@@ -123,6 +126,24 @@ export function registerIpc(ctx: IpcContext): void {
       return { discarded: true }
     },
     'diff:file': ({ repoPath, target }) => getFileDiff(requireOpened(repoPath), target),
+    'diff:contents': ({ repoPath, target }) => getFileContents(requireOpened(repoPath), target),
+    'diff:apply-hunks': async ({ repoPath, path, source, action, selections }, event) => {
+      requireOpened(repoPath)
+      if (action === 'discard') {
+        const lines = selections.some((s) => s.lines)
+        const confirmed = await confirmDestructive(event, {
+          message: lines ? `Discard the selected lines in ${path}?` : `Discard ${selections.length === 1 ? 'this change' : `${selections.length} changes`} in ${path}?`,
+          detail: 'These unstaged edits will be lost. Other changes in the file are kept.',
+          confirmLabel: 'Discard',
+        })
+        if (!confirmed) return { applied: false }
+      }
+      await applyHunks(repoPath, path, source, action, selections)
+      return { applied: true }
+    },
+    'conflict:get': ({ repoPath, path }) => getConflictVersions(requireOpened(repoPath), path),
+    'conflict:save': ({ repoPath, path, content, markResolved }) =>
+      saveConflictResolution(requireOpened(repoPath), path, content, { markResolved }),
     'commit:create': ({ repoPath, message, amend }) => createCommit(requireOpened(repoPath), message, { amend }),
     'commit:last-message': ({ repoPath }) => getLastCommitMessage(requireOpened(repoPath)),
     'branch:create': ({ repoPath, name, startPoint, checkout }) =>

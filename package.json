@@ -6,7 +6,7 @@
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
-  "author": "Tam\u00e1s <szabto@gmail.com>",
+  "author": "Tamás <szabto@gmail.com>",
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
@@ -26,6 +26,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",
     "@tanstack/react-virtual": "^3.14.14",
+    "monaco-editor": "^0.57.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.5",

@@ -32,6 +32,9 @@ interface UiState {
   prompt: (PromptOptions & { resolve: (value: string | null) => void }) | null
   /** Label of the currently running long operation (fetch/pull/push), if any. */
   busy: string | null
+  /** Preferred diff presentation (remembered per viewer). */
+  diffMode: 'unified' | 'split'
+  setDiffMode: (mode: 'unified' | 'split') => void
   progress: { phase: string; percent: number } | null
   setProgress: (p: { phase: string; percent: number } | null) => void
   showError: (err: unknown) => void
@@ -55,6 +58,15 @@ export const useUiStore = create<UiState>((set, get) => ({
   menu: null,
   prompt: null,
   busy: null,
+  diffMode: readDiffMode(),
+  setDiffMode: (diffMode) => {
+    try {
+      localStorage.setItem('gitbob.diffMode', diffMode)
+    } catch {
+      /* storage unavailable: keep in memory only */
+    }
+    set({ diffMode })
+  },
   progress: null,
   setProgress: (progress) => set({ progress }),
   showError: (err) => set({ error: toApiError(err) }),
@@ -72,3 +84,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   setBusy: (busy) => set({ busy, progress: null }),
 }))
+
+function readDiffMode(): 'unified' | 'split' {
+  try {
+    return localStorage.getItem('gitbob.diffMode') === 'split' ? 'split' : 'unified'
+  } catch {
+    return 'unified'
+  }
+}
