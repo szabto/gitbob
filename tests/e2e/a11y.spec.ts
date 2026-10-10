@@ -77,7 +77,7 @@ for (const theme of ['dark', 'light'] as const) {
       await page.keyboard.press('Escape')
 
       await page.getByRole('button', { name: 'New tab' }).click()
-      await page.getByText('Recent repositories').waitFor()
+      await page.getByRole('heading', { name: 'Recent repositories' }).waitFor()
       problems.push(...(await audit(page, 'welcome')))
 
       expect(problems, problems.join('\n')).toEqual([])
