@@ -158,6 +158,7 @@ Changed your mind about a file? **Discard** throws away its unstaged edits after
 </p>
 
 - **New branch:** click **Branch** in the toolbar (it starts from where you are), or right-click any commit → **Create branch here…**
+- **Folders:** branches named like `feature/login` are grouped into collapsible folders (`feature › login`), and remote branches sit under their remote (`origin › feature › login`).
 - **Switch branch:** double-click it in the sidebar. Double-clicking a remote branch such as `origin/feature` creates a local copy that tracks it.
 - **Rename, delete, set upstream:** right-click the branch. GitBob refuses to delete a branch whose work isn't merged anywhere unless you confirm twice.
 - **Look at an old version:** right-click a commit → **Checkout this commit**.
@@ -177,6 +178,10 @@ If the server needs a username and password (or token), GitBob asks for it in a 
 ### 6. Pull requests and CI
 
 Working with GitHub, GitLab, Bitbucket or Azure DevOps? Open **Pull requests** in the sidebar and click **Connect**. GitBob opens the page where you create a personal access token; paste it, and GitBob stores it encrypted by your operating system. Then you see the open pull requests of the repository, whether the selected commit's CI checks passed, and you can right-click a pushed branch → **Create pull request…**.
+
+Click a pull request to open it inside GitBob: read the description and comments, see who approved and whether CI passed, and switch to **Files** to read every change (GitBob downloads the pull request's commits, so diffs work offline afterwards). Leave a comment, **Approve** or **Request changes**, and when it's ready pick merge, squash or rebase and press **Merge pull request**. GitBob asks first, and refuses if someone pushed new commits since you looked.
+
+On GitHub you can also **Sign in with GitHub** instead of pasting a token: GitBob shows a short code, opens github.com in your browser, and you approve it there. (This needs a GitHub OAuth app client id with device flow enabled in **Settings → GitHub sign-in**; without one, use a token.)
 
 ### 7. Undo, park and reuse work
 
@@ -207,6 +212,8 @@ Need to switch tasks with half-finished work? Click **Stash…** in Working chan
 </p>
 
 If a merge, rebase, cherry-pick or revert stops because of a conflict, a yellow banner tells you how many files need attention and offers **Continue**, **Skip** and **Abort**. Click a conflicted file in Working changes to open the conflict editor: your version and theirs side by side on top, the result below. Pick **Ours**, **Theirs** or **Both** for each conflict (or edit the result yourself), then **Save and mark resolved** and press **Continue**.
+
+Images and other binary files can't be merged line by line, so for those (and for files one side deleted) GitBob simply asks which whole version to keep.
 
 <p align="center">
   <img src="docs/images/gitbob-conflict.png" alt="The conflict editor: ours and theirs versions of settings.ts side by side on top, the editable result with conflict markers below, and Ours, Theirs and Both buttons for the conflict" width="100%">
@@ -297,11 +304,11 @@ Every screenshot in this README is the real app working on a real Git repository
     </td>
     <td width="33%" valign="top">
       <h4>🧩 Working tree</h4>
-      Status with added, modified, deleted, renamed, untracked and conflicted files · stage/unstage files, hunks or single lines · discard with confirmation (new files go to the Trash) · unified and side-by-side diffs with syntax highlighting · three-way conflict editor · commit · amend · merge/rebase/cherry-pick in progress indicator · live refresh
+      Status with added, modified, deleted, renamed, untracked and conflicted files · stage/unstage files, hunks or single lines · discard with confirmation (new files go to the Trash) · unified and side-by-side diffs with syntax highlighting · three-way conflict editor · keep-ours/theirs for binary and delete conflicts · staged renames shown as renames · commit · amend · merge/rebase/cherry-pick in progress indicator · live refresh
     </td>
     <td width="33%" valign="top">
       <h4>🌿 Branches &amp; sync</h4>
-      Create · checkout (local, remote-tracking, detached) · rename · delete (with unmerged protection) · upstream and ahead/behind · remotes add/remove · fetch with prune · pull ff-only/merge/rebase · push with upstream · force-with-lease · HTTPS credential prompt (optionally remembered in the OS keychain) · SSH passphrase and host-key prompts · progress and cancel
+      Branch folders · create · checkout (local, remote-tracking, detached) · rename · delete (with unmerged protection) · upstream and ahead/behind · remotes add/remove · fetch with prune · pull ff-only/merge/rebase · push with upstream · force-with-lease · HTTPS credential prompt (optionally remembered in the OS keychain) · SSH passphrase and host-key prompts · progress and cancel
     </td>
   </tr>
   <tr>
@@ -310,26 +317,25 @@ Every screenshot in this README is the real app working on a real Git repository
       Interactive rebase (reorder, reword, squash, fixup, drop) · cherry-pick · revert (merge commits too) · reset soft/mixed/hard with automatic backup · reflog · continue/skip/abort for stopped merges, rebases, cherry-picks and reverts
     </td>
     <td width="33%" valign="top">
-      <h4>📦 Stash &amp; tags</h4>
-      Stash with message (untracked files included) · pop · apply · delete · see stashed files · annotated and lightweight tags · push and delete tags
+      <h4>📦 Stash, tags &amp; LFS</h4>
+      Stash with message (untracked files included) · pop · apply · delete · see stashed files · annotated and lightweight tags · push and delete tags · Git LFS: tracked patterns, track/untrack, download missing files, set up per repository
     </td>
-  <tr>
     <td width="33%" valign="top">
       <h4>🔗 Hosting services</h4>
-      GitHub, GitLab, Bitbucket and Azure DevOps via personal access tokens (stored encrypted by the OS) · open pull requests · CI status per commit · create pull requests, also as drafts
+      GitHub, GitLab, Bitbucket and Azure DevOps via personal access tokens (stored encrypted by the OS) · Sign in with GitHub (device flow) · pull requests: list, view, files, comment, approve / request changes, merge / squash / rebase · CI status per commit · create pull requests, also as drafts
     </td>
   </tr>
   <tr>
     <td width="33%" valign="top">
       <h4>🎨 Comfortable</h4>
-      Command palette · rebindable shortcuts · settings · accessible dialogs and contrast (checked with axe-core) · repository tabs (restored on restart) · clone with progress · new repository · light, dark or match-system theme · blame · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories
+      Command palette · rebindable shortcuts · settings · accessible dialogs and contrast (checked with axe-core) · repository tabs (restored on restart) · clone with progress · new repository · light, dark or match-system theme · blame · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories · first-run setup (Git check, name and email) · in-app updates on Windows and Linux AppImage
     </td>
   </tr>
 </table>
 
 ### On the roadmap
 
-Git LFS, sign in with OAuth (instead of tokens), reviewing and merging pull requests in the app, automatic updates, and installers signed with developer certificates.
+Sign-in with OAuth for GitLab, Bitbucket and Azure DevOps, line comments in pull request reviews, and installers signed with developer certificates (which also brings automatic updates to macOS).
 
 <br>
 

@@ -1,4 +1,5 @@
 import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test'
+import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -180,6 +181,42 @@ test('first run: shows the Git version and sets a missing identity (isolated con
     expect(written).toContain('email = ada@example.com')
 
     await page.getByTestId('tips').getByRole('button', { name: 'Hide tips' }).click()
+    await expect(page.getByTestId('tips')).toHaveCount(0)
+  } finally {
+    await app.close()
+  }
+})
+
+test('first run: checks Git, sets name and email globally, and tips can be hidden', async () => {
+  const gitconfig = join(makeTempDir('gitbob-home-'), '.gitconfig')
+  const app = await electron.launch({
+    args: [appDir],
+    env: {
+      ...process.env,
+      GITBOB_USER_DATA: makeTempDir('gitbob-ud-'),
+      ELECTRON_RENDERER_URL: '',
+      GITBOB_HIDDEN: '1',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: gitconfig,
+    },
+  })
+  try {
+    const page = await app.firstWindow()
+    const onboarding = page.getByTestId('onboarding')
+    await expect(onboarding.getByTestId('git-ok')).toContainText('Git')
+    const form = onboarding.getByTestId('identity-form')
+    await form.getByLabel('Name').fill('Ada Lovelace')
+    await form.getByLabel('Email').fill('ada@example.com')
+    await form.getByRole('button', { name: 'Save' }).click()
+    await expect(onboarding.getByTestId('identity-form')).toHaveCount(0)
+    await expect(onboarding.getByTestId('git-ok')).toContainText('Ada Lovelace <ada@example.com>')
+    const env = { ...process.env, GIT_CONFIG_GLOBAL: gitconfig, GIT_CONFIG_NOSYSTEM: '1' }
+    expect(execFileSync('git', ['config', '--global', 'user.email'], { env, encoding: 'utf8' }).trim()).toBe('ada@example.com')
+
+    await onboarding.getByRole('button', { name: 'Hide tips' }).click()
+    await expect(onboarding.getByTestId('tips')).toHaveCount(0)
+    await page.reload()
+    await expect(page.getByTestId('onboarding')).toBeVisible()
     await expect(page.getByTestId('tips')).toHaveCount(0)
   } finally {
     await app.close()
