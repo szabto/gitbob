@@ -307,14 +307,14 @@ Every screenshot in this README is the real app working on a real Git repository
   <tr>
     <td width="33%" valign="top">
       <h4>🎨 Comfortable</h4>
-      Repository tabs (restored on restart) · clone with progress · new repository · light, dark or match-system theme · blame · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories
+      Command palette · rebindable shortcuts · settings · accessible dialogs and contrast (checked with axe-core) · repository tabs (restored on restart) · clone with progress · new repository · light, dark or match-system theme · blame · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories
     </td>
   </tr>
 </table>
 
 ### On the roadmap
 
-Git LFS, sign in with OAuth (instead of tokens), reviewing and merging pull requests in the app, and signed installers for macOS, Windows and Linux.
+Git LFS, sign in with OAuth (instead of tokens), reviewing and merging pull requests in the app, automatic updates, and signed installers for macOS, Windows and Linux.
 
 <br>
 
@@ -325,11 +325,20 @@ Git LFS, sign in with OAuth (instead of tokens), reviewing and merging pull requ
 | Open repository | <kbd>⌘O</kbd> | <kbd>Ctrl+O</kbd> |
 | Clone repository | <kbd>⇧⌘O</kbd> | <kbd>Ctrl+Shift+O</kbd> |
 | New repository | <kbd>⌥⌘N</kbd> | <kbd>Ctrl+Alt+N</kbd> |
+| Command palette (run anything, switch branches) | <kbd>⌘K</kbd> | <kbd>Ctrl+K</kbd> |
+| Settings | <kbd>⌘,</kbd> | <kbd>Ctrl+,</kbd> |
 | Search history | <kbd>⌘F</kbd> | <kbd>Ctrl+F</kbd> |
+| Fetch / Pull / Push | <kbd>⇧⌘F</kbd> / <kbd>⇧⌘L</kbd> / <kbd>⇧⌘P</kbd> | <kbd>Ctrl+Shift+F</kbd> / <kbd>L</kbd> / <kbd>P</kbd> |
+| New branch | <kbd>⌘B</kbd> | <kbd>Ctrl+B</kbd> |
+| Stash changes | <kbd>⇧⌘S</kbd> | <kbd>Ctrl+Shift+S</kbd> |
+| Working changes | <kbd>⇧⌘C</kbd> | <kbd>Ctrl+Shift+C</kbd> |
+| New tab / close tab | <kbd>⌘T</kbd> / <kbd>⇧⌘W</kbd> | <kbd>Ctrl+T</kbd> / <kbd>Ctrl+Shift+W</kbd> |
 | Next / previous match | <kbd>Enter</kbd> / <kbd>⇧Enter</kbd> | <kbd>Enter</kbd> / <kbd>Shift+Enter</kbd> |
 | Move through commits | <kbd>↑</kbd> <kbd>↓</kbd> | <kbd>↑</kbd> <kbd>↓</kbd> |
 | Commit | <kbd>⌘Enter</kbd> in the message box | <kbd>Ctrl+Enter</kbd> |
 | Close a dialog / clear search | <kbd>Esc</kbd> | <kbd>Esc</kbd> |
+
+Every shortcut can be changed in **Settings → Keyboard shortcuts**. Don't remember a shortcut? Press <kbd>⌘K</kbd> and type what you want to do.
 
 <br>
 
@@ -343,7 +352,7 @@ Git LFS, sign in with OAuth (instead of tokens), reviewing and merging pull requ
 
 **Where are my passwords stored?** Never in a file by GitBob. When Git asks for credentials, GitBob shows a dialog and passes your answer to Git. If you tick *Remember*, they go to your system's secure credential store (macOS Keychain, Windows Credential Manager, or libsecret on Linux) through Git's own credential helpers. Access tokens for GitHub and the like are encrypted with your operating system's keychain.
 
-**Does it send data anywhere?** No telemetry, no analytics. The only network traffic is Git talking to your remotes when you fetch, pull or push.
+**Does it send data anywhere?** No telemetry, no analytics. The only network traffic is Git talking to your remotes, the hosting service you connect yourself, and, only if you ask for it in Settings, a check of GitHub Releases for a newer GitBob.
 
 **Windows and Linux?** Builds are configured and planned. They aren't tested yet, so we don't promise them yet.
 
@@ -363,6 +372,7 @@ npm run dist:mac     # package for macOS (dmg + zip)
 
 - **Fast on big repositories:** measured on a generated 100,000-commit repository: the full history loads in about 3 seconds and the graph layout takes about 40 ms ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)).
 - **Tested against real Git:** more than 600 integration tests (including fake GitHub, GitLab, Bitbucket and Azure DevOps API servers) (including randomized partial-staging checks) create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
+- **Accessible:** an axe-core audit of the main screens in both themes runs with the end-to-end tests and must report no serious issues.
 - **Secure by default:** sandboxed renderer without Node access, context isolation, strict Content Security Policy, schema-validated IPC, and Git can only be run on repositories you opened.
 
 <br>
