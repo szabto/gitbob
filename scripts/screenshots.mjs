@@ -23,6 +23,7 @@ async function launch(args) {
       ...process.env,
       GITBOB_USER_DATA: userData,
       ELECTRON_RENDERER_URL: '',
+      GITBOB_HIDDEN: '1',
       HOME: demo.home,
       GIT_CONFIG_NOSYSTEM: '1',
       GIT_CONFIG_GLOBAL: join(demo.home, '.gitconfig'),

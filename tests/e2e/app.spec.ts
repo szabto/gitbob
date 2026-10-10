@@ -190,6 +190,9 @@ test('renderer is sandboxed with no Node access', async () => {
     }))
     expect(probe).toEqual({ require: 'undefined', process: 'undefined', bridge: ['invoke', 'on', 'platform'] })
 
+    // Test runs never show windows or take focus (GITBOB_HIDDEN, set in playwright.config.ts).
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([false])
+
     // Unknown channels are rejected by the preload allowlist.
     const err = await page.evaluate(() => window.gitbob.invoke('evil:channel', {}).then(() => 'ok', (e: Error) => e.message))
     expect(err).toContain('Unknown IPC channel')

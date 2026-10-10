@@ -20,6 +20,14 @@ const iconPath = app.isPackaged
   : join(import.meta.dirname, '../../resources/icon.png')
 
 let mainWindow: BrowserWindow | null = null
+
+/**
+ * Automated tests and screenshot runs set GITBOB_HIDDEN=1: windows render offscreen and are
+ * never shown, and on macOS the app gets no Dock icon and never takes focus, so test runs
+ * don't interrupt whoever is using the computer.
+ */
+const hidden = process.env.GITBOB_HIDDEN === '1'
+if (hidden && process.platform === 'darwin') app.setActivationPolicy('accessory')
 let activeWatcher: RepositoryWatcher | null = null
 let network: NetworkSession | null = null
 
@@ -57,10 +65,12 @@ function createWindow(): BrowserWindow {
       sandbox: true,
       webSecurity: true,
       spellcheck: false,
+      // Hidden test windows must keep rendering and running timers at full speed.
+      backgroundThrottling: !hidden,
     },
   })
 
-  win.once('ready-to-show', () => win.show())
+  if (!hidden) win.once('ready-to-show', () => win.show())
 
   // The renderer is a single-page app: block all navigation and popups.
   win.webContents.on('will-navigate', (e, url) => {
@@ -82,7 +92,7 @@ app.on('web-contents-created', (_e, contents) => {
 })
 
 void app.whenReady().then(async () => {
-  if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(iconPath)
+  if (process.platform === 'darwin' && !app.isPackaged && !hidden) app.dock?.setIcon(iconPath)
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false))
 
   const settings = new SettingsStore(app.getPath('userData'))

@@ -12,6 +12,7 @@ async function launch(repo?: string): Promise<{ app: ElectronApplication; page: 
       ...process.env,
       GITBOB_USER_DATA: makeTempDir('gitbob-ud-'),
       ELECTRON_RENDERER_URL: '',
+      GITBOB_HIDDEN: '1',
       GIT_AUTHOR_NAME: 'E2E Author',
       GIT_AUTHOR_EMAIL: 'e2e@example.com',
       GIT_COMMITTER_NAME: 'E2E Author',
