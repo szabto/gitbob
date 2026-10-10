@@ -41,5 +41,5 @@ publish:
   provider: github
   owner: szabto
   repo: gitbob
-  releaseType: prerelease
+  releaseType: release
 artifactName: GitBob-${version}-${os}-${arch}.${ext}

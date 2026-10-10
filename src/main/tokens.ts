@@ -19,8 +19,20 @@ export class TokenStore {
     this.file = join(userDataDir, 'provider-tokens.json')
   }
 
+  /**
+   * Whether tokens can be stored. On macOS and Windows encryption is always available and
+   * asking would touch the keychain (and may show a system prompt), so we don't; on Linux it
+   * depends on a secret service being present, and checking does not prompt.
+   */
   canStore(): boolean {
-    return this.ephemeral || safeStorage.isEncryptionAvailable()
+    if (this.ephemeral || process.platform !== 'linux') return true
+    return safeStorage.isEncryptionAvailable()
+  }
+
+  /** A token is stored for this key. Reads only the local file, never the keychain. */
+  async has(key: string): Promise<boolean> {
+    if (this.ephemeral) return this.memory.has(key)
+    return !!(await this.load())[key]
   }
 
   private async load(): Promise<Record<string, string>> {

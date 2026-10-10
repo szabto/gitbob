@@ -52,20 +52,14 @@ export class ProviderService {
     const canStoreTokens = this.tokens.canStore()
     if (!found) return { repo: null, remote: null, connected: false, user: null, canStoreTokens }
     const key = tokenKey(found.ref.kind, found.ref.host)
-    const token = await this.tokens.get(key)
-    if (token && !this.users.has(key)) {
-      // After a restart: look up who the stored token belongs to (best effort).
-      const login = await this.adapterFor(found.ref, token)
-        .getUser()
-        .then((u) => u.login)
-        .catch(() => null)
-      if (login) this.users.set(key, login)
-    }
+    // Only checks that a token is saved: decrypting it would touch the OS keychain, which
+    // must happen only when the token is actually used (listing pull requests, CI, …).
+    const connected = await this.tokens.has(key)
     return {
       repo: found.ref,
       remote: found.remote,
-      connected: !!token,
-      user: token ? (this.users.get(key) ?? null) : null,
+      connected,
+      user: connected ? (this.users.get(key) ?? null) : null,
       canStoreTokens,
     }
   }
@@ -91,6 +85,15 @@ export class ProviderService {
 
   async pullRequests(repoPath: string, state: 'open' | 'all'): Promise<PullRequest[]> {
     const { ref, adapter } = await this.connected(repoPath)
+    const key = tokenKey(ref.kind, ref.host)
+    if (!this.users.has(key)) {
+      // After a restart: learn who the stored token belongs to (best effort).
+      const login = await adapter
+        .getUser()
+        .then((u) => u.login)
+        .catch(() => null)
+      if (login) this.users.set(key, login)
+    }
     return mapErrors(() => adapter.listPullRequests(ref, { state }))
   }
 

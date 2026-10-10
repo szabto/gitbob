@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { GitRef, ProviderKind, ProviderStatus, RepoRef } from '@shared/types'
 import { call } from '../lib/api'
@@ -54,6 +54,11 @@ export function PullRequestsSection({
   const pulls = usePullRequests(repoPath, status.connected && open)
   const ref = status.repo!
   const name = PROVIDER_NAMES[ref.kind]
+
+  // The account name is learned when pull requests load (not at startup, to avoid the keychain).
+  useEffect(() => {
+    if (pulls.isSuccess && status.connected && !status.user) void qc.invalidateQueries({ queryKey: ['provider', repoPath] })
+  }, [pulls.isSuccess, status.connected, status.user, qc, repoPath])
 
   const refresh = (): void => {
     void qc.invalidateQueries({ queryKey: ['provider', repoPath] })
