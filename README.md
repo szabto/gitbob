@@ -16,6 +16,7 @@
   <img alt="Free to use" src="https://img.shields.io/badge/price-free-3ee0f5?style=flat-square">
   <img alt="Electron + React + TypeScript" src="https://img.shields.io/badge/Electron%20%C2%B7%20React%20%C2%B7%20TypeScript-desktop-b46cff?style=flat-square">
   <img alt="Platform: macOS (Windows and Linux planned)" src="https://img.shields.io/badge/macOS-verified-2f7bf5?style=flat-square&logo=apple">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-3a3a3a?style=flat-square">
   <img alt="Status: early alpha" src="https://img.shields.io/badge/status-early%20alpha-d69e2e?style=flat-square">
 </p>
 
@@ -258,7 +259,7 @@ Every screenshot in this README is the real app working on a real Git repository
 
 ### On the roadmap
 
-Interactive rebase, a side-by-side diff with syntax highlighting, line-by-line staging, a three-way merge conflict editor, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux. Progress is tracked in [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md).
+Interactive rebase, a side-by-side diff with syntax highlighting, line-by-line staging, a three-way merge conflict editor, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux.
 
 <br>
 
@@ -277,7 +278,7 @@ Interactive rebase, a side-by-side diff with syntax highlighting, line-by-line s
 
 ## FAQ
 
-**Is it really free?** Yes. GitBob costs nothing and needs no account.
+**Is it really free?** Yes. GitBob costs nothing, needs no account, and its source code is MIT licensed.
 
 **Does it replace Git?** No. GitBob uses the Git already installed on your computer for every operation, so your repositories stay 100% standard. You can switch between GitBob, your terminal and other tools at any time.
 
@@ -306,7 +307,12 @@ npm run dist:mac     # package for macOS (dmg + zip)
 - **Fast on big repositories:** measured on a generated 100,000-commit repository: the full history loads in about 3 seconds and the graph layout takes about 40 ms ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)).
 - **Tested against real Git:** more than 300 integration tests create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
 - **Secure by default:** sandboxed renderer without Node access, context isolation, strict Content Security Policy, schema-validated IPC, and Git can only be run on repositories you opened.
-- **Architecture and decisions:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Current status and test results: [`docs/PROGRESS.md`](docs/PROGRESS.md).
+
+<br>
+
+## License
+
+GitBob is released under the [MIT License](LICENSE).
 
 <br>
 

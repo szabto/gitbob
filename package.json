@@ -7,7 +7,7 @@
   "type": "module",
   "main": "out/main/index.js",
   "author": "Tam\u00e1s <szabto@gmail.com>",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
