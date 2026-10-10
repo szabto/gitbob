@@ -3,6 +3,7 @@ import { useReflog, useSubmodules, useWorktrees } from '../lib/queries'
 import { formatShortDate, shortSha } from '../lib/format'
 import type { GitRef, ProviderStatus, StashEntry } from '@shared/types'
 import { PullRequestsSection } from './PullRequests'
+import { RefTree } from './RefTree'
 import { useAppStore } from '../state/store'
 import { useUiStore, type MenuEntry } from '../state/ui'
 import type { useRepoActions } from '../lib/actions'
@@ -75,16 +76,23 @@ export function Sidebar({
   return (
     <aside className="w-60 shrink-0 overflow-y-auto border-r border-border bg-panel py-2" data-testid="sidebar">
       <Section title="Local" count={local.length} testId="local-branches">
-        {local.map((r) => (
-          <RefItem
-            key={r.name}
-            gitRef={r}
-            active={r.name === currentRef}
-            onClick={() => reveal(r.target)}
-            onDoubleClick={() => r.name !== currentRef && void actions.checkout(r.name)}
-            onMenu={(e) => openMenu(e.clientX, e.clientY, localMenu(r))}
-          />
-        ))}
+        <RefTree
+          refs={local}
+          scope="local"
+          activeRef={currentRef}
+          renderRef={(r, label, depth) => (
+            <RefItem
+              key={r.name}
+              gitRef={r}
+              label={label}
+              depth={depth}
+              active={r.name === currentRef}
+              onClick={() => reveal(r.target)}
+              onDoubleClick={() => r.name !== currentRef && void actions.checkout(r.name)}
+              onMenu={(e) => openMenu(e.clientX, e.clientY, localMenu(r))}
+            />
+          )}
+        />
       </Section>
       {provider?.repo && (
         <PullRequestsSection repoPath={repoPath} status={provider} remoteRefs={remote} actions={actions} />
@@ -96,38 +104,41 @@ export function Sidebar({
         action={{ label: '+', title: 'Add remote', onClick: () => void actions.addRemote() }}
       >
         {remotes.map((name) => (
-          <li key={`remote:${name}`}>
-            <div
-              className="flex items-center gap-1 py-0.5 pr-3 pl-5 text-xs text-muted"
-              data-testid="remote-name"
-              onContextMenu={(e) => {
-                e.preventDefault()
-                openMenu(e.clientX, e.clientY, [
-                  { label: 'Fetch', onSelect: () => void actions.fetch() },
-                  { label: `Remove remote ${name}…`, danger: true, onSelect: () => void actions.removeRemote(name) },
-                ])
-              }}
-            >
-              ☁ {name}
-            </div>
-          </li>
-        ))}
-        {remote.map((r) => (
-          <RefItem
-            key={r.name}
-            gitRef={r}
-            active={false}
-            onClick={() => reveal(r.target)}
-            onDoubleClick={() => void actions.checkout(r.name)}
-            onMenu={(e) => openMenu(e.clientX, e.clientY, remoteMenu(r))}
+          <RemoteGroup
+            key={`remote:${name}`}
+            name={name}
+            refs={remote.filter((r) => r.shortName.startsWith(`${name}/`))}
+            onMenu={(e) =>
+              openMenu(e.clientX, e.clientY, [
+                { label: 'Fetch', onSelect: () => void actions.fetch() },
+                { label: `Remove remote ${name}…`, danger: true, onSelect: () => void actions.removeRemote(name) },
+              ])
+            }
+            renderRef={(r, label, depth) => (
+              <RefItem
+                key={r.name}
+                gitRef={r}
+                label={label}
+                depth={depth}
+                active={false}
+                onClick={() => reveal(r.target)}
+                onDoubleClick={() => void actions.checkout(r.name)}
+                onMenu={(e) => openMenu(e.clientX, e.clientY, remoteMenu(r))}
+              />
+            )}
           />
         ))}
       </Section>
       <Section title="Tags" count={tags.length} testId="tags">
-        {tags.map((r) => (
+        <RefTree
+          refs={tags}
+          scope="tags"
+          renderRef={(r, label, depth) => (
           <RefItem
             key={r.name}
             gitRef={r}
+            label={label}
+            depth={depth}
             active={false}
             onClick={() => reveal(r.target)}
             onMenu={(e) =>
@@ -138,7 +149,8 @@ export function Sidebar({
               ])
             }
           />
-        ))}
+          )}
+        />
       </Section>
       <Section title="Stashes" count={stashes.length} testId="stashes">
         {stashes.map((s) => (
@@ -381,8 +393,12 @@ function RefItem({
   onClick,
   onDoubleClick,
   onMenu,
+  label,
+  depth = 0,
 }: {
   gitRef: GitRef
+  label?: string
+  depth?: number
   active: boolean
   onClick: () => void
   onDoubleClick?: () => void
@@ -401,12 +417,13 @@ function RefItem({
         title={gitRef.name}
         data-testid="ref-item"
         data-ref={gitRef.name}
-        className={`flex w-full items-center gap-2 truncate py-0.5 pr-3 pl-7 text-left hover:bg-panel-2 ${
+        style={{ paddingLeft: 28 + depth * 12 }}
+        className={`flex w-full items-center gap-2 truncate py-0.5 pr-3 text-left hover:bg-panel-2 ${
           active ? 'font-semibold text-accent' : ''
         }`}
       >
         {active && <span aria-label="current branch">●</span>}
-        <span className="truncate">{gitRef.shortName}</span>
+        <span className="truncate">{label ?? gitRef.shortName}</span>
         {gitRef.upstream && (gitRef.ahead || gitRef.behind || gitRef.upstreamGone) ? (
           <span className="ml-auto shrink-0 text-[11px] font-normal text-muted" data-testid="ahead-behind">
             {gitRef.upstreamGone ? 'gone' : `${gitRef.ahead ? `↑${gitRef.ahead}` : ''}${gitRef.behind ? ` ↓${gitRef.behind}` : ''}`}
@@ -414,5 +431,49 @@ function RefItem({
         ) : null}
       </button>
     </li>
+  )
+}
+
+function RemoteGroup({
+  name,
+  refs,
+  onMenu,
+  renderRef,
+}: {
+  name: string
+  refs: GitRef[]
+  onMenu: (e: React.MouseEvent) => void
+  renderRef: (r: GitRef, label: string, depth: number) => React.ReactNode
+}) {
+  const [open, setOpen] = useState(true)
+  return (
+    <>
+      <li>
+        <button
+          data-testid="remote-name"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            onMenu(e)
+          }}
+          className="flex w-full items-center gap-1.5 py-0.5 pr-3 pl-3 text-left text-muted hover:bg-panel-2 hover:text-fg"
+        >
+          <span className="inline-block w-3 text-[10px]">{open ? '▾' : '▸'}</span>
+          <span aria-hidden>☁</span>
+          <span className="truncate">{name}</span>
+          <span className="ml-auto text-[10px]">{refs.length}</span>
+        </button>
+      </li>
+      {open && (
+        <RefTree
+          refs={refs}
+          scope={`remote:${name}`}
+          nameOf={(r) => r.shortName.slice(name.length + 1)}
+          depth={1}
+          renderRef={renderRef}
+        />
+      )}
+    </>
   )
 }

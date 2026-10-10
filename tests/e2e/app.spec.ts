@@ -269,3 +269,32 @@ test('View > Theme switches between dark and light and persists', async () => {
     await app.close()
   }
 })
+
+test('branches are shown as a tree that can be collapsed', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1' })
+  repo.branch('feature/login')
+  repo.branch('feature/ui/dark')
+  repo.branch('fix/typo')
+  const userData = makeTempDir('gitbob-ud-')
+  let { app, page } = await launch({ repo: repo.dir, userData })
+  try {
+    const local = page.getByTestId('local-branches')
+    await expect(local.locator('[data-testid="ref-folder"][data-folder="feature"]')).toBeVisible()
+    await expect(local.locator('[data-testid="ref-folder"][data-folder="feature/ui"]')).toBeVisible()
+    const leaf = local.locator('[data-ref="refs/heads/feature/ui/dark"]')
+    await expect(leaf).toHaveText('dark')
+
+    await local.locator('[data-folder="feature"]').click()
+    await expect(leaf).toHaveCount(0)
+    await expect(local.locator('[data-ref="refs/heads/fix/typo"]')).toBeVisible()
+  } finally {
+    await app.close()
+  }
+  ;({ app, page } = await launch({ repo: repo.dir, userData }))
+  try {
+    await expect(page.getByTestId('local-branches').locator('[data-folder="feature"]')).toHaveAttribute('aria-expanded', 'false')
+  } finally {
+    await app.close()
+  }
+})
