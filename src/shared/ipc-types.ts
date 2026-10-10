@@ -107,6 +107,8 @@ export interface IpcOutputs {
   'settings:update': AppSettings
   'app:info': AppInfo
   'app:check-update': UpdateInfo
+  'app:download-update': void
+  'app:install-update': void
   /** The validated git path, or null if the user cancelled. */
   'app:pick-git': { path: string; version: string } | null
   'provider:status': ProviderStatus
@@ -161,6 +163,8 @@ export interface IpcEvents {
   'menu:command-palette': void
   'settings:changed': AppSettings
   'app:update-available': UpdateInfo
+  'app:update-progress': { percent: number }
+  'app:update-downloaded': { version: string }
 }
 
 type _EventsExhaustive = [IpcEventName] extends [keyof IpcEvents]

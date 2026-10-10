@@ -66,6 +66,8 @@ export const IPC_CHANNELS = [
   'settings:update',
   'app:info',
   'app:check-update',
+  'app:download-update',
+  'app:install-update',
   'app:pick-git',
   'provider:status',
   'provider:connect',
@@ -93,5 +95,7 @@ export const IPC_EVENTS = [
   'menu:command-palette',
   'settings:changed',
   'app:update-available',
+  'app:update-progress',
+  'app:update-downloaded',
 ] as const
 export type IpcEventName = (typeof IPC_EVENTS)[number]

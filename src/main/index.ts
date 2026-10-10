@@ -9,7 +9,8 @@ import { NetworkSession } from './network'
 import { SettingsStore } from './settings'
 import { TokenStore } from './tokens'
 import { ProviderService } from './providers'
-import { checkForUpdate, validateGitPath } from './app-info'
+import { validateGitPath } from './app-info'
+import { Updater } from './updater'
 import { setGitBinary } from '@git-core/runner'
 import type { AppSettings } from '@shared/types'
 
@@ -140,7 +141,9 @@ void app.whenReady().then(async () => {
     return settings.get()
   }
 
+  const updater = new Updater()
   const ctx: IpcContext = {
+    updater,
     getSettings: () => settings.get(),
     updateSettings,
     providers: new ProviderService(new TokenStore(app.getPath('userData'))),
@@ -171,7 +174,8 @@ void app.whenReady().then(async () => {
   if (settings.get().autoCheckUpdates) {
     const win = mainWindow
     win.webContents.once('did-finish-load', () => {
-      checkForUpdate()
+      updater
+        .check()
         .then((u) => u.newer && !win.isDestroyed() && win.webContents.send('app:update-available', u))
         .catch(() => {})
     })

@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AppSettings } from '@shared/types'
 import type { IpcInput } from '@shared/ipc'
 
 /** What the renderer may change (a custom git path is only set via the native picker). */
 type SettingsPatch = IpcInput<'settings:update'>['patch']
-import { call } from '../lib/api'
+import { call, subscribe } from '../lib/api'
 import { useDialog } from '../lib/useDialog'
 import type { Command } from '../lib/commands'
 import { eventToAccelerator, formatAccelerator, normalizeAccelerator, RESERVED } from '../lib/shortcuts'
@@ -270,6 +270,11 @@ function Shortcuts({
 function About({ s, update, version }: { s: AppSettings; update: (p: SettingsPatch) => Promise<void>; version: string | undefined }) {
   const [result, setResult] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
+  const [canInstall, setCanInstall] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
+  const [downloaded, setDownloaded] = useState<string | null>(null)
+  useEffect(() => subscribe('app:update-progress', (p) => setProgress(p.percent)), [])
+  useEffect(() => subscribe('app:update-downloaded', (d) => setDownloaded(d.version)), [])
   return (
     <>
       <Row label="Version">
@@ -296,7 +301,9 @@ function About({ s, update, version }: { s: AppSettings; update: (p: SettingsPat
                     ? `You have the latest version (${u.current}).`
                     : 'No published releases yet.',
               )
-              if (u.newer && u.url) window.open(u.url, '_blank')
+              setCanInstall(!!u.canInstall)
+              // Without in-app installation (macOS until signed builds, Linux .deb, dev builds): open the release page.
+              if (u.newer && !u.canInstall && u.url) window.open(u.url, '_blank')
             } catch (e) {
               setResult(e instanceof Error ? e.message : String(e))
             } finally {
@@ -307,6 +314,31 @@ function About({ s, update, version }: { s: AppSettings; update: (p: SettingsPat
           {checking ? 'Checking…' : 'Check now'}
         </button>
         {result && <p className="mt-2 text-sm" data-testid="update-result">{result}</p>}
+        {canInstall && !downloaded && (
+          <button
+            disabled={progress !== null}
+            className="mt-2 rounded bg-accent px-2 py-1 text-sm font-medium text-on-accent disabled:opacity-60"
+            onClick={async () => {
+              setProgress(0)
+              try {
+                await call('app:download-update', {})
+              } catch (e) {
+                setProgress(null)
+                setResult(e instanceof Error ? e.message : String(e))
+              }
+            }}
+          >
+            {progress === null ? 'Download and install' : `Downloading… ${progress}%`}
+          </button>
+        )}
+        {downloaded && (
+          <button
+            className="mt-2 rounded bg-accent px-2 py-1 text-sm font-medium text-on-accent"
+            onClick={() => void call('app:install-update', {})}
+          >
+            Restart and install {downloaded}
+          </button>
+        )}
       </Row>
       <Row label="Source code">
         <a href="https://github.com/szabto/gitbob" target="_blank" rel="noreferrer" className="text-sm text-accent hover:underline">

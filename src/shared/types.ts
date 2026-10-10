@@ -413,4 +413,6 @@ export interface UpdateInfo {
   latest: string | null
   newer: boolean
   url: string | null
+  /** The update can be downloaded and installed from inside the app (Windows, Linux AppImage). */
+  canInstall?: boolean
 }

@@ -208,6 +208,8 @@ export const ipcInputSchemas = {
   }),
   'app:info': z.object({}).strict(),
   'app:check-update': z.object({}).strict(),
+  'app:download-update': z.object({}).strict(),
+  'app:install-update': z.object({}).strict(),
   'app:pick-git': z.object({}).strict(),
   'provider:status': z.object({ repoPath: absolutePath }),
   'provider:connect': z.object({

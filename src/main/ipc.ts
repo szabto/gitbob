@@ -29,7 +29,8 @@ import {
 import { addRemote, fetch, listRemotes, pull, push, removeRemote, type NetworkOptions } from '@git-core/remotes'
 import type { NetworkSession } from './network'
 import type { ProviderService } from './providers'
-import { appInfo, checkForUpdate, validateGitPath } from './app-info'
+import { appInfo, validateGitPath } from './app-info'
+import type { Updater } from './updater'
 import { applyStash, createStash, dropStash, getStashFiles, listStashes } from '@git-core/stash'
 import { createTag, deleteTag, listTags, pushTag } from '@git-core/tags'
 import { abortOperation, cherryPick, continueOperation, reset, revert, skipOperation } from '@git-core/history'
@@ -57,6 +58,7 @@ export interface IpcContext {
   /** Validate and apply a settings change (theme, git path, …); returns the new settings. */
   updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
   providers: ProviderService
+  updater: Updater
 }
 
 /**
@@ -354,7 +356,9 @@ export function registerIpc(ctx: IpcContext): void {
     'settings:get': async () => ctx.getSettings(),
     'settings:update': ({ patch }) => ctx.updateSettings(patch),
     'app:info': () => appInfo(),
-    'app:check-update': () => checkForUpdate(),
+    'app:check-update': () => ctx.updater.check(),
+    'app:download-update': () => ctx.updater.download(),
+    'app:install-update': () => ctx.updater.install(),
     'app:pick-git': async (_input, event) => {
       const win = BrowserWindow.fromWebContents(event.sender)
       const opts = {
