@@ -25,7 +25,7 @@ You can also start the workflow manually (Actions → Release → Run workflow) 
 
 ## Current state: unsigned builds
 
-Builds are **not code-signed** yet:
+Builds are **not signed with a Developer ID** yet. macOS builds are signed *ad-hoc* (a valid signature without an Apple account; an unsigned or stale signature makes Apple Silicon Macs kill the app at launch):
 
 - **macOS** shows "GitBob can't be opened because Apple cannot check it for malicious software". Users open it once with right-click → **Open**, or run `xattr -dr com.apple.quarantine /Applications/GitBob.app`.
 - **Windows** SmartScreen shows "Windows protected your PC". Users click **More info** → **Run anyway**.
@@ -49,7 +49,7 @@ Requires an Apple Developer Program membership.
    | `APPLE_APP_SPECIFIC_PASSWORD` | the app-specific password |
    | `APPLE_TEAM_ID` | your 10-character team ID |
 
-4. In `electron-builder.yml` remove `identity: null` and add `notarize: true` under `mac:`.
+4. In `electron-builder.yml` replace `identity: '-'` with your identity (or remove it to auto-discover), set `hardenedRuntime: true`, add an entitlements file allowing JIT (`com.apple.security.cs.allow-jit`) and `notarize: true` under `mac:`.
 5. In `release.yml` remove `CSC_IDENTITY_AUTO_DISCOVERY: 'false'` and pass the secrets above as environment variables to the packaging step.
 
 ### Windows
