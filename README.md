@@ -15,7 +15,8 @@
 <p align="center">
   <img alt="Free to use" src="https://img.shields.io/badge/price-free-3ee0f5?style=flat-square">
   <img alt="Electron + React + TypeScript" src="https://img.shields.io/badge/Electron%20%C2%B7%20React%20%C2%B7%20TypeScript-desktop-b46cff?style=flat-square">
-  <img alt="Platform: macOS (Windows and Linux planned)" src="https://img.shields.io/badge/macOS-verified-2f7bf5?style=flat-square&logo=apple">
+  <img alt="macOS, Windows and Linux" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-downloads-2f7bf5?style=flat-square">
+  <a href="https://github.com/szabto/gitbob/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/szabto/gitbob?style=flat-square&label=release"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-3a3a3a?style=flat-square">
   <img alt="Status: early alpha" src="https://img.shields.io/badge/status-early%20alpha-d69e2e?style=flat-square">
 </p>
@@ -69,9 +70,27 @@
 ## Get started
 
 > [!IMPORTANT]
-> GitBob is in **early alpha**. Signed installers are not published yet. Until then you can run it from source in a few minutes.
+> GitBob is in **early alpha**. It's careful with your work, but keep your usual backups and pushes.
 
-**You need:** [Git](https://git-scm.com/downloads) (2.30 or newer) and [Node.js](https://nodejs.org/) (22 or newer).
+**1. Install [Git](https://git-scm.com/downloads)** if you don't have it. GitBob uses the Git on your computer for everything.
+
+**2. Download GitBob** (latest release):
+
+| Platform | Download |
+|---|---|
+| macOS, Apple Silicon (M1 and newer) | [GitBob-mac-arm64.dmg](https://github.com/szabto/gitbob/releases/latest/download/GitBob-mac-arm64.dmg) |
+| macOS, Intel | [GitBob-mac-x64.dmg](https://github.com/szabto/gitbob/releases/latest/download/GitBob-mac-x64.dmg) |
+| Windows 10/11, 64-bit | [GitBob-win-x64.exe](https://github.com/szabto/gitbob/releases/latest/download/GitBob-win-x64.exe) |
+| Linux, x64 | [AppImage](https://github.com/szabto/gitbob/releases/latest/download/GitBob-linux-x86_64.AppImage) · [.deb](https://github.com/szabto/gitbob/releases/latest/download/GitBob-linux-amd64.deb) |
+
+These builds aren't signed with a developer certificate yet. **macOS:** open GitBob the first time with right-click → **Open**. **Windows:** if SmartScreen appears, click **More info** → **Run anyway**.
+
+**3. Open a project:** click **Open Repository…**, **Clone…** or **New repository…**. That's it.
+
+<details>
+<summary>Run from source instead</summary>
+
+You need Git and [Node.js](https://nodejs.org/) 22 or newer.
 
 ```sh
 git clone https://github.com/szabto/gitbob.git
@@ -80,11 +99,7 @@ npm install
 npm run dev
 ```
 
-GitBob opens. Click **Open Repository…** and choose any folder that contains a Git project. That's it.
-
-Want a real app bundle instead? `npm run dist:mac` builds an (unsigned) `.dmg` into `release/`. Because it isn't signed yet, macOS will ask you to confirm the first launch (right-click the app → **Open**).
-
-**Platforms:** everything below is tested on **macOS**. Windows and Linux builds are configured but not tested yet.
+</details>
 
 <br>
 
@@ -314,7 +329,7 @@ Every screenshot in this README is the real app working on a real Git repository
 
 ### On the roadmap
 
-Git LFS, sign in with OAuth (instead of tokens), reviewing and merging pull requests in the app, automatic updates, and signed installers for macOS, Windows and Linux.
+Git LFS, sign in with OAuth (instead of tokens), reviewing and merging pull requests in the app, automatic updates, and installers signed with developer certificates.
 
 <br>
 
@@ -354,7 +369,7 @@ Every shortcut can be changed in **Settings → Keyboard shortcuts**. Don't reme
 
 **Does it send data anywhere?** No telemetry, no analytics. The only network traffic is Git talking to your remotes, the hosting service you connect yourself, and, only if you ask for it in Settings, a check of GitHub Releases for a newer GitBob.
 
-**Windows and Linux?** Builds are configured and planned. They aren't tested yet, so we don't promise them yet.
+**Windows and Linux?** Yes. Every change is tested automatically on macOS, Windows and Linux (the full end-to-end suite runs on macOS and Linux), and each release ships installers for all three.
 
 <br>
 
