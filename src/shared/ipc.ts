@@ -198,7 +198,9 @@ export const ipcInputSchemas = {
       .object({
         theme: z.enum(['system', 'light', 'dark']).optional(),
         usePlatformCredentialHelper: z.boolean().optional(),
-        gitPath: z.string().min(1).max(4096).nullable().optional(),
+        // Only resetting is allowed from the renderer; a custom git is chosen in the main
+        // process's native file picker (app:pick-git), never sent as a path.
+        gitPath: z.null().optional(),
         shortcuts: z.record(z.string().regex(/^[a-z0-9.:-]{1,64}$/i), z.string().max(64)).optional(),
         autoCheckUpdates: z.boolean().optional(),
       })

@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AppSettings } from '@shared/types'
+import type { IpcInput } from '@shared/ipc'
+
+/** What the renderer may change (a custom git path is only set via the native picker). */
+type SettingsPatch = IpcInput<'settings:update'>['patch']
 import { call } from '../lib/api'
 import { useDialog } from '../lib/useDialog'
 import type { Command } from '../lib/commands'
@@ -17,7 +21,7 @@ export function SettingsDialog({ commands, onClose }: { commands: Command[]; onC
   const info = useQuery({ queryKey: ['app-info'], queryFn: () => call('app:info', {}) })
   const { showError } = useUiStore.getState()
 
-  const update = async (patch: Partial<AppSettings>): Promise<void> => {
+  const update = async (patch: SettingsPatch): Promise<void> => {
     try {
       qc.setQueryData(['settings'], await call('settings:update', { patch }))
       if (patch.gitPath !== undefined) void qc.invalidateQueries({ queryKey: ['app-info'] })
@@ -93,7 +97,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   )
 }
 
-function General({ s, update }: { s: AppSettings; update: (p: Partial<AppSettings>) => Promise<void> }) {
+function General({ s, update }: { s: AppSettings; update: (p: SettingsPatch) => Promise<void> }) {
   const diffMode = useUiStore((st) => st.diffMode)
   const setDiffMode = useUiStore((st) => st.setDiffMode)
   return (
@@ -145,7 +149,7 @@ function GitTab({
   gitVersion,
 }: {
   s: AppSettings
-  update: (p: Partial<AppSettings>) => Promise<void>
+  update: (p: SettingsPatch) => Promise<void>
   gitPath: string | undefined
   gitVersion: string | null
 }) {
@@ -189,7 +193,7 @@ function Shortcuts({
   commands,
 }: {
   s: AppSettings
-  update: (p: Partial<AppSettings>) => Promise<void>
+  update: (p: SettingsPatch) => Promise<void>
   commands: Command[]
 }) {
   const [recording, setRecording] = useState<string | null>(null)
@@ -263,7 +267,7 @@ function Shortcuts({
   )
 }
 
-function About({ s, update, version }: { s: AppSettings; update: (p: Partial<AppSettings>) => Promise<void>; version: string | undefined }) {
+function About({ s, update, version }: { s: AppSettings; update: (p: SettingsPatch) => Promise<void>; version: string | undefined }) {
   const [result, setResult] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
   return (

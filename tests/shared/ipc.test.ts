@@ -85,3 +85,12 @@ describe('ipc input schemas', () => {
     }
   })
 })
+
+describe('settings:update', () => {
+  it('never accepts an executable path from the renderer', () => {
+    expect(ipcInputSchemas['settings:update'].safeParse({ patch: { gitPath: '/tmp/evil' } }).success).toBe(false)
+    expect(ipcInputSchemas['settings:update'].safeParse({ patch: { gitPath: null } }).success).toBe(true)
+    expect(ipcInputSchemas['settings:update'].safeParse({ patch: { theme: 'dark' } }).success).toBe(true)
+    expect(ipcInputSchemas['settings:update'].safeParse({ patch: { unknown: 1 } }).success).toBe(false)
+  })
+})
