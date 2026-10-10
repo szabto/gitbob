@@ -37,7 +37,7 @@ export function OperationBanner({
           <button
             disabled={conflicts > 0}
             onClick={() => void actions.continueOperation()}
-            className="rounded bg-accent px-2.5 py-0.5 font-medium text-[#0b1220] disabled:opacity-40"
+            className="rounded bg-accent px-2.5 py-0.5 font-medium text-on-accent disabled:opacity-40"
           >
             Continue
           </button>

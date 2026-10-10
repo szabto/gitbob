@@ -1,6 +1,7 @@
-import { Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron'
+import { app, Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron'
 
 export interface MenuOptions {
+  onSettings: () => void
   theme: 'system' | 'light' | 'dark'
   onThemeChange: (theme: 'system' | 'light' | 'dark') => void
 }
@@ -10,13 +11,33 @@ export function buildMenu(getWindow: () => BrowserWindow | null, opts: MenuOptio
   const send = (channel: string): void => getWindow()?.webContents.send(channel)
 
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' as const },
+              { type: 'separator' as const },
+              { label: 'Settings…', accelerator: 'Cmd+,', click: () => opts.onSettings() },
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const },
+            ],
+          },
+        ]
+      : []),
     {
       label: 'File',
       submenu: [
         { label: 'Open Repository…', accelerator: 'CmdOrCtrl+O', click: () => send('menu:open-repository') },
         { label: 'Clone Repository…', accelerator: 'CmdOrCtrl+Shift+O', click: () => send('menu:clone-repository') },
         { label: 'New Repository…', accelerator: 'CmdOrCtrl+Alt+N', click: () => send('menu:init-repository') },
+        ...(isMac ? [] : [{ type: 'separator' as const }, { label: 'Settings…', accelerator: 'Ctrl+,', click: () => opts.onSettings() }]),
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
@@ -25,6 +46,8 @@ export function buildMenu(getWindow: () => BrowserWindow | null, opts: MenuOptio
     {
       label: 'View',
       submenu: [
+        { label: 'Command Palette…', accelerator: 'CmdOrCtrl+K', click: () => send('menu:command-palette') },
+        { type: 'separator' },
         { role: 'reload' },
         { role: 'toggleDevTools' },
         { type: 'separator' },

@@ -3,7 +3,7 @@ import { IPC_CHANNELS, type IpcChannel } from '@shared/channels'
 import { ipcInputSchemas } from '@shared/ipc'
 import type { IpcOutputs } from '@shared/ipc-types'
 import type { Result } from '@shared/result'
-import type { RepositoryInfo } from '@shared/types'
+import type { AppSettings, RepositoryInfo } from '@shared/types'
 import { GitError, toAppError } from '@git-core/errors'
 import { openRepository } from '@git-core/repository'
 import { getHead, listRefs } from '@git-core/refs'
@@ -29,6 +29,7 @@ import {
 import { addRemote, fetch, listRemotes, pull, push, removeRemote, type NetworkOptions } from '@git-core/remotes'
 import type { NetworkSession } from './network'
 import type { ProviderService } from './providers'
+import { appInfo, checkForUpdate, validateGitPath } from './app-info'
 import { applyStash, createStash, dropStash, getStashFiles, listStashes } from '@git-core/stash'
 import { createTag, deleteTag, listTags, pushTag } from '@git-core/tags'
 import { abortOperation, cherryPick, continueOperation, reset, revert, skipOperation } from '@git-core/history'
@@ -52,7 +53,9 @@ export interface IpcContext {
   /** Called whenever a repository is opened (e.g. to start watching it). */
   onRepositoryOpened?: (info: RepositoryInfo) => void
   network: NetworkSession
-  getSettings: () => { theme: 'system' | 'light' | 'dark' }
+  getSettings: () => AppSettings
+  /** Validate and apply a settings change (theme, git path, …); returns the new settings. */
+  updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
   providers: ProviderService
 }
 
@@ -348,9 +351,23 @@ export function registerIpc(ctx: IpcContext): void {
         repoPath,
       ),
     'commit:signature': ({ repoPath, sha }) => getSignature(requireOpened(repoPath), sha),
-    'settings:get': async () => {
-      const { theme } = ctx.getSettings()
-      return { theme }
+    'settings:get': async () => ctx.getSettings(),
+    'settings:update': ({ patch }) => ctx.updateSettings(patch),
+    'app:info': () => appInfo(),
+    'app:check-update': () => checkForUpdate(),
+    'app:pick-git': async (_input, event) => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const opts = {
+        title: 'Choose the Git program',
+        buttonLabel: 'Use this Git',
+        properties: ['openFile' as const, 'showHiddenFiles' as const],
+      }
+      const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+      const path = res.filePaths[0]
+      if (res.canceled || !path) return null
+      const version = await validateGitPath(path)
+      await ctx.updateSettings({ gitPath: path })
+      return { path, version }
     },
     'provider:status': ({ repoPath }) => ctx.providers.status(requireOpened(repoPath)),
     'provider:connect': ({ repoPath, token }) => ctx.providers.connect(requireOpened(repoPath), token),

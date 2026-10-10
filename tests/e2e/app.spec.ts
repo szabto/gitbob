@@ -127,7 +127,7 @@ test('opens a repository via the dialog, remembers it, and reports invalid folde
     await expect(page.getByTestId('repo-tab')).toHaveCount(1)
     await expect(page.getByTestId('commit-row')).toHaveCount(8)
     await page.getByRole('button', { name: 'New tab' }).click()
-    const recent = page.getByRole('button', { name: new RegExp(repo.dir.split('/').pop()!) })
+    const recent = page.getByTestId('recent-repo').filter({ hasText: repo.dir.split('/').pop()! })
     await expect(recent).toBeVisible()
     await recent.click()
     await expect(page.getByTestId('repo-tab')).toHaveCount(1)

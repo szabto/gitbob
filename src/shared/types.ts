@@ -387,3 +387,30 @@ export interface ProviderStatus {
   /** Encrypted token storage is available on this system. */
   canStoreTokens: boolean
 }
+
+// ---------------------------------------------------------------------------
+// Settings and app info (M8)
+
+export interface AppSettings {
+  theme: 'system' | 'light' | 'dark'
+  usePlatformCredentialHelper: boolean
+  gitPath: string | null
+  /** Command id -> accelerator overrides, e.g. { "repo.fetch": "Mod+Shift+F" }. */
+  shortcuts: Record<string, string>
+  autoCheckUpdates: boolean
+}
+
+export interface AppInfo {
+  version: string
+  platform: string
+  home: string
+  gitPath: string
+  gitVersion: string | null
+}
+
+export interface UpdateInfo {
+  current: string
+  latest: string | null
+  newer: boolean
+  url: string | null
+}

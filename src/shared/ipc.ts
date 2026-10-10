@@ -193,6 +193,20 @@ export const ipcInputSchemas = {
   'commit:signature': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'reflog:get': z.object({ repoPath: absolutePath, limit: z.number().int().min(1).max(10_000).default(200) }),
   'settings:get': z.object({}).strict(),
+  'settings:update': z.object({
+    patch: z
+      .object({
+        theme: z.enum(['system', 'light', 'dark']).optional(),
+        usePlatformCredentialHelper: z.boolean().optional(),
+        gitPath: z.string().min(1).max(4096).nullable().optional(),
+        shortcuts: z.record(z.string().regex(/^[a-z0-9.:-]{1,64}$/i), z.string().max(64)).optional(),
+        autoCheckUpdates: z.boolean().optional(),
+      })
+      .strict(),
+  }),
+  'app:info': z.object({}).strict(),
+  'app:check-update': z.object({}).strict(),
+  'app:pick-git': z.object({}).strict(),
   'provider:status': z.object({ repoPath: absolutePath }),
   'provider:connect': z.object({
     repoPath: absolutePath,

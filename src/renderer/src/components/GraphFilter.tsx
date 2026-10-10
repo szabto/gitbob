@@ -139,7 +139,7 @@ function FilterForm({
         <button type="button" onClick={() => onApply(null)} className="rounded border border-border px-2 py-0.5 text-fg hover:bg-panel-2">
           Show all
         </button>
-        <button type="submit" className="rounded bg-accent px-2 py-0.5 font-medium text-[#0b1220]">
+        <button type="submit" className="rounded bg-accent px-2 py-0.5 font-medium text-on-accent">
           Apply filter
         </button>
       </div>

@@ -38,19 +38,6 @@ export function GraphSearch({
     onMatchesChange(query && search.data ? new Set(search.data.shas) : null)
   }, [query, search.data, onMatchesChange])
 
-  // Cmd/Ctrl+F focuses the search box.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        inputRef.current?.focus()
-        inputRef.current?.select()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
-
   const go = (delta: number): void => {
     if (shas.length === 0) return
     const next = jumped ? (index + delta + shas.length) % shas.length : delta < 0 ? shas.length - 1 : 0
@@ -63,6 +50,7 @@ export function GraphSearch({
     <div className="ml-auto flex min-w-0 items-center gap-1 pl-2 font-normal" data-testid="graph-search">
       <input
         ref={inputRef}
+        id="graph-search-input"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {

@@ -63,6 +63,10 @@ export const IPC_CHANNELS = [
   'submodule:update',
   'commit:signature',
   'settings:get',
+  'settings:update',
+  'app:info',
+  'app:check-update',
+  'app:pick-git',
   'provider:status',
   'provider:connect',
   'provider:disconnect',
@@ -85,5 +89,9 @@ export const IPC_EVENTS = [
   'theme:changed',
   'menu:clone-repository',
   'menu:init-repository',
+  'menu:settings',
+  'menu:command-palette',
+  'settings:changed',
+  'app:update-available',
 ] as const
 export type IpcEventName = (typeof IPC_EVENTS)[number]

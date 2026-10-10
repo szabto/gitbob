@@ -140,6 +140,13 @@ try {
   await page.getByTestId('stash-panel').waitFor()
   await shot(page, 'gitbob-stash')
 
+  // Command palette.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('menu:command-palette'))
+  await page.getByLabel('Type a command').fill('pu')
+  await page.getByTestId('palette-item').first().waitFor()
+  await shot(page, 'gitbob-palette')
+  await page.keyboard.press('Escape')
+
   // Light theme.
   await app.evaluate(({ nativeTheme, BrowserWindow }) => {
     nativeTheme.themeSource = 'light'

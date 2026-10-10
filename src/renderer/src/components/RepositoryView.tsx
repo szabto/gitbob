@@ -18,7 +18,8 @@ import { OperationBanner } from './OperationBanner'
 import { BlameView } from './BlameView'
 import { RebaseDialog } from './RebaseDialog'
 import { CreatePullRequestDialog, PROVIDER_NAMES } from './PullRequests'
-import { useProviderStatus } from '../lib/queries'
+import { useAppInfo, useProviderStatus } from '../lib/queries'
+import { displayPath } from '../lib/format'
 import type { GitRef as GitRefType } from '@shared/types'
 import { useUiStore } from '../state/ui'
 
@@ -102,6 +103,7 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
   const stashEntry = stashes.data?.find((s) => s.sha === selectedStash?.sha)
   const branchLabel = currentBranchName(head.data?.ref ?? null)
   const provider = useProviderStatus(repo.root)
+  const appInfo = useAppInfo()
   const [prBranch, setPrBranch] = useState<GitRefType | null>(null)
 
   const currentBranch = head.data?.ref?.startsWith('refs/heads/') ? head.data.ref.slice('refs/heads/'.length) : null
@@ -113,8 +115,8 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
         <span className="font-semibold" data-testid="repo-name">
           {repo.name}
         </span>
-        <span className="truncate text-xs text-muted" title={repo.root}>
-          {repo.root}
+        <span className="truncate text-xs text-muted" title={repo.root} data-testid="repo-path">
+          {displayPath(repo.root, appInfo.data?.home)}
         </span>
         <span className="ml-2 rounded bg-panel-2 px-2 py-0.5 text-xs" data-testid="head-label">
           {head.data

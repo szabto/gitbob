@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useDialog } from '../lib/useDialog'
 import { useUiStore } from '../state/ui'
 
 export function ContextMenu() {
@@ -82,13 +83,16 @@ function PromptForm({
   onClose: (v: string | null) => void
 }) {
   const [value, setValue] = useState(prompt.initialValue ?? prompt.choices?.[0] ?? '')
+  const dialogRef = useDialog<HTMLFormElement>(() => onClose(null))
   return (
     <div
       className="fixed inset-0 z-40 flex items-start justify-center bg-black/50 pt-[15vh]"
       onMouseDown={() => onClose(null)}
     >
       <form
+        ref={dialogRef}
         role="dialog"
+        aria-modal="true"
         aria-label={prompt.title}
         data-testid="prompt-dialog"
         className="w-[420px] rounded-lg border border-border bg-panel p-4 shadow-2xl"
@@ -97,14 +101,14 @@ function PromptForm({
           e.preventDefault()
           if (value.trim() || prompt.allowEmpty) onClose(value.trim())
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') onClose(null)
-        }}
       >
         <h2 className="mb-3 font-semibold">{prompt.title}</h2>
-        <label className="mb-1 block text-xs text-muted">{prompt.label}</label>
+        <label className="mb-1 block text-xs text-muted" htmlFor="prompt-input">
+          {prompt.label}
+        </label>
         {prompt.choices ? (
           <select
+            id="prompt-input"
             autoFocus
             value={value}
             onChange={(e) => setValue(e.target.value)}
@@ -117,6 +121,7 @@ function PromptForm({
           </select>
         ) : prompt.multiline ? (
           <textarea
+            id="prompt-input"
             autoFocus
             rows={4}
             value={value}
@@ -127,6 +132,7 @@ function PromptForm({
           />
         ) : (
           <input
+            id="prompt-input"
             autoFocus
             type={prompt.secret ? 'password' : 'text'}
             autoComplete="off"
@@ -145,7 +151,7 @@ function PromptForm({
           <button
             type="submit"
             disabled={!value.trim() && !prompt.allowEmpty}
-            className="rounded bg-accent px-3 py-1 font-medium text-[#0b1220] disabled:opacity-40"
+            className="rounded bg-accent px-3 py-1 font-medium text-on-accent disabled:opacity-40"
           >
             {prompt.confirmLabel ?? 'OK'}
           </button>

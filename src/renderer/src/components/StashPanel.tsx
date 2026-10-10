@@ -37,7 +37,7 @@ export function StashPanel({
         </p>
         <div className="mt-3 flex gap-2">
           <button
-            className="rounded bg-gradient-to-r from-accent to-accent-2 px-3 py-1 font-medium text-[#0b1220]"
+            className="rounded bg-gradient-to-r from-accent to-accent-2 px-3 py-1 font-medium text-on-accent"
             onClick={() => void actions.applyStash(stash, true).then(() => selectStash(null))}
           >
             Pop

@@ -10,36 +10,38 @@ export function TabBar() {
   if (tabs.length === 0) return null
 
   return (
-    <div className="flex h-8 shrink-0 items-end gap-0.5 border-b border-border bg-panel-2 px-2" role="tablist" data-testid="tab-bar">
-      {tabs.map((t) => {
-        const active = t.root === repo?.root
-        return (
-          <div
-            key={t.root}
-            role="tab"
-            aria-selected={active}
-            data-testid="repo-tab"
-            title={t.root}
-            onClick={() => setRepo(t)}
-            onAuxClick={(e) => e.button === 1 && closeTab(t.root)}
-            className={`group flex h-7 max-w-52 cursor-default items-center gap-2 rounded-t border border-b-0 px-3 text-xs ${
-              active ? 'border-border bg-panel text-fg' : 'border-transparent text-muted hover:bg-panel/60'
-            }`}
-          >
-            <span className="truncate">{t.name}</span>
-            <button
-              aria-label={`Close ${t.name}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                closeTab(t.root)
-              }}
-              className={`rounded px-0.5 leading-none hover:bg-fg/10 ${active ? '' : 'invisible group-hover:visible'}`}
+    <div className="flex h-8 shrink-0 items-end gap-0.5 border-b border-border bg-panel-2 px-2" data-testid="tab-bar">
+      <nav aria-label="Open repositories" className="flex min-w-0 items-end gap-0.5">
+        {tabs.map((t) => {
+          const active = t.root === repo?.root
+          return (
+            <div
+              key={t.root}
+              className={`group flex h-7 max-w-52 items-center rounded-t border border-b-0 ${
+                active ? 'border-border bg-panel text-fg' : 'border-transparent text-muted hover:bg-panel/60'
+              }`}
             >
-              ✕
-            </button>
-          </div>
-        )
-      })}
+              <button
+                aria-current={active ? 'page' : undefined}
+                data-testid="repo-tab"
+                title={t.root}
+                onClick={() => setRepo(t)}
+                onAuxClick={(e) => e.button === 1 && closeTab(t.root)}
+                className="min-w-0 truncate py-1 pr-1 pl-3 text-left text-xs"
+              >
+                {t.name}
+              </button>
+              <button
+                aria-label={`Close ${t.name}`}
+                onClick={() => closeTab(t.root)}
+                className={`mr-1 rounded px-1 text-xs leading-none hover:bg-fg/10 focus:visible ${active ? '' : 'invisible group-hover:visible'}`}
+              >
+                ✕
+              </button>
+            </div>
+          )
+        })}
+      </nav>
       <button
         aria-label="New tab"
         onClick={newTab}

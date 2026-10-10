@@ -9,6 +9,9 @@ import { NetworkSession } from './network'
 import { SettingsStore } from './settings'
 import { TokenStore } from './tokens'
 import { ProviderService } from './providers'
+import { checkForUpdate, validateGitPath } from './app-info'
+import { setGitBinary } from '@git-core/runner'
+import type { AppSettings } from '@shared/types'
 
 // Allow tests to isolate persisted state.
 if (process.env.GITBOB_USER_DATA) app.setPath('userData', resolve(process.env.GITBOB_USER_DATA))
@@ -108,8 +111,38 @@ void app.whenReady().then(async () => {
     },
   })
 
+  const loaded = settings.get()
+  if (loaded.gitPath) {
+    // A custom git that no longer works falls back to PATH instead of breaking every command.
+    await validateGitPath(loaded.gitPath)
+      .then(() => setGitBinary(loaded.gitPath!))
+      .catch(() => console.error('Configured git executable is not usable; using git from PATH'))
+  }
+
+  const broadcastSettings = (): void => {
+    for (const w of BrowserWindow.getAllWindows()) w.webContents.send('settings:changed', settings.get())
+  }
+  const updateSettings = async (patch: Partial<AppSettings>): Promise<AppSettings> => {
+    if (patch.gitPath !== undefined) {
+      if (patch.gitPath === null) setGitBinary('git')
+      else {
+        await validateGitPath(patch.gitPath)
+        setGitBinary(patch.gitPath)
+      }
+    }
+    await settings.update(patch)
+    if (patch.theme) {
+      nativeTheme.themeSource = patch.theme
+      for (const w of BrowserWindow.getAllWindows()) w.webContents.send('theme:changed', { theme: patch.theme })
+    }
+    rebuildMenu()
+    broadcastSettings()
+    return settings.get()
+  }
+
   const ctx: IpcContext = {
     getSettings: () => settings.get(),
+    updateSettings,
     providers: new ProviderService(new TokenStore(app.getPath('userData'))),
     recent: new RecentRepositoryStore(app.getPath('userData')),
     isTrustedSender,
@@ -125,17 +158,24 @@ void app.whenReady().then(async () => {
   }
   registerIpc(ctx)
 
-  const rebuildMenu = (): void =>
+  function rebuildMenu(): void {
     buildMenu(() => mainWindow, {
       theme: settings.get().theme,
-      onThemeChange: (theme) => {
-        nativeTheme.themeSource = theme
-        for (const w of BrowserWindow.getAllWindows()) w.webContents.send('theme:changed', { theme })
-        void settings.update({ theme }).then(rebuildMenu)
-      },
+      onThemeChange: (theme) => void updateSettings({ theme }),
+      onSettings: () => mainWindow?.webContents.send('menu:settings'),
     })
+  }
   rebuildMenu()
   mainWindow = createWindow()
+
+  if (settings.get().autoCheckUpdates) {
+    const win = mainWindow
+    win.webContents.once('did-finish-load', () => {
+      checkForUpdate()
+        .then((u) => u.newer && !win.isDestroyed() && win.webContents.send('app:update-available', u))
+        .catch(() => {})
+    })
+  }
 
   const initialRepo = repoFromArgs(process.argv)
   if (initialRepo) {

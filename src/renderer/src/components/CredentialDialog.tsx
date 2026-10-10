@@ -72,7 +72,7 @@ function CredentialForm({
             <button autoFocus className="rounded border border-border px-3 py-1 hover:bg-panel-2" onClick={() => onAnswer(null)}>
               Cancel
             </button>
-            <button className="rounded bg-accent px-3 py-1 font-medium text-[#0b1220]" onClick={() => onAnswer('yes')}>
+            <button className="rounded bg-accent px-3 py-1 font-medium text-on-accent" onClick={() => onAnswer('yes')}>
               Trust and connect
             </button>
           </div>
@@ -123,7 +123,7 @@ function CredentialForm({
           <button type="button" className="rounded border border-border px-3 py-1 hover:bg-panel-2" onClick={() => onAnswer(null)}>
             Cancel
           </button>
-          <button type="submit" className="rounded bg-accent px-3 py-1 font-medium text-[#0b1220]">
+          <button type="submit" className="rounded bg-accent px-3 py-1 font-medium text-on-accent">
             Continue
           </button>
         </div>

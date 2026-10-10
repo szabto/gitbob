@@ -114,7 +114,7 @@ function Resolver({
             disabled={save.isPending || conflicts.length > 0}
             title={conflicts.length > 0 ? 'Resolve every conflict first' : undefined}
             onClick={() => save.mutate(true, { onError: showError, onSuccess: onDone })}
-            className="rounded bg-gradient-to-r from-accent to-accent-2 px-2.5 py-0.5 font-medium text-[#0b1220] disabled:opacity-40"
+            className="rounded bg-gradient-to-r from-accent to-accent-2 px-2.5 py-0.5 font-medium text-on-accent disabled:opacity-40"
           >
             Save and mark resolved
           </button>

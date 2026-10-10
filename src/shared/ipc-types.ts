@@ -1,4 +1,7 @@
 import type {
+  AppInfo,
+  AppSettings,
+  UpdateInfo,
   CheckStatus,
   ProviderStatus,
   PullRequest,
@@ -100,7 +103,12 @@ export interface IpcOutputs {
   'submodule:list': SubmoduleInfo[]
   'submodule:update': void
   'commit:signature': SignatureInfo
-  'settings:get': { theme: 'system' | 'light' | 'dark' }
+  'settings:get': AppSettings
+  'settings:update': AppSettings
+  'app:info': AppInfo
+  'app:check-update': UpdateInfo
+  /** The validated git path, or null if the user cancelled. */
+  'app:pick-git': { path: string; version: string } | null
   'provider:status': ProviderStatus
   'provider:connect': { user: string }
   'provider:disconnect': { disconnected: boolean }
@@ -149,6 +157,10 @@ export interface IpcEvents {
   'theme:changed': { theme: 'system' | 'light' | 'dark' }
   'menu:clone-repository': void
   'menu:init-repository': void
+  'menu:settings': void
+  'menu:command-palette': void
+  'settings:changed': AppSettings
+  'app:update-available': UpdateInfo
 }
 
 type _EventsExhaustive = [IpcEventName] extends [keyof IpcEvents]

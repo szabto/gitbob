@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { RebaseAction, RebaseCommit, RebaseTodoItem } from '@shared/types'
 import { call } from '../lib/api'
+import { useDialog } from '../lib/useDialog'
 import { useRepoMutation } from '../lib/queries'
 import { formatShortDate, shortSha } from '../lib/format'
 import { useUiStore } from '../state/ui'
@@ -21,6 +22,7 @@ interface Row extends RebaseCommit {
 
 /** Interactive rebase of base..HEAD: reorder, reword, squash, fixup or drop commits. */
 export function RebaseDialog({ repoPath, base, onClose }: { repoPath: string; base: string; onClose: () => void }) {
+  const dialogRef = useDialog<HTMLDivElement>(onClose)
   const todo = useQuery({
     queryKey: ['rebase-todo', repoPath, base],
     queryFn: () => call('rebase:todo', { repoPath, base }),
@@ -30,12 +32,14 @@ export function RebaseDialog({ repoPath, base, onClose }: { repoPath: string; ba
   return (
     <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/50 pt-[8vh]" onMouseDown={onClose}>
       <div
+        ref={dialogRef}
         role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
         aria-label="Interactive rebase"
         data-testid="rebase-dialog"
         className="flex max-h-[80vh] w-[760px] max-w-[94vw] flex-col rounded-lg border border-border bg-panel shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === 'Escape' && onClose()}
       >
         <div className="border-b border-border p-4">
           <h2 className="font-semibold">Interactive rebase</h2>
@@ -169,7 +173,7 @@ function RebaseEditor({
         <button
           disabled={!!problem || unchanged || start.isPending}
           onClick={submit}
-          className="rounded bg-gradient-to-r from-accent to-accent-2 px-3 py-1 font-medium text-[#0b1220] disabled:opacity-40"
+          className="rounded bg-gradient-to-r from-accent to-accent-2 px-3 py-1 font-medium text-on-accent disabled:opacity-40"
         >
           {start.isPending ? 'Rebasing…' : 'Start rebase'}
         </button>

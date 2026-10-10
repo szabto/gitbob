@@ -1,11 +1,12 @@
 import type { GitRef } from '@shared/types'
 
 const kindStyle: Record<GitRef['kind'], string> = {
-  head: 'border-info/50 bg-info/15 text-info',
-  remote: 'border-purple/50 bg-purple/15 text-purple',
-  tag: 'border-warn/50 bg-warn/15 text-warn',
-  stash: 'border-muted/50 bg-muted/15 text-fg',
-  other: 'border-muted/50 bg-muted/15 text-fg',
+  // Text uses the normal foreground for contrast on any row background; color is in border/fill.
+  head: 'border-info/60 bg-info/15 text-fg',
+  remote: 'border-purple/60 bg-purple/15 text-fg',
+  tag: 'border-warn/60 bg-warn/15 text-fg',
+  stash: 'border-muted/60 bg-muted/15 text-fg',
+  other: 'border-muted/60 bg-muted/15 text-fg',
 }
 
 export function RefBadge({ gitRef, current }: { gitRef: GitRef; current: boolean }) {

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { GitRef, ProviderKind, ProviderStatus, RepoRef } from '@shared/types'
 import { call } from '../lib/api'
+import { useDialog } from '../lib/useDialog'
 import { usePullRequests } from '../lib/queries'
 import { useUiStore } from '../state/ui'
 import type { useRepoActions } from '../lib/actions'
@@ -194,6 +195,7 @@ export function CreatePullRequestDialog({
   defaultTitle: string
   onClose: () => void
 }) {
+  const dialogRef = useDialog<HTMLFormElement>(onClose)
   const [title, setTitle] = useState(defaultTitle)
   const [body, setBody] = useState('')
   const [target, setTarget] = useState(targets.find((t) => t === 'main' || t === 'master') ?? targets[0] ?? 'main')
@@ -220,12 +222,14 @@ export function CreatePullRequestDialog({
   return (
     <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/50 pt-[10vh]" onMouseDown={onClose}>
       <form
+        ref={dialogRef}
         role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
         aria-label="Create pull request"
         data-testid="create-pr-dialog"
         className="w-[560px] max-w-[94vw] rounded-lg border border-border bg-panel p-4 shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === 'Escape' && onClose()}
         onSubmit={(e) => {
           e.preventDefault()
           void submit()
@@ -267,7 +271,7 @@ export function CreatePullRequestDialog({
           <button
             type="submit"
             disabled={busy || !title.trim() || target === branch}
-            className="rounded bg-gradient-to-r from-accent to-accent-2 px-3 py-1 font-medium text-[#0b1220] disabled:opacity-40"
+            className="rounded bg-gradient-to-r from-accent to-accent-2 px-3 py-1 font-medium text-on-accent disabled:opacity-40"
           >
             {busy ? 'Creating…' : 'Create pull request'}
           </button>

@@ -306,7 +306,7 @@ function CommitComposer({ repoPath, stagedCount, unborn }: { repoPath: string; s
       <button
         type="submit"
         disabled={!canCommit}
-        className="w-full rounded bg-gradient-to-r from-accent to-accent-2 py-1.5 font-medium text-[#0b1220] disabled:cursor-not-allowed disabled:opacity-40"
+        className="w-full rounded bg-gradient-to-r from-accent to-accent-2 py-1.5 font-medium text-on-accent disabled:cursor-not-allowed disabled:opacity-40"
       >
         {commit.isPending
           ? 'Committing…'

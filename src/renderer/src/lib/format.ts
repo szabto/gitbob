@@ -12,3 +12,11 @@ export function formatShortDate(epochSeconds: number): string {
 export function shortSha(sha: string): string {
   return sha.slice(0, 7)
 }
+
+/** Show paths under the home folder as ~/… (display only; real paths are used everywhere else). */
+export function displayPath(path: string, home: string | undefined): string {
+  if (!home) return path
+  const h = home.replace(/[\\/]+$/, '')
+  if (path === h) return '~'
+  return path.startsWith(h + '/') || path.startsWith(h + '\\') ? '~' + path.slice(h.length) : path
+}

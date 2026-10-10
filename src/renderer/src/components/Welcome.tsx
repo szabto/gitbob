@@ -1,4 +1,5 @@
-import { useRecent } from '../lib/queries'
+import { useAppInfo, useRecent } from '../lib/queries'
+import { displayPath } from '../lib/format'
 import logoUrl from '../assets/logo.png'
 
 export function Welcome({
@@ -13,6 +14,7 @@ export function Welcome({
   onInit: () => void
 }) {
   const recent = useRecent()
+  const info = useAppInfo()
 
   return (
     <div className="flex flex-1 items-center justify-center">
@@ -27,7 +29,7 @@ export function Welcome({
 
         <button
           onClick={onPick}
-          className="w-full rounded-md bg-gradient-to-r from-accent to-accent-2 px-4 py-2.5 font-medium text-[#0b1220] hover:brightness-110"
+          className="w-full rounded-md bg-gradient-to-r from-accent to-accent-2 px-4 py-2.5 font-medium text-on-accent hover:brightness-110"
         >
           Open Repository…
         </button>
@@ -47,11 +49,14 @@ export function Welcome({
               {recent.data.map((r) => (
                 <li key={r.path}>
                   <button
+                    data-testid="recent-repo"
                     onClick={() => onOpenPath(r.path)}
                     className="flex w-full flex-col items-start border-b border-border px-3 py-2 text-left last:border-b-0 hover:bg-panel-2"
                   >
                     <span className="font-medium">{r.name}</span>
-                    <span className="w-full truncate text-xs text-muted">{r.path}</span>
+                    <span className="w-full truncate text-xs text-muted" title={r.path}>
+                      {displayPath(r.path, info.data?.home)}
+                    </span>
                   </button>
                 </li>
               ))}

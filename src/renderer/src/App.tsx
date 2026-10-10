@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { RepositoryInfo } from '@shared/types'
 import { useQueryClient } from '@tanstack/react-query'
 import { call, subscribe } from './lib/api'
@@ -9,6 +9,7 @@ import { ErrorBanner } from './components/ErrorBanner'
 import { ContextMenu, PromptDialog } from './components/Overlays'
 import { CredentialDialog } from './components/CredentialDialog'
 import { TabBar } from './components/TabBar'
+import { CommandHost } from './components/CommandHost'
 import { useUiStore } from './state/ui'
 
 export function App() {
@@ -92,6 +93,11 @@ export function App() {
     return subscribe('theme:changed', ({ theme }) => apply(theme))
   }, [])
 
+  const commandApp = useMemo(
+    () => ({ openRepository: () => void pickRepository(), cloneRepository: () => void cloneRepository(), initRepository: () => void initRepository() }),
+    [pickRepository, cloneRepository, initRepository],
+  )
+
   // Restore the previous session's tabs once, then remember them as they change.
   const tabs = useAppStore((s) => s.tabs)
   const [restored, setRestored] = useState(false)
@@ -160,6 +166,7 @@ export function App() {
       ) : (
         <Welcome onPick={pickRepository} onOpenPath={openPath} onClone={cloneRepository} onInit={initRepository} />
       )}
+      <CommandHost repo={repo} app={commandApp} />
       <ContextMenu />
       <PromptDialog />
       <CredentialDialog />

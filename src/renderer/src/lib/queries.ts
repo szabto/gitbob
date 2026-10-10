@@ -5,12 +5,12 @@ import { call } from './api'
 
 export const PAGE_SIZE = 2000
 
-export function useRefs(repoPath: string) {
-  return useQuery({ queryKey: ['refs', repoPath], queryFn: () => call('repo:refs', { repoPath }) })
+export function useRefs(repoPath: string, enabled = true) {
+  return useQuery({ queryKey: ['refs', repoPath], queryFn: () => call('repo:refs', { repoPath }), enabled })
 }
 
-export function useHead(repoPath: string) {
-  return useQuery({ queryKey: ['head', repoPath], queryFn: () => call('repo:head', { repoPath }) })
+export function useHead(repoPath: string, enabled = true) {
+  return useQuery({ queryKey: ['head', repoPath], queryFn: () => call('repo:head', { repoPath }), enabled })
 }
 
 export function useHistory(repoPath: string, filter: HistoryFilter | null = null) {
@@ -84,8 +84,12 @@ export function useRepoMutation<TVars, TData>(
   return useMutation({ mutationFn: fn, onSettled: () => invalidate(opts) })
 }
 
-export function useRemotes(repoPath: string) {
-  return useQuery({ queryKey: ['remotes', repoPath], queryFn: () => call('remote:list', { repoPath }) })
+export function useRemotes(repoPath: string, enabled = true) {
+  return useQuery({ queryKey: ['remotes', repoPath], queryFn: () => call('remote:list', { repoPath }), enabled })
+}
+
+export function useAppInfo() {
+  return useQuery({ queryKey: ['app-info'], queryFn: () => call('app:info', {}), staleTime: Infinity })
 }
 
 export function useHistorySearch(repoPath: string, query: string) {
