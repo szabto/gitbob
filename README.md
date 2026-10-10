@@ -206,11 +206,17 @@ Every screenshot in this README is the real app working on a real Git repository
       Create · checkout (local, remote-tracking, detached) · rename · delete (with unmerged protection) · upstream and ahead/behind · remotes add/remove · fetch with prune · pull ff-only/merge/rebase · push with upstream · force-with-lease · HTTPS credential prompt · progress and cancel
     </td>
   </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <h4>🎨 Comfortable</h4>
+      Light, dark or match-system theme (View → Theme) · native menus · keyboard navigation · remembers recent repositories
+    </td>
+  </tr>
 </table>
 
 ### On the roadmap
 
-Stash, tags management, reset, revert and cherry-pick from the UI, interactive rebase, a side-by-side diff with syntax highlighting, line-by-line staging, a three-way merge conflict editor, light theme, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux. Progress is tracked in [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md).
+Stash, tags management, reset, revert and cherry-pick from the UI, interactive rebase, a side-by-side diff with syntax highlighting, line-by-line staging, a three-way merge conflict editor, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux. Progress is tracked in [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md).
 
 <br>
 

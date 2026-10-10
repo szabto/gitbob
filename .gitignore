@@ -9,5 +9,3 @@ playwright-report/
 *.log
 .vite/
 
-# Landing page lives in its own repository (gitbob-site)
-site/
