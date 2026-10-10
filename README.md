@@ -165,6 +165,15 @@ Right-click any commit for the time-travel tools:
 - **Revert** adds a new commit that undoes it (safe for shared branches).
 - **Reset** moves your branch back to that commit. *Soft* keeps the changes staged, *mixed* keeps them as unstaged edits, *hard* throws them away. Before a hard reset GitBob asks you, and saves your uncommitted work as a backup stash so it can come back.
 - **Create tag** marks a release, with an optional message. Push or delete tags from the sidebar.
+- **Blame** (in any file's diff) shows who last changed each line and links to that commit.
+
+Want to tidy up before sharing? Right-click the commit *before* the ones you want to change and choose **Interactive rebase onto here**. Reorder commits with the arrows, and for each one pick **Reword** (new message), **Squash** or **Fixup** (fold into the commit above) or **Drop**.
+
+<p align="center">
+  <img src="docs/images/gitbob-rebase.png" alt="The interactive rebase dialog listing three commits with Pick, Reword and Squash actions and a new message being typed" width="100%">
+</p>
+
+Lost something after a reset or rebase? Open **Reflog** in the sidebar: it lists everywhere your HEAD has been. Right-click an entry to create a branch there and get the work back.
 
 Need to switch tasks with half-finished work? Click **Stash…** in Working changes. Your edits are put aside and the working tree is clean. They wait under **Stashes** in the sidebar, where **Pop** brings them back.
 
@@ -227,6 +236,18 @@ Every screenshot in this README is the real app working on a real Git repository
   </tr>
   <tr>
     <td width="50%" valign="top">
+      <img src="docs/images/gitbob-rebase.png" alt="Interactive rebase dialog" width="100%">
+      <h3>Rewrite history safely</h3>
+      Interactive rebase without a text editor: reorder, reword, squash, fixup or drop commits in a dialog. If a conflict stops it, the banner takes you through Continue or Abort. The reflog keeps every former state one right-click away.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/gitbob-blame.png" alt="Blame view" width="100%">
+      <h3>Know the why behind every line</h3>
+      Blame any file in your working tree or in any commit. Each block shows the commit, author and date; one click jumps to the commit in the graph.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
       <img src="docs/images/gitbob-search.png" alt="Searching the history for forecast: matching commits are highlighted and the rest are dimmed" width="100%">
       <h3>Find anything</h3>
       <kbd>⌘F</kbd> searches the whole history (not just what's on screen) by message, author, committer or commit id. Matches light up, everything else fades, and <kbd>Enter</kbd> jumps to the next one, loading older history when needed.
@@ -260,8 +281,8 @@ Every screenshot in this README is the real app working on a real Git repository
   </tr>
   <tr>
     <td width="33%" valign="top">
-      <h4>⏪ Undo &amp; reuse</h4>
-      Cherry-pick · revert (merge commits too) · reset soft/mixed/hard with automatic backup · continue/skip/abort for stopped merges, rebases, cherry-picks and reverts
+      <h4>⏪ Undo &amp; rewrite</h4>
+      Interactive rebase (reorder, reword, squash, fixup, drop) · cherry-pick · revert (merge commits too) · reset soft/mixed/hard with automatic backup · reflog · continue/skip/abort for stopped merges, rebases, cherry-picks and reverts
     </td>
     <td width="33%" valign="top">
       <h4>📦 Stash &amp; tags</h4>
@@ -270,14 +291,14 @@ Every screenshot in this README is the real app working on a real Git repository
   <tr>
     <td width="33%" valign="top">
       <h4>🎨 Comfortable</h4>
-      Light, dark or match-system theme (View → Theme) · native menus · keyboard navigation · remembers recent repositories
+      Light, dark or match-system theme (View → Theme) · blame · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories
     </td>
   </tr>
 </table>
 
 ### On the roadmap
 
-Interactive rebase, reflog browser, blame, worktrees and submodules, clone and init, repository tabs, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux.
+Clone and init, repository tabs, graph filters, Git LFS, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux.
 
 <br>
 
@@ -323,7 +344,7 @@ npm run dist:mac     # package for macOS (dmg + zip)
 ```
 
 - **Fast on big repositories:** measured on a generated 100,000-commit repository: the full history loads in about 3 seconds and the graph layout takes about 40 ms ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)).
-- **Tested against real Git:** more than 350 integration tests (including randomized partial-staging checks) create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
+- **Tested against real Git:** more than 400 integration tests (including randomized partial-staging checks) create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
 - **Secure by default:** sandboxed renderer without Node access, context isolation, strict Content Security Policy, schema-validated IPC, and Git can only be run on repositories you opened.
 
 <br>

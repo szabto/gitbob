@@ -99,6 +99,24 @@ try {
   await shot(page, 'gitbob-history-menu')
   await page.keyboard.press('Escape')
 
+  // Interactive rebase dialog.
+  await page.locator('[data-testid="commit-row"]', { hasText: 'Release 0.2.0' }).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: /Interactive rebase/ }).click()
+  await page.getByTestId('rebase-row').first().waitFor()
+  await page.getByLabel('Action for Document the forecast API').selectOption('reword')
+  await page.getByLabel('New message for Document the forecast API').fill('Document getForecast() and the retry helper')
+  await page.getByLabel('Action for Polish search empty state').selectOption('squash')
+  await shot(page, 'gitbob-rebase')
+  await page.getByTestId('rebase-dialog').getByRole('button', { name: 'Cancel' }).click()
+
+  // Blame.
+  await page.locator('[data-testid="commit-row"]', { hasText: 'Retry forecast requests with backoff' }).click()
+  await page.locator('[data-testid="details-file"]').first().click()
+  await page.getByRole('button', { name: 'Blame' }).click()
+  await page.getByTestId('blame-line').first().waitFor()
+  await shot(page, 'gitbob-blame')
+  await page.getByTestId('blame-view').getByRole('button', { name: 'Close' }).click()
+
   // Whole-history search.
   await page.getByLabel('Search history').fill('forecast')
   await page.getByTestId('search-count').filter({ hasText: 'of' }).waitFor()

@@ -276,7 +276,7 @@ function ReflogSection({
   return (
     <Section
       title="Reflog"
-      count={reflog.data?.length ?? 0}
+      count={reflog.data?.length ?? null}
       testId="reflog"
       open={open}
       onToggle={() => setOpen(!open)}
@@ -325,7 +325,8 @@ function Section({
   onToggle,
 }: {
   title: string
-  count: number
+  /** null hides the count (e.g. not loaded yet). */
+  count: number | null
   testId: string
   action?: { label: string; title: string; onClick: () => void }
   children: React.ReactNode
@@ -345,7 +346,7 @@ function Section({
         >
           <span className="inline-block w-3">{open ? '▾' : '▸'}</span>
           {title}
-          <span className="ml-auto font-normal">{count}</span>
+          {count !== null && <span className="ml-auto font-normal">{count}</span>}
         </button>
         {action && (
           <button
