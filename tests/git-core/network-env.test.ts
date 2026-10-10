@@ -77,7 +77,7 @@ describe('approveCredential', () => {
     const repo = createFixtureRepo()
     const file = join(makeTempDir(), 'creds')
     // A configured (test-only) helper: never touches the real system keychain.
-    repo.git(['config', 'credential.helper', `store --file=${file}`])
+    repo.git(['config', 'credential.helper', `store --file=${file.replace(/\\/g, '/')}`])
     const ok = await approveCredential(repo.dir, { protocol: 'https', host: 'example.test', username: 'al ice', password: 'p@ss:word' })
     expect(ok).toBe(true)
     expect(readFileSync(file, 'utf8').trim()).toBe('https://al%20ice:p%40ss%3aword@example.test')
@@ -86,7 +86,7 @@ describe('approveCredential', () => {
   it('refuses values containing newlines (credential protocol injection)', async () => {
     const repo = createFixtureRepo()
     const file = join(makeTempDir(), 'creds')
-    repo.git(['config', 'credential.helper', `store --file=${file}`])
+    repo.git(['config', 'credential.helper', `store --file=${file.replace(/\\/g, '/')}`])
     expect(await approveCredential(repo.dir, { protocol: 'https', host: 'a.test', username: 'u', password: 'x\nhost=evil.test' })).toBe(false)
     expect(existsSync(file)).toBe(false)
   })

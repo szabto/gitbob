@@ -13,7 +13,9 @@ const created: string[] = []
 
 export function makeTempDir(prefix = 'gitbob-test-'): string {
   // realpath: macOS /var -> /private/var, so paths match what git reports.
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix)))
+  // realpath.native: macOS /var -> /private/var, Windows 8.3 names (RUNNER~1) -> long names,
+  // so paths match what git reports.
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)))
   created.push(dir)
   return dir
 }
@@ -21,7 +23,12 @@ export function makeTempDir(prefix = 'gitbob-test-'): string {
 export function cleanupFixtures(): void {
   while (created.length) {
     const dir = created.pop()!
-    rmSync(dir, { recursive: true, force: true })
+    // Windows keeps files locked briefly after a process exits; retry instead of failing the test.
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    } catch {
+      /* best effort: the OS cleans temp eventually */
+    }
   }
 }
 

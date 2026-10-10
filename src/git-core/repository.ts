@@ -3,6 +3,7 @@ import { basename, dirname, isAbsolute, resolve, sep } from 'node:path'
 import type { RepositoryInfo } from '@shared/types'
 import { GitError } from './errors'
 import { runGit } from './runner'
+import { nativePath } from './paths'
 
 /** Resolve and validate a path as a Git repository. */
 export async function openRepository(inputPath: string): Promise<RepositoryInfo> {
@@ -39,14 +40,15 @@ export async function openRepository(inputPath: string): Promise<RepositoryInfo>
   const bare = bareLine?.trim() === 'true'
   if (!gitDir) throw new GitError('INTERNAL', 'Unexpected rev-parse output')
 
-  let root = gitDir.trim()
+  const gitDirNative = nativePath(gitDir)
+  let root = gitDirNative
   if (!bare) {
     // When opened from inside a non-bare repository's .git directory there is no work tree
     // at `path`; resolve the top level from the directory that contains the git dir instead.
-    const dir = gitDir.trim()
+    const dir = gitDirNative
     const cwd = (path + sep).startsWith(dir + sep) ? dirname(dir) : path
     try {
-      root = (await runGit(['rev-parse', '--show-toplevel'], { cwd, timeoutMs: 10_000 })).stdout.trim()
+      root = nativePath((await runGit(['rev-parse', '--show-toplevel'], { cwd, timeoutMs: 10_000 })).stdout)
     } catch (e) {
       if (e instanceof GitError && e.code === 'GIT_FAILED') {
         throw new GitError('NOT_A_REPOSITORY', `Could not determine the work tree for ${path}`, { detail: e.detail })
@@ -55,5 +57,5 @@ export async function openRepository(inputPath: string): Promise<RepositoryInfo>
     }
   }
 
-  return { root, gitDir: gitDir.trim(), bare, name: basename(root.replace(/[\\/]\.git$/, '')) }
+  return { root, gitDir: gitDirNative, bare, name: basename(root.replace(/[\\/]\.git$/, '')) }
 }

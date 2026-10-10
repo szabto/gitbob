@@ -1,3 +1,4 @@
+import { nativePath } from '@git-core/paths'
 import { afterEach, describe, expect, it } from 'vitest'
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -273,7 +274,7 @@ describe('initRepository', () => {
     const outer = createFixtureRepo()
     const dir = join(outer.dir, 'inner')
     await initRepository(dir, { initialBranch: 'main' })
-    expect(await git(dir, ['rev-parse', '--show-toplevel'])).toBe(dir)
+    expect(nativePath(await git(dir, ['rev-parse', '--show-toplevel']))).toBe(dir)
   })
 
   it('refuses a folder that is already a repository', async () => {

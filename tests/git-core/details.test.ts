@@ -145,7 +145,9 @@ describe('getCommitDetails', () => {
     await expect(getCommitDetails(repo.dir, blob)).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 
-  it('handles file names with spaces, unicode and special characters', async () => {
+  // Windows file names cannot contain these characters (" * : tab).
+
+  it.skipIf(process.platform === 'win32')('handles file names with spaces, unicode and special characters', async () => {
     const repo = createFixtureRepo()
     repo.commit('base', { 'old file.txt': 'same content for rename detection\nline2\nline3\n' })
     repo.git(['mv', 'old file.txt', 'nëw fïle 🚀.txt'])

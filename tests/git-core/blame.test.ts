@@ -86,7 +86,8 @@ describe('getBlame', () => {
     await expect(getBlame(repo.dir, 'untracked.txt')).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 
-  it('does not follow a symlink out of the repository', async () => {
+  // Creating symlinks needs elevated rights on Windows.
+  it.skipIf(process.platform === 'win32')('does not follow a symlink out of the repository', async () => {
     const repo = createFixtureRepo()
     symlinkSync('/etc/hosts', join(repo.dir, 'link'))
     repo.commit('link', { 'f.txt': 'a\n' })

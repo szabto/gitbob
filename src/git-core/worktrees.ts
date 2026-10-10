@@ -4,6 +4,7 @@ import { assertValidBranchName } from './branches'
 import { GitError } from './errors'
 import { runGit } from './runner'
 import type { WorktreeInfo } from '@shared/types'
+import { nativePath } from './paths'
 export type { WorktreeInfo }
 
 
@@ -36,7 +37,7 @@ export function parseWorktreeList(stdout: string, sep: '\0' | '\n'): Omit<Worktr
     const value = sp === -1 ? '' : attr.slice(sp + 1)
     if (key === 'worktree') {
       cur = {
-        path: value,
+        path: nativePath(value),
         head: null,
         branch: null,
         detached: false,

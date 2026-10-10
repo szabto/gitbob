@@ -261,7 +261,9 @@ describe('applyHunks', () => {
     expect(indexText(repo, 'f.txt')).toBe('a\nlast\nnew last')
   })
 
-  it('works with paths containing spaces and unicode', async () => {
+  // Windows file names cannot contain these characters (" * : tab).
+
+  it.skipIf(process.platform === 'win32')('works with paths containing spaces and unicode', async () => {
     for (const path of ['dir with space/my file.txt', 'ünïcödé/日本語 ファイル.txt', 'quote"back\\slash.txt']) {
       const { repo } = twoHunkRepo(path)
       const diff = await getFileDiff(repo.dir, { kind: 'unstaged', path })

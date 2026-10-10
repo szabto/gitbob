@@ -1,3 +1,4 @@
+import { resolve as resolvePath } from 'node:path'
 import { isAbsolute, resolve, sep } from 'node:path'
 import { GitError } from './errors'
 
@@ -38,3 +39,13 @@ export function pathspecInput(paths: readonly string[]): string {
 }
 
 export const PATHSPEC_STDIN = ['--pathspec-from-file=-', '--pathspec-file-nul'] as const
+
+/**
+ * Git reports paths with forward slashes on Windows ("C:/Users/x"); everything else in GitBob
+ * (Node, dialogs, the UI, authorization checks) uses native paths ("C:\\Users\\x").
+ * Convert a path printed by git into the native absolute form. A no-op on macOS/Linux.
+ */
+export function nativePath(gitPath: string): string {
+  const p = gitPath.trim()
+  return process.platform === 'win32' ? resolvePath(p) : p
+}

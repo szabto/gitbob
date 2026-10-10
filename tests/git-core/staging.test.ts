@@ -55,29 +55,34 @@ async function expectGitError(p: Promise<unknown>, code: string): Promise<GitErr
   return err as GitError
 }
 
+// '*' is not allowed in Windows file names.
+const SPECIAL = process.platform === 'win32' ? 'sp ace [x].txt' : 'sp ace [x]*.txt'
+
 describe('stage / unstage', () => {
   it('round-trips modifications, additions and deletions', async () => {
     const repo = createFixtureRepo()
-    repo.commit('init', { 'a.txt': 'a\n', 'gone.txt': 'g\n', 'sp ace [x]*.txt': 's\n' })
+    repo.commit('init', { 'a.txt': 'a\n', 'gone.txt': 'g\n', [SPECIAL]: 's\n' })
     repo.write('a.txt', 'changed\n')
     repo.write('new dir/n é.txt', 'n\n')
-    repo.write('sp ace [x]*.txt', 'changed\n')
+    repo.write(SPECIAL, 'changed\n')
     rmSync(join(repo.dir, 'gone.txt'))
 
-    await stagePaths(repo.dir, ['a.txt', 'gone.txt', 'new dir/n é.txt', 'sp ace [x]*.txt'])
+    await stagePaths(repo.dir, ['a.txt', 'gone.txt', 'new dir/n é.txt', SPECIAL])
     expect(await entry(repo, 'a.txt')).toMatchObject({ index: 'M', worktree: '.' })
     expect(await entry(repo, 'gone.txt')).toMatchObject({ index: 'D', worktree: '.' })
     expect(await entry(repo, 'new dir/n é.txt')).toMatchObject({ index: 'A', worktree: '.' })
-    expect(await entry(repo, 'sp ace [x]*.txt')).toMatchObject({ index: 'M' })
+    expect(await entry(repo, SPECIAL)).toMatchObject({ index: 'M' })
 
-    await unstagePaths(repo.dir, ['a.txt', 'gone.txt', 'new dir/n é.txt', 'sp ace [x]*.txt'])
+    await unstagePaths(repo.dir, ['a.txt', 'gone.txt', 'new dir/n é.txt', SPECIAL])
     expect(await entry(repo, 'a.txt')).toMatchObject({ index: '.', worktree: 'M' })
     expect(await entry(repo, 'gone.txt')).toMatchObject({ index: '.', worktree: 'D' })
     expect(await entry(repo, 'new dir/n é.txt')).toMatchObject({ kind: 'untracked' })
     expect(readFileSync(join(repo.dir, 'a.txt'), 'utf8')).toBe('changed\n')
   })
 
-  it('treats pathspecs literally (a glob-like name does not match other files)', async () => {
+  // Windows file names cannot contain these characters (" * : tab).
+
+  it.skipIf(process.platform === 'win32')('treats pathspecs literally (a glob-like name does not match other files)', async () => {
     const repo = createFixtureRepo()
     repo.commit('init', { 'a.txt': 'a\n' })
     repo.write('*.txt', 'star\n')

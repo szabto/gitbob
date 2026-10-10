@@ -132,7 +132,8 @@ describe('interactiveRebase', () => {
     expect(subjects(repo, `${base}..HEAD`)).toEqual(['C', 'B2', 'A'])
   })
 
-  it('works when the temp directory path contains spaces and quotes', async () => {
+  // Overrides TMPDIR, which only POSIX systems honor (Windows uses TEMP/TMP).
+  it.skipIf(process.platform === 'win32')('works when the temp directory path contains spaces and quotes', async () => {
     const { repo, base, a, b, c } = linear()
     const tmp = makeTempDir("gitbob tmp 'x' $(y) ")
     const saved = process.env.TMPDIR
