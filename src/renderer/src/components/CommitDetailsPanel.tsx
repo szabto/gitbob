@@ -1,5 +1,7 @@
 import type { FileChange, GitRef } from '@shared/types'
 import { useCommitDetails } from '../lib/queries'
+import { useQuery } from '@tanstack/react-query'
+import { call } from '../lib/api'
 import { useAppStore } from '../state/store'
 import { formatDate, shortSha } from '../lib/format'
 import { RefBadge } from './RefBadge'
@@ -25,6 +27,11 @@ export function CommitDetailsPanel({
   refsBySha: Map<string, GitRef[]>
 }) {
   const details = useCommitDetails(repoPath, sha)
+  const signature = useQuery({
+    queryKey: ['signature', repoPath, sha],
+    queryFn: () => call('commit:signature', { repoPath, sha }),
+    staleTime: Infinity,
+  })
   const reveal = useAppStore((s) => s.reveal)
   const select = useAppStore((s) => s.select)
   const showDiff = useAppStore((s) => s.showDiff)
@@ -73,6 +80,15 @@ export function CommitDetailsPanel({
                 <dd>
                   {details.data.committerName} &lt;{details.data.committerEmail}&gt;
                   <div className="text-muted">{formatDate(details.data.commitTime)}</div>
+                </dd>
+              </>
+            )}
+            {signature.data && signature.data.status !== 'none' && (
+              <>
+                <dt className="text-muted">Signature</dt>
+                <dd data-testid="signature" className={signature.data.status === 'good' ? 'text-ok' : 'text-warn'}>
+                  {signature.data.status === 'good' ? '✓ Verified' : `⚠ ${signature.data.status.replace(/-/g, ' ')}`}
+                  {signature.data.signer ? ` · ${signature.data.signer}` : ''}
                 </dd>
               </>
             )}

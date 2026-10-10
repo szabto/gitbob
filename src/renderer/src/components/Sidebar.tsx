@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useReflog } from '../lib/queries'
+import { useReflog, useSubmodules, useWorktrees } from '../lib/queries'
 import { formatShortDate, shortSha } from '../lib/format'
 import type { GitRef, StashEntry } from '@shared/types'
 import { useAppStore } from '../state/store'
@@ -154,8 +154,106 @@ export function Sidebar({
           </li>
         ))}
       </Section>
+      <WorktreeSection repoPath={repoPath} actions={actions} />
+      <SubmoduleSection repoPath={repoPath} actions={actions} />
       <ReflogSection repoPath={repoPath} currentBranch={currentBranch} actions={actions} />
     </aside>
+  )
+}
+
+function WorktreeSection({ repoPath, actions }: { repoPath: string; actions: Actions }) {
+  const worktrees = useWorktrees(repoPath)
+  const openMenu = useUiStore((s) => s.openMenu)
+  const list = (worktrees.data ?? []).filter((w) => !w.bare)
+  return (
+    <Section
+      title="Worktrees"
+      count={list.length}
+      testId="worktrees"
+      action={{ label: '+', title: 'Add worktree', onClick: () => void actions.addWorktree() }}
+    >
+      {list.map((w) => (
+        <li key={w.path}>
+          <button
+            data-testid="worktree-item"
+            title={w.path}
+            onDoubleClick={() => !w.isCurrent && void actions.openRepositoryAt(w.path)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              openMenu(e.clientX, e.clientY, [
+                { label: 'Open', disabled: w.isCurrent, onSelect: () => void actions.openRepositoryAt(w.path) },
+                'separator',
+                {
+                  label: 'Remove worktree…',
+                  danger: true,
+                  disabled: w.isMain || w.isCurrent,
+                  onSelect: () => void actions.removeWorktree(w.path),
+                },
+                {
+                  label: 'Force remove (discard its changes)…',
+                  danger: true,
+                  disabled: w.isMain || w.isCurrent,
+                  onSelect: () => void actions.removeWorktree(w.path, true),
+                },
+              ])
+            }}
+            className={`flex w-full items-center gap-2 truncate py-0.5 pr-3 pl-7 text-left hover:bg-panel-2 ${
+              w.isCurrent ? 'font-semibold text-accent' : ''
+            }`}
+          >
+            <span className="truncate">{w.branch ?? (w.head ? `detached ${shortSha(w.head)}` : w.path)}</span>
+            <span className="ml-auto shrink-0 text-[10px] text-muted">
+              {w.isMain ? 'main' : w.locked ? 'locked' : w.prunable ? 'missing' : ''}
+            </span>
+          </button>
+        </li>
+      ))}
+    </Section>
+  )
+}
+
+function SubmoduleSection({ repoPath, actions }: { repoPath: string; actions: Actions }) {
+  const subs = useSubmodules(repoPath)
+  const openMenu = useUiStore((s) => s.openMenu)
+  if (!subs.data || subs.data.length === 0) return null
+  const statusCls: Record<string, string> = {
+    clean: 'text-ok',
+    modified: 'text-warn',
+    uninitialized: 'text-muted',
+    conflict: 'text-err',
+  }
+  return (
+    <Section
+      title="Submodules"
+      count={subs.data.length}
+      testId="submodules"
+      action={{ label: '⟳', title: 'Update all submodules', onClick: () => void actions.updateSubmodules() }}
+    >
+      {subs.data.map((m) => (
+        <li key={m.path}>
+          <button
+            data-testid="submodule-item"
+            title={m.url ?? m.path}
+            onDoubleClick={() => m.status !== 'uninitialized' && void actions.openRepositoryAt(`${repoPath}/${m.path}`)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              openMenu(e.clientX, e.clientY, [
+                {
+                  label: 'Open submodule',
+                  disabled: m.status === 'uninitialized',
+                  onSelect: () => void actions.openRepositoryAt(`${repoPath}/${m.path}`),
+                },
+                { label: m.status === 'uninitialized' ? 'Initialize and update' : 'Update', onSelect: () => void actions.updateSubmodules([m.path]) },
+              ])
+            }}
+            className="flex w-full items-center gap-2 truncate py-0.5 pr-3 pl-7 text-left hover:bg-panel-2"
+          >
+            <span className="truncate">{m.path}</span>
+            <span className={`ml-auto shrink-0 text-[10px] ${statusCls[m.status] ?? 'text-muted'}`}>{m.status}</span>
+          </button>
+        </li>
+      ))}
+    </Section>
   )
 }
 

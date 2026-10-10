@@ -62,6 +62,8 @@ export function useInvalidateRepo(repoPath: string) {
       void qc.invalidateQueries({ queryKey: ['remotes', repoPath] })
       void qc.invalidateQueries({ queryKey: ['stashes', repoPath] })
       void qc.invalidateQueries({ queryKey: ['reflog', repoPath] })
+      void qc.invalidateQueries({ queryKey: ['worktrees', repoPath] })
+      void qc.invalidateQueries({ queryKey: ['submodules', repoPath] })
       if (opts.history !== false) {
         void qc.invalidateQueries({ queryKey: ['log', repoPath] })
         void qc.invalidateQueries({ queryKey: ['search', repoPath] })
@@ -122,4 +124,12 @@ export function useReflog(repoPath: string, enabled: boolean) {
     queryFn: () => call('reflog:get', { repoPath, limit: 200 }),
     enabled,
   })
+}
+
+export function useWorktrees(repoPath: string) {
+  return useQuery({ queryKey: ['worktrees', repoPath], queryFn: () => call('worktree:list', { repoPath }) })
+}
+
+export function useSubmodules(repoPath: string) {
+  return useQuery({ queryKey: ['submodules', repoPath], queryFn: () => call('submodule:list', { repoPath }) })
 }

@@ -1,4 +1,9 @@
 import type {
+  BlameLine,
+  RebaseCommit,
+  SignatureInfo,
+  SubmoduleInfo,
+  WorktreeInfo,
   ConflictVersions,
   FileContents,
   FileChange,
@@ -77,6 +82,17 @@ export interface IpcOutputs {
   'op:abort': { operation: string | null }
   'op:skip': { operation: string }
   'reflog:get': ReflogEntry[]
+  'rebase:todo': RebaseCommit[]
+  /** completed: false when the rebase stopped on a conflict (banner takes over). */
+  'rebase:start': { completed: boolean }
+  'blame:get': { lines: BlameLine[]; text: string[] }
+  'worktree:list': WorktreeInfo[]
+  /** null if the user cancelled the folder picker. */
+  'worktree:add': { path: string } | null
+  'worktree:remove': { removed: boolean }
+  'submodule:list': SubmoduleInfo[]
+  'submodule:update': void
+  'commit:signature': SignatureInfo
   'settings:get': { theme: 'system' | 'light' | 'dark' }
   'credentials:respond': void
   /** True if a running network operation was cancelled. */

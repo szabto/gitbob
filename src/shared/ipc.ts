@@ -151,6 +151,32 @@ export const ipcInputSchemas = {
   'op:continue': z.object({ repoPath: absolutePath }),
   'op:abort': z.object({ repoPath: absolutePath }),
   'op:skip': z.object({ repoPath: absolutePath }),
+  'rebase:todo': z.object({ repoPath: absolutePath, base: shaSchema }),
+  'rebase:start': z.object({
+    repoPath: absolutePath,
+    base: shaSchema,
+    todo: z
+      .array(
+        z.object({
+          sha: shaSchema,
+          action: z.enum(['pick', 'reword', 'squash', 'fixup', 'drop']),
+          message: z.string().max(100_000).optional(),
+        }),
+      )
+      .min(1)
+      .max(5000),
+  }),
+  'blame:get': z.object({ repoPath: absolutePath, path: repoPathSchema, rev: shaSchema.optional() }),
+  'worktree:list': z.object({ repoPath: absolutePath }),
+  'worktree:add': z.object({
+    repoPath: absolutePath,
+    newBranch: branchName.optional(),
+    branch: branchName.optional(),
+  }),
+  'worktree:remove': z.object({ repoPath: absolutePath, path: absolutePath, force: z.boolean().default(false) }),
+  'submodule:list': z.object({ repoPath: absolutePath }),
+  'submodule:update': z.object({ repoPath: absolutePath, paths: repoPaths.optional() }),
+  'commit:signature': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'reflog:get': z.object({ repoPath: absolutePath, limit: z.number().int().min(1).max(10_000).default(200) }),
   'settings:get': z.object({}).strict(),
   'credentials:respond': z.object({

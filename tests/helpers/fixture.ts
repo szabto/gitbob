@@ -106,9 +106,11 @@ export class FixtureRepo {
   }
 }
 
-export function createFixtureRepo(opts: { bare?: boolean; initialBranch?: string } = {}): FixtureRepo {
+export function createFixtureRepo(
+  opts: { bare?: boolean; initialBranch?: string; /** temp dir name prefix, e.g. with spaces */ prefix?: string } = {},
+): FixtureRepo {
   const home = makeTempDir('gitbob-home-')
-  const dir = makeTempDir('gitbob-repo-')
+  const dir = makeTempDir(opts.prefix ?? 'gitbob-repo-')
   const repo = new FixtureRepo(dir, home)
   repo.git(['init', '-q', `--initial-branch=${opts.initialBranch ?? 'main'}`, ...(opts.bare ? ['--bare'] : [])])
   return repo
@@ -184,4 +186,21 @@ export function makeDivergedBranches(
   const theirs = repo.commit('theirs', { [path]: 'theirs\n' })
   repo.checkout('main')
   return { base, ours, theirs, path }
+}
+
+/**
+ * Add `sub` as a submodule of `superRepo` at `path` and commit it. Local-path submodule URLs are
+ * blocked by default since git 2.38.1 (protocol.file.allow=user, CVE-2022-39253); the fixture
+ * allows the file protocol for this one command only.
+ */
+export function addSubmodule(superRepo: FixtureRepo, sub: FixtureRepo, path: string): string {
+  superRepo.git(['-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', sub.dir, path])
+  return superRepo.commit(`add submodule ${path}`)
+}
+
+/** Env for code under test that must clone local-path submodules (see addSubmodule). */
+export const ALLOW_FILE_PROTOCOL_ENV: Record<string, string> = {
+  GIT_CONFIG_COUNT: '1',
+  GIT_CONFIG_KEY_0: 'protocol.file.allow',
+  GIT_CONFIG_VALUE_0: 'always',
 }

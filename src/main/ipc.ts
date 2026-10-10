@@ -31,6 +31,11 @@ import { applyStash, createStash, dropStash, getStashFiles, listStashes } from '
 import { createTag, deleteTag, listTags, pushTag } from '@git-core/tags'
 import { abortOperation, cherryPick, continueOperation, reset, revert, skipOperation } from '@git-core/history'
 import { getReflog } from '@git-core/reflog'
+import { cleanupRebaseFiles, getRebaseTodo, interactiveRebase } from '@git-core/rebase'
+import { getBlame } from '@git-core/blame'
+import { addWorktree, listWorktrees, removeWorktree } from '@git-core/worktrees'
+import { listSubmodules, updateSubmodules } from '@git-core/submodules'
+import { getSignature } from '@git-core/signatures'
 import type { RecentRepositoryStore } from './recent'
 import { z } from 'zod'
 
@@ -246,7 +251,12 @@ export function registerIpc(ctx: IpcContext): void {
     },
     'history:revert': ({ repoPath, sha }) => revert(requireOpened(repoPath), sha),
     'history:cherry-pick': ({ repoPath, shas }) => cherryPick(requireOpened(repoPath), shas),
-    'op:continue': ({ repoPath }) => continueOperation(requireOpened(repoPath)),
+    'op:continue': async ({ repoPath }) => {
+      const res = await continueOperation(requireOpened(repoPath))
+      // Remove reword/squash message files left by an interactive rebase once it has finished.
+      await cleanupRebaseFiles(repoPath).catch(() => {})
+      return res
+    },
     'op:abort': async ({ repoPath }, event) => {
       requireOpened(repoPath)
       const confirmed = await confirmDestructive(event, {
@@ -255,10 +265,56 @@ export function registerIpc(ctx: IpcContext): void {
         confirmLabel: 'Abort',
       })
       if (!confirmed) return { operation: null }
-      return abortOperation(repoPath)
+      const res = await abortOperation(repoPath)
+      await cleanupRebaseFiles(repoPath).catch(() => {})
+      return res
     },
     'op:skip': ({ repoPath }) => skipOperation(requireOpened(repoPath)),
     'reflog:get': ({ repoPath, limit }) => getReflog(requireOpened(repoPath), 'HEAD', limit),
+    'rebase:todo': ({ repoPath, base }) => getRebaseTodo(requireOpened(repoPath), base),
+    'rebase:start': ({ repoPath, base, todo }) => interactiveRebase(requireOpened(repoPath), base, todo),
+    'blame:get': ({ repoPath, path, rev }) => getBlame(requireOpened(repoPath), path, rev),
+    'worktree:list': ({ repoPath }) => listWorktrees(requireOpened(repoPath)),
+    'worktree:add': async ({ repoPath, newBranch, branch }, event) => {
+      requireOpened(repoPath)
+      // The folder is chosen in a native dialog, never sent by the renderer.
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const opts = {
+        title: 'Choose an empty folder for the new worktree',
+        buttonLabel: 'Create worktree here',
+        properties: ['openDirectory' as const, 'createDirectory' as const],
+      }
+      const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+      const path = res.filePaths[0]
+      if (res.canceled || !path) return null
+      await addWorktree(repoPath, path, { ...(newBranch ? { newBranch } : {}), ...(branch ? { branch } : {}) })
+      return { path }
+    },
+    'worktree:remove': async ({ repoPath, path, force }, event) => {
+      requireOpened(repoPath)
+      const confirmed = await confirmDestructive(event, {
+        message: force ? `Force remove the worktree at ${path}?` : `Remove the worktree at ${path}?`,
+        detail: force
+          ? 'The folder and any uncommitted changes in it will be deleted.'
+          : 'The worktree folder is deleted. Git refuses if it has uncommitted changes.',
+        confirmLabel: force ? 'Force remove' : 'Remove worktree',
+      })
+      if (!confirmed) return { removed: false }
+      await removeWorktree(repoPath, path, { force })
+      return { removed: true }
+    },
+    'submodule:list': ({ repoPath }) => listSubmodules(requireOpened(repoPath)),
+    'submodule:update': ({ repoPath, paths }, event) =>
+      ctx.network.run(event.sender, (net) =>
+        updateSubmodules(requireOpened(repoPath), {
+          init: true,
+          recursive: true,
+          ...(paths ? { paths } : {}),
+          ...(net.env ? { env: net.env } : {}),
+          ...(net.signal ? { signal: net.signal } : {}),
+        }),
+      ),
+    'commit:signature': ({ repoPath, sha }) => getSignature(requireOpened(repoPath), sha),
     'settings:get': async () => ctx.getSettings(),
     'credentials:respond': async ({ id, answer }) => ctx.network.respond(id, answer),
     'op:cancel': async () => ctx.network.cancel(),

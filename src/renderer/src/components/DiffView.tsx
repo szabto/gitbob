@@ -27,6 +27,7 @@ const SideBySideDiff = lazy(() => import('./SideBySideDiff').then((m) => ({ defa
 export function DiffView({ repoPath, target }: { repoPath: string; target: DiffTarget }) {
   const diff = useFileDiff(repoPath, target)
   const showDiff = useAppStore((s) => s.showDiff)
+  const openBlame = useAppStore((s) => s.openBlame)
   const mode = useUiStore((s) => s.diffMode)
   const setMode = useUiStore((s) => s.setDiffMode)
   const contents = useFileContents(repoPath, target, mode === 'split')
@@ -54,6 +55,15 @@ export function DiffView({ repoPath, target }: { repoPath: string; target: DiffT
             </button>
           ))}
         </div>
+        {target.kind !== 'untracked' && !diff.data?.isDeleted && (
+          <button
+            className="rounded border border-border px-2 py-0.5 text-xs hover:bg-panel-2"
+            title="Show who last changed each line"
+            onClick={() => openBlame({ path: target.path, ...(target.kind === 'commit' ? { rev: target.sha } : {}) })}
+          >
+            Blame
+          </button>
+        )}
         <button
           className="rounded border border-border px-2 py-0.5 text-xs hover:bg-panel-2"
           onClick={() => showDiff(null)}

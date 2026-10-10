@@ -1,6 +1,7 @@
 import { call } from './api'
 import { useInvalidateRepo } from './queries'
 import { useUiStore } from '../state/ui'
+import { useAppStore } from '../state/store'
 import { useCallback } from 'react'
 import type { GitRef } from '@shared/types'
 
@@ -97,6 +98,31 @@ export function useRepoActions(repoPath: string) {
       if (url) await run(null, () => call('remote:add', { repoPath, name, url }))
     },
     removeRemote: (name: string) => run(null, () => call('remote:remove', { repoPath, name })),
+
+    // Worktrees and submodules
+    openRepositoryAt: async (path: string) => {
+      try {
+        useAppStore.getState().setRepo(await call('repo:open', { path }))
+      } catch (e) {
+        showError(e)
+      }
+    },
+    addWorktree: async () => {
+      const name = await ask({
+        title: 'New worktree',
+        label: 'New branch for the worktree (leave empty for a detached checkout)',
+        placeholder: 'feature/side-task',
+        confirmLabel: 'Choose folder…',
+        allowEmpty: true,
+      })
+      if (name === null) return
+      const res = await run(null, () => call('worktree:add', { repoPath, ...(name ? { newBranch: name } : {}) }))
+      if (res) showNotice(`Worktree created at ${res.path}. Open it from the Worktrees list.`)
+    },
+    removeWorktree: (path: string, force = false) =>
+      run(null, () => call('worktree:remove', { repoPath, path, force })),
+    updateSubmodules: (paths?: string[]) =>
+      run('Updating submodules…', () => call('submodule:update', { repoPath, ...(paths ? { paths } : {}) })),
 
     // Stash
     stash: async () => {

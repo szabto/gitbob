@@ -15,6 +15,8 @@ import { useRepoActions } from '../lib/actions'
 import { useRemotes, useStashes } from '../lib/queries'
 import { StashPanel } from './StashPanel'
 import { OperationBanner } from './OperationBanner'
+import { BlameView } from './BlameView'
+import { RebaseDialog } from './RebaseDialog'
 import { useUiStore } from '../state/ui'
 
 // Monaco-based; loaded on first use.
@@ -35,6 +37,9 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
   const wipSelected = useAppStore((s) => s.wipSelected)
   const diffTarget = useAppStore((s) => s.diffTarget)
   const conflictPath = useAppStore((s) => s.conflictPath)
+  const blame = useAppStore((s) => s.blame)
+  const rebaseBase = useAppStore((s) => s.rebaseBase)
+  const openRebase = useAppStore((s) => s.openRebase)
   const invalidate = useInvalidateRepo(repo.root)
   const queryClient = useQueryClient()
 
@@ -193,7 +198,9 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {status.data && <OperationBanner status={status.data} actions={actions} />}
-          {conflictPath ? (
+          {blame ? (
+            <BlameView repoPath={repo.root} path={blame.path} {...(blame.rev ? { rev: blame.rev } : {})} />
+          ) : conflictPath ? (
             <Suspense fallback={<div className="p-4 text-xs text-muted">Loading editor…</div>}>
               <ConflictEditor repoPath={repo.root} path={conflictPath} />
             </Suspense>
@@ -229,6 +236,11 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
                     onSelect: () => void actions.cherryPick(commit.sha),
                   },
                   { label: 'Revert this commit', disabled: repo.bare, onSelect: () => void actions.revert(commit.sha) },
+                  {
+                    label: `Interactive rebase ${branchLabel} onto here…`,
+                    disabled: repo.bare || !head.data?.ref || commit.sha === head.data?.sha,
+                    onSelect: () => openRebase(commit.sha),
+                  },
                   ...(head.data?.sha && !repo.bare
                     ? ([
                         'separator',
@@ -259,6 +271,7 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
             />
           )}
         </main>
+        {rebaseBase && <RebaseDialog repoPath={repo.root} base={rebaseBase} onClose={() => openRebase(null)} />}
         {wipSelected && !repo.bare ? (
           <StagingPanel repo={repo} onStash={() => void actions.stash()} />
         ) : stashEntry ? (

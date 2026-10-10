@@ -262,3 +262,58 @@ export interface ConflictVersions {
   oursLabel: string
   theirsLabel: string
 }
+
+// ---------------------------------------------------------------------------
+// Rebase, blame, worktrees, submodules, signatures (M5 rest)
+
+export type RebaseAction = 'pick' | 'reword' | 'squash' | 'fixup' | 'drop'
+
+export interface RebaseTodoItem {
+  sha: string
+  action: RebaseAction
+  /** Required for reword; optional combined message for squash. */
+  message?: string
+}
+
+export interface RebaseCommit {
+  sha: string
+  subject: string
+  authorName: string
+  time: number
+}
+
+export interface BlameLine {
+  line: number
+  sha: string
+  authorName: string
+  authorTime: number
+  summary: string
+  originalLine: number
+  boundary: boolean
+}
+
+export interface WorktreeInfo {
+  path: string
+  head: string | null
+  branch: string | null
+  detached: boolean
+  bare: boolean
+  locked: boolean
+  prunable: boolean
+  isMain: boolean
+  isCurrent: boolean
+}
+
+export interface SubmoduleInfo {
+  path: string
+  url: string | null
+  sha: string | null
+  status: 'uninitialized' | 'clean' | 'modified' | 'conflict'
+  branch: string | null
+}
+
+export interface SignatureInfo {
+  status: 'good' | 'bad' | 'unknown-validity' | 'expired' | 'expired-key' | 'revoked' | 'missing-key' | 'none' | 'error'
+  signer: string | null
+  key: string | null
+}
