@@ -8,3 +8,6 @@ playwright-report/
 .DS_Store
 *.log
 .vite/
+
+# Landing page lives in its own repository (gitbob-site)
+site/
