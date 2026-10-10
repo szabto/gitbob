@@ -1,0 +1,107 @@
+import { z } from 'zod'
+import type { IpcChannel } from './channels'
+
+/**
+ * IPC contract. Every renderer -> main call is declared here with a zod schema
+ * for its input. The main process validates all input before acting on it.
+ * Response types are declared statically (main is trusted).
+ */
+
+const absolutePath = z
+  .string()
+  .min(1)
+  .max(4096)
+  .refine((p) => !p.includes('\0'), 'path must not contain NUL')
+
+/** A full or abbreviated hex object id. Rejects anything that could be parsed as an option or revision expression. */
+export const shaSchema = z.string().regex(/^[0-9a-f]{4,64}$/i, 'expected a hexadecimal object id')
+
+/**
+ * A path relative to the repository root, as reported by git status. Rejects
+ * absolute paths, parent traversal and option-like values.
+ */
+export const repoPathSchema = z
+  .string()
+  .min(1)
+  .max(4096)
+  .refine((p) => !p.includes('\0'), 'path must not contain NUL')
+  .refine((p) => !/^([/\\]|[a-zA-Z]:)/.test(p), 'path must be relative to the repository')
+  .refine((p) => !p.split(/[/\\]/).includes('..'), 'path must not traverse outside the repository')
+  .refine((p) => !p.startsWith('-'), 'path must not start with "-"')
+
+/** Branch/remote names: shape check only; git-core validates authoritatively with check-ref-format. */
+const branchName = z
+  .string()
+  .min(1)
+  .max(255)
+  .refine((n) => !n.startsWith('-') && !n.includes('\0'), 'invalid branch name')
+const remoteName = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/, 'invalid remote name')
+const fullBranchRef = z
+  .string()
+  .max(300)
+  .regex(/^refs\/(heads|remotes)\/[^\0]+$/, 'expected refs/heads/* or refs/remotes/*')
+
+const repoPaths = z.array(repoPathSchema).min(1).max(10_000)
+
+export const diffTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('unstaged'), path: repoPathSchema }),
+  z.object({ kind: z.literal('staged'), path: repoPathSchema }),
+  z.object({ kind: z.literal('untracked'), path: repoPathSchema }),
+  z.object({ kind: z.literal('commit'), sha: shaSchema, path: repoPathSchema, oldPath: repoPathSchema.optional() }),
+])
+
+export const ipcInputSchemas = {
+  'repo:open': z.object({ path: absolutePath }),
+  'repo:pick': z.object({}).strict(),
+  'repo:recent': z.object({}).strict(),
+  'repo:refs': z.object({ repoPath: absolutePath }),
+  'repo:head': z.object({ repoPath: absolutePath }),
+  'log:page': z.object({
+    repoPath: absolutePath,
+    skip: z.number().int().min(0).max(10_000_000),
+    limit: z.number().int().min(1).max(10_000),
+  }),
+  'commit:details': z.object({ repoPath: absolutePath, sha: shaSchema }),
+  'status:get': z.object({ repoPath: absolutePath }),
+  'index:stage': z.object({ repoPath: absolutePath, paths: repoPaths }),
+  'index:unstage': z.object({ repoPath: absolutePath, paths: repoPaths }),
+  'index:stage-all': z.object({ repoPath: absolutePath }),
+  'index:unstage-all': z.object({ repoPath: absolutePath }),
+  'worktree:discard': z.object({ repoPath: absolutePath, paths: repoPaths }),
+  'diff:file': z.object({ repoPath: absolutePath, target: diffTargetSchema }),
+  'commit:create': z.object({
+    repoPath: absolutePath,
+    message: z.string().max(1_000_000).refine((m) => m.trim().length > 0, 'commit message must not be empty'),
+    amend: z.boolean().default(false),
+  }),
+  'commit:last-message': z.object({ repoPath: absolutePath }),
+  'branch:create': z.object({
+    repoPath: absolutePath,
+    name: branchName,
+    startPoint: shaSchema,
+    checkout: z.boolean(),
+  }),
+  'branch:checkout': z.object({ repoPath: absolutePath, ref: fullBranchRef }),
+  'commit:checkout': z.object({ repoPath: absolutePath, sha: shaSchema }),
+  'branch:rename': z.object({ repoPath: absolutePath, oldName: branchName, newName: branchName }),
+  'branch:delete': z.object({ repoPath: absolutePath, name: branchName, force: z.boolean().default(false) }),
+  'branch:set-upstream': z.object({
+    repoPath: absolutePath,
+    name: branchName,
+    upstream: z.string().min(3).max(300).regex(/^[^\0-]/).nullable(),
+  }),
+  'remote:list': z.object({ repoPath: absolutePath }),
+  'remote:add': z.object({ repoPath: absolutePath, name: remoteName, url: z.string().min(1).max(4096) }),
+  'remote:remove': z.object({ repoPath: absolutePath, name: remoteName }),
+  'remote:fetch': z.object({ repoPath: absolutePath, remote: remoteName.optional(), prune: z.boolean().default(true) }),
+  'remote:pull': z.object({ repoPath: absolutePath, mode: z.enum(['ff-only', 'merge', 'rebase']) }),
+  'remote:push': z.object({
+    repoPath: absolutePath,
+    branch: branchName,
+    remote: remoteName,
+    setUpstream: z.boolean().default(false),
+    force: z.enum(['none', 'with-lease']).default('none'),
+  }),
+} as const satisfies Record<IpcChannel, z.ZodType>
+
+export type IpcInput<C extends IpcChannel> = z.input<(typeof ipcInputSchemas)[C]>

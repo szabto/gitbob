@@ -1,0 +1,55 @@
+import { memo } from 'react'
+import type { GraphRow, Segment } from '@git-graph/layout'
+import { laneColor } from './graph-colors'
+
+export const ROW_HEIGHT = 28
+export const LANE_WIDTH = 16
+
+const x = (col: number): number => col * LANE_WIDTH + LANE_WIDTH / 2
+const H = ROW_HEIGHT
+const MID = H / 2
+
+function incomingPath(s: Segment): string {
+  const x1 = x(s.from)
+  const x2 = x(s.to)
+  if (x1 === x2) return `M${x1} 0 V${MID}`
+  return `M${x1} 0 C${x1} ${MID * 0.8} ${x2} ${MID * 0.4} ${x2} ${MID}`
+}
+
+function outgoingPath(s: Segment): string {
+  const x1 = x(s.from)
+  const x2 = x(s.to)
+  if (x1 === x2) return `M${x1} ${MID} V${H}`
+  return `M${x1} ${MID} C${x1} ${MID + MID * 0.6} ${x2} ${MID + MID * 0.2} ${x2} ${H}`
+}
+
+interface Props {
+  row: GraphRow
+  width: number
+  isHead: boolean
+}
+
+export const GraphCell = memo(function GraphCell({ row, width, isHead }: Props) {
+  const w = Math.max(width, 1) * LANE_WIDTH
+  const cx = x(row.column)
+  const color = laneColor(row.color)
+  return (
+    <svg width={w} height={H} className="shrink-0" aria-hidden data-column={row.column}>
+      {row.passThrough.map((s) => (
+        <line key={`p${s.from}`} x1={x(s.from)} y1={0} x2={x(s.to)} y2={H} stroke={laneColor(s.color)} strokeWidth={2} />
+      ))}
+      {row.incoming.map((s) => (
+        <path key={`i${s.from}`} d={incomingPath(s)} stroke={laneColor(s.color)} strokeWidth={2} fill="none" />
+      ))}
+      {row.outgoing.map((s, i) => (
+        <path key={`o${i}`} d={outgoingPath(s)} stroke={laneColor(s.color)} strokeWidth={2} fill="none" />
+      ))}
+      {row.isMerge ? (
+        <circle cx={cx} cy={MID} r={4} fill={color} stroke="#0f1115" strokeWidth={1.5} />
+      ) : (
+        <circle cx={cx} cy={MID} r={6} fill={color} stroke="#0f1115" strokeWidth={2} />
+      )}
+      {isHead && <circle cx={cx} cy={MID} r={9} fill="none" stroke="#ffffff" strokeWidth={1.5} />}
+    </svg>
+  )
+})
