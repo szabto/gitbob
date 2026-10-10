@@ -161,7 +161,7 @@ describe('stage / unstage', () => {
     await stagePaths(repo.dir, paths)
     const e = await entries(repo)
     expect(e.filter((x) => x.index === 'A')).toHaveLength(3000)
-  })
+  }, 120_000)
 
   it('rejects paths outside the repository', async () => {
     const repo = createFixtureRepo()

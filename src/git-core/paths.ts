@@ -1,4 +1,3 @@
-import { resolve as resolvePath } from 'node:path'
 import { isAbsolute, resolve, sep } from 'node:path'
 import { GitError } from './errors'
 
@@ -45,7 +44,9 @@ export const PATHSPEC_STDIN = ['--pathspec-from-file=-', '--pathspec-file-nul'] 
  * (Node, dialogs, the UI, authorization checks) uses native paths ("C:\\Users\\x").
  * Convert a path printed by git into the native absolute form. A no-op on macOS/Linux.
  */
-export function nativePath(gitPath: string): string {
+export function nativePath(gitPath: string, platform: NodeJS.Platform = process.platform): string {
   const p = gitPath.trim()
-  return process.platform === 'win32' ? resolvePath(p) : p
+  if (platform !== 'win32') return p
+  // Only drive-letter ("C:/x") and UNC ("//server/share") paths are converted.
+  return /^[A-Za-z]:\//.test(p) || p.startsWith('//') ? p.replace(/\//g, '\\') : p
 }
