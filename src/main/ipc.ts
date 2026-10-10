@@ -29,7 +29,7 @@ import {
 import { addRemote, fetch, listRemotes, pull, push, removeRemote, type NetworkOptions } from '@git-core/remotes'
 import type { NetworkSession } from './network'
 import type { ProviderService } from './providers'
-import { appInfo, validateGitPath } from './app-info'
+import { appInfo, gitIdentity, setGitIdentity, validateGitPath } from './app-info'
 import type { Updater } from './updater'
 import { applyStash, createStash, dropStash, getStashFiles, listStashes } from '@git-core/stash'
 import { createTag, deleteTag, listTags, pushTag } from '@git-core/tags'
@@ -356,6 +356,8 @@ export function registerIpc(ctx: IpcContext): void {
     'settings:get': async () => ctx.getSettings(),
     'settings:update': ({ patch }) => ctx.updateSettings(patch),
     'app:info': () => appInfo(),
+    'app:git-identity': () => gitIdentity(),
+    'app:set-git-identity': ({ name, email }) => setGitIdentity(name, email),
     'app:check-update': () => ctx.updater.check(),
     'app:download-update': () => ctx.updater.download(),
     'app:install-update': () => ctx.updater.install(),

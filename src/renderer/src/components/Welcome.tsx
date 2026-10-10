@@ -1,5 +1,6 @@
 import { useAppInfo, useRecent } from '../lib/queries'
 import { displayPath } from '../lib/format'
+import { Onboarding } from './Onboarding'
 import logoUrl from '../assets/logo.png'
 
 export function Welcome({
@@ -17,7 +18,7 @@ export function Welcome({
   const info = useAppInfo()
 
   return (
-    <div className="flex flex-1 items-center justify-center">
+    <div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto py-[8vh]">
       <div className="w-[520px] max-w-[90vw]">
         <div className="mb-8 flex items-center gap-3">
           <Logo size={72} />
@@ -65,6 +66,7 @@ export function Welcome({
             <p className="px-3 py-4 text-muted">No recent repositories.</p>
           )}
         </div>
+        <Onboarding />
       </div>
     </div>
   )

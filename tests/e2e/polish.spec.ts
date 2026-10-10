@@ -150,3 +150,38 @@ test('shows repository paths under the home folder as ~/…', async () => {
     await app.close()
   }
 })
+
+test('first run: shows the Git version and sets a missing identity (isolated config)', async () => {
+  const home = makeTempDir('gitbob-home-')
+  const globalConfig = join(home, '.gitconfig')
+  writeFileSync(globalConfig, '')
+  const app = await electron.launch({
+    args: [appDir],
+    env: {
+      ...process.env,
+      GITBOB_USER_DATA: makeTempDir('gitbob-ud-'),
+      ELECTRON_RENDERER_URL: '',
+      GIT_CONFIG_NOSYSTEM: '1',
+      // Never touch the developer's real ~/.gitconfig.
+      GIT_CONFIG_GLOBAL: globalConfig,
+    },
+  })
+  const page = await app.firstWindow()
+  try {
+    await expect(page.getByTestId('git-ok')).toContainText('Using Git')
+    const form = page.getByTestId('identity-form')
+    await form.getByPlaceholder('Your name').fill('Ada Lovelace')
+    await form.getByPlaceholder('you@example.com').fill('ada@example.com')
+    await form.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByTestId('identity-form')).toHaveCount(0)
+    await expect(page.getByTestId('git-ok')).toContainText('Ada Lovelace <ada@example.com>')
+    const written = (await import('node:fs')).readFileSync(globalConfig, 'utf8')
+    expect(written).toContain('name = Ada Lovelace')
+    expect(written).toContain('email = ada@example.com')
+
+    await page.getByTestId('tips').getByRole('button', { name: 'Hide tips' }).click()
+    await expect(page.getByTestId('tips')).toHaveCount(0)
+  } finally {
+    await app.close()
+  }
+})

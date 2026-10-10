@@ -111,6 +111,8 @@ export interface IpcOutputs {
   'app:install-update': void
   /** The validated git path, or null if the user cancelled. */
   'app:pick-git': { path: string; version: string } | null
+  'app:git-identity': { name: string; email: string }
+  'app:set-git-identity': void
   'provider:status': ProviderStatus
   'provider:connect': { user: string }
   'provider:disconnect': { disconnected: boolean }

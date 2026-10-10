@@ -211,6 +211,8 @@ export const ipcInputSchemas = {
   'app:download-update': z.object({}).strict(),
   'app:install-update': z.object({}).strict(),
   'app:pick-git': z.object({}).strict(),
+  'app:git-identity': z.object({}).strict(),
+  'app:set-git-identity': z.object({ name: z.string().trim().min(1).max(200), email: z.string().trim().min(3).max(320) }),
   'provider:status': z.object({ repoPath: absolutePath }),
   'provider:connect': z.object({
     repoPath: absolutePath,

@@ -75,3 +75,27 @@ export async function checkForUpdate(): Promise<{ current: string; latest: strin
   const url = typeof data.html_url === 'string' && data.html_url.startsWith('https://github.com/') ? data.html_url : null
   return { current, latest, newer: !!latest && isNewer(latest, current), url }
 }
+
+/** Global git identity (used for commits). Empty strings when not set. */
+export async function gitIdentity(): Promise<{ name: string; email: string }> {
+  const get = async (key: string): Promise<string> => {
+    try {
+      const { stdout } = await run(getGitBinary(), ['config', '--global', '--get', key], { timeout: 10_000, windowsHide: true })
+      return stdout.trim()
+    } catch {
+      return '' // exit code 1: not set
+    }
+  }
+  const [name, email] = await Promise.all([get('user.name'), get('user.email')])
+  return { name, email }
+}
+
+/** Set the global git identity, exactly like `git config --global user.name/email`. */
+export async function setGitIdentity(name: string, email: string): Promise<void> {
+  const clean = (v: string): string => v.trim()
+  if (!clean(name) || /[\0\n\r]/.test(name) || !/^[^\s@]+@[^\s@]+$/.test(clean(email))) {
+    throw new Error('Enter a name and a valid email address.')
+  }
+  await run(getGitBinary(), ['config', '--global', 'user.name', clean(name)], { timeout: 10_000, windowsHide: true })
+  await run(getGitBinary(), ['config', '--global', 'user.email', clean(email)], { timeout: 10_000, windowsHide: true })
+}

@@ -9,3 +9,6 @@ playwright-report/
 *.log
 .vite/
 
+
+# Ad-hoc scratch scripts
+/.*.mjs

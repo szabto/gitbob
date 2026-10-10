@@ -69,6 +69,8 @@ export const IPC_CHANNELS = [
   'app:download-update',
   'app:install-update',
   'app:pick-git',
+  'app:git-identity',
+  'app:set-git-identity',
   'provider:status',
   'provider:connect',
   'provider:disconnect',
