@@ -4,6 +4,7 @@ import { formatShortDate, shortSha } from '../lib/format'
 import type { GitRef, ProviderStatus, StashEntry } from '@shared/types'
 import { PullRequestsSection } from './PullRequests'
 import { RefTree } from './RefTree'
+import { LfsSection } from './LfsSection'
 import { useAppStore } from '../state/store'
 import { useUiStore, type MenuEntry } from '../state/ui'
 import type { useRepoActions } from '../lib/actions'
@@ -177,6 +178,7 @@ export function Sidebar({
           </li>
         ))}
       </Section>
+      <LfsSection repoPath={repoPath} />
       <WorktreeSection repoPath={repoPath} actions={actions} />
       <SubmoduleSection repoPath={repoPath} actions={actions} />
       <ReflogSection repoPath={repoPath} currentBranch={currentBranch} actions={actions} />

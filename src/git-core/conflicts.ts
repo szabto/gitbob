@@ -7,6 +7,8 @@ import { GitError } from './errors'
 import { LITERAL_PATHSPECS_ENV, resolveRepoPath } from './paths'
 import { runGit } from './runner'
 import type { ConflictVersions } from '@shared/types'
+import type { ConflictKind, ConflictDescription } from '@shared/types'
+export type { ConflictKind, ConflictDescription }
 export type { ConflictVersions }
 
 
@@ -171,4 +173,88 @@ export async function saveConflictResolution(
   if (opts.markResolved) {
     await runGit(['add', '--', path], { cwd: repoPath, env: LITERAL_PATHSPECS_ENV, timeoutMs: INDEX_TIMEOUT })
   }
+}
+
+
+
+const BINARY_SNIFF_BYTES = 8000
+
+/** Attributes that make git treat a file as binary for merging (or as LFS pointers). */
+async function attributesSayBinary(repoPath: string, path: string): Promise<boolean> {
+  const r = await runGit(['check-attr', '-z', 'diff', 'merge', 'filter', '--', path], {
+    cwd: repoPath,
+    env: LITERAL_PATHSPECS_ENV,
+  })
+  const f = r.stdout.split('\0')
+  const attrs = new Map<string, string>()
+  for (let i = 0; i + 2 < f.length; i += 3) attrs.set(f[i + 1]!, f[i + 2]!)
+  return attrs.get('diff') === 'unset' || ['unset', 'binary'].includes(attrs.get('merge') ?? '') || attrs.get('filter') === 'lfs'
+}
+
+async function blobIsBinary(repoPath: string, id: string): Promise<boolean> {
+  if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(id)) throw new GitError('INTERNAL', 'Unexpected object id')
+  const r = await runGit(['cat-file', 'blob', id], {
+    cwd: repoPath,
+    maxOutputBytes: BINARY_SNIFF_BYTES,
+    truncateOutput: true,
+  })
+  return r.stdout.includes('\0')
+}
+
+/** Classify the conflict on `path`. INVALID_ARGUMENT if `path` is not currently unmerged. */
+export async function describeConflict(repoPath: string, path: string): Promise<ConflictDescription> {
+  const entries = await requireUnmerged(repoPath, path)
+  const stages = [...new Set(entries.map((e) => e.stage))].sort((a, b) => a - b)
+  const has = (n: number): boolean => stages.includes(n)
+  const special = entries.some((e) => e.mode === '160000' || e.mode === '120000')
+  const binary =
+    !special &&
+    ((await attributesSayBinary(repoPath, path)) ||
+      (await Promise.all(entries.map((e) => blobIsBinary(repoPath, e.id)))).some(Boolean))
+
+  let kind: ConflictKind
+  let deletedBy: 'ours' | 'theirs' | null = null
+  if (special) kind = 'other'
+  else if (has(1) && has(2) && has(3)) kind = binary ? 'binary' : 'content'
+  else if (!has(1) && has(2) && has(3)) kind = binary ? 'binary' : 'add-add'
+  else if (has(1) && has(2) !== has(3)) {
+    kind = 'modify-delete'
+    deletedBy = has(2) ? 'theirs' : 'ours'
+  } else kind = 'other'
+  return { kind, stages, deletedBy, binary }
+}
+
+export async function getConflictKind(repoPath: string, path: string): Promise<ConflictKind> {
+  return (await describeConflict(repoPath, path)).kind
+}
+
+/**
+ * Resolve a conflicted path by taking one side as a whole (works for binary files):
+ * - `ours` / `theirs`: `git checkout --ours|--theirs -- <path>` then `git add -- <path>`;
+ *   if the chosen side deleted the file, `git rm -- <path>` instead
+ * - `delete`: `git rm --quiet -- <path>`
+ * "ours" is index stage 2 and "theirs" stage 3, as in git (during a rebase "ours" is the branch
+ * being rebased onto). This replaces the worktree file, so callers must confirm with the user.
+ * Only allowed while `path` is unmerged; no other path is touched.
+ */
+export async function resolveConflictWith(
+  repoPath: string,
+  path: string,
+  choice: 'ours' | 'theirs' | 'delete',
+): Promise<void> {
+  if (choice !== 'ours' && choice !== 'theirs' && choice !== 'delete') {
+    throw new GitError('INVALID_ARGUMENT', 'Invalid conflict resolution')
+  }
+  if (path.split(/[/\\]/).some((seg) => seg.toLowerCase() === '.git')) {
+    throw new GitError('INVALID_ARGUMENT', 'Invalid path')
+  }
+  const entries = await requireUnmerged(repoPath, path)
+  const opts = { cwd: repoPath, env: LITERAL_PATHSPECS_ENV, timeoutMs: INDEX_TIMEOUT }
+  const stage = choice === 'ours' ? 2 : choice === 'theirs' ? 3 : 0
+  if (choice === 'delete' || !entries.some((e) => e.stage === stage)) {
+    await runGit(['rm', '--quiet', '--', path], opts)
+    return
+  }
+  await runGit(['checkout', choice === 'ours' ? '--ours' : '--theirs', '--', path], opts)
+  await runGit(['add', '--', path], opts)
 }

@@ -187,3 +187,166 @@ describe('BitbucketAdapter', () => {
     )
   })
 })
+
+describe('BitbucketAdapter review & merge', () => {
+  const PR = `${R}/pullrequests/7`
+  const HEAD12 = SHA.slice(0, 12)
+
+  function detailRoutes(over: Record<string, unknown> = {}, diffstat: unknown[] | null = null): void {
+    api.route(`GET ${PR}`, () => ({
+      body: bbPull(7, {
+        description: 'PR body',
+        destination: {
+          branch: { name: 'main', merge_strategies: ['merge_commit', 'squash', 'fast_forward'], default_merge_strategy: 'merge_commit' },
+          commit: { hash: 'aaaaaaaaaaaa' },
+          repository: { full_name: 'acme/widgets' },
+        },
+        reviewers: [{ nickname: 'rev1' }, { nickname: 'rev2' }],
+        participants: [
+          { role: 'REVIEWER', approved: true, state: 'approved', user: { nickname: 'rev1' } },
+          { role: 'REVIEWER', approved: false, state: null, user: { nickname: 'rev2' } },
+          { role: 'PARTICIPANT', approved: false, state: 'changes_requested', user: { nickname: 'pat' } },
+          { role: 'PARTICIPANT', approved: false, state: null, user: { display_name: 'Chatty Person' } },
+        ],
+        ...over,
+      }),
+    }))
+    api.route(`GET ${PR}/diffstat`, () =>
+      diffstat === null
+        ? { status: 500, body: { error: { message: 'boom' } } }
+        : { body: { pagelen: 500, values: diffstat } },
+    )
+  }
+
+  it('getPullRequest maps detail, participants and diffstat totals', async () => {
+    detailRoutes({}, [
+      { status: 'modified', lines_added: 5, lines_removed: 2 },
+      { status: 'added', lines_added: 10, lines_removed: 0 },
+    ])
+    expect(await bb.getPullRequest(REPO, 7)).toMatchObject({
+      number: 7,
+      body: 'PR body',
+      baseSha: 'aaaaaaaaaaaa',
+      headSha: HEAD12,
+      mergeable: 'yes',
+      mergeMethods: ['merge', 'squash', 'rebase'],
+      reviewers: [
+        { login: 'rev1', state: 'approved' },
+        { login: 'rev2', state: 'pending' },
+        { login: 'pat', state: 'changes-requested' },
+        { login: 'Chatty Person', state: 'commented' },
+      ],
+      additions: 15,
+      deletions: 2,
+      changedFiles: 2,
+      headRepoIsFork: false,
+    })
+  })
+
+  it('reports conflicts from the diffstat, unknown when it fails, and forks', async () => {
+    detailRoutes({}, [{ status: 'merge conflict', lines_added: 1, lines_removed: 1 }])
+    expect((await bb.getPullRequest(REPO, 7)).mergeable).toBe('conflicts')
+    detailRoutes({ source: { branch: { name: 'f' }, commit: { hash: HEAD12 }, repository: { full_name: 'someone/widgets' } } }, null)
+    const d = await bb.getPullRequest(REPO, 7)
+    expect(d).toMatchObject({ mergeable: 'unknown', additions: null, changedFiles: null, headRepoIsFork: true })
+    detailRoutes({ state: 'DECLINED' }, [])
+    expect((await bb.getPullRequest(REPO, 7)).mergeable).toBe('no')
+  })
+
+  it('listComments follows next links (max 3 pages) and skips deleted comments', async () => {
+    api.route(`GET ${PR}/comments`, (req, base) => {
+      const page = Number(req.query.get('page') ?? '1')
+      return {
+        body: {
+          pagelen: 2,
+          next: `${base}/repositories/acme/widgets/pullrequests/7/comments?page=${page + 1}`,
+          values: [
+            { id: page * 10 + 1, deleted: false, content: { raw: `c${page}` }, user: { nickname: 'jane' }, created_on: `2024-05-0${page}T00:00:00+00:00` },
+            {
+              id: page * 10 + 2,
+              deleted: page === 1,
+              content: { raw: `inline${page}` },
+              user: { nickname: 'joe' },
+              created_on: `2024-05-0${page}T01:00:00+00:00`,
+              inline: { path: 'src/x.py', from: null, to: 3 },
+            },
+          ],
+        },
+      }
+    })
+    const c = await bb.listComments(REPO, 7)
+    expect(api.requests).toHaveLength(3)
+    expect(c.map((x) => x.id)).toEqual(['11', '21', '22', '31', '32'])
+    expect(c[2]).toEqual({ id: '22', author: 'joe', body: 'inline2', createdAt: '2024-05-02T01:00:00+00:00', path: 'src/x.py', line: 3 })
+  })
+
+  it('addComment posts content.raw', async () => {
+    api.route(`POST ${PR}/comments`, (req) => ({
+      status: 201,
+      body: { id: 5, content: { raw: (req.body as { content: { raw: string } }).content.raw }, user: { nickname: 'jane' }, created_on: '2024-06-01' },
+    }))
+    expect(await bb.addComment(REPO, 7, 'hi')).toEqual({ id: '5', author: 'jane', body: 'hi', createdAt: '2024-06-01' })
+    expect(api.requests[0]!.body).toEqual({ content: { raw: 'hi' } })
+  })
+
+  it('submitReview uses /approve, /request-changes and comments', async () => {
+    api.route(`POST ${PR}/approve`, () => ({ body: { approved: true } }))
+    api.route(`POST ${PR}/request-changes`, () => ({ body: { state: 'changes_requested' } }))
+    api.route(`POST ${PR}/comments`, () => ({ status: 201, body: { id: 1, content: { raw: '' } } }))
+    await bb.submitReview(REPO, 7, 'approve', '')
+    await bb.submitReview(REPO, 7, 'request-changes', 'please fix')
+    await bb.submitReview(REPO, 7, 'comment', 'fyi')
+    expect(api.requests.map((r) => `${r.method} ${r.pathname}`)).toEqual([
+      `POST ${PR}/approve`,
+      `POST ${PR}/request-changes`,
+      `POST ${PR}/comments`,
+      `POST ${PR}/comments`,
+    ])
+    expect(api.requests[2]!.body).toEqual({ content: { raw: 'please fix' } })
+    api.route(`POST ${PR}/approve`, () => ({ status: 400, body: { type: 'error', error: { message: "You can't approve your own pull request." } } }))
+    const e = await catchErr(bb.submitReview(REPO, 7, 'approve', ''))
+    expect(e.code).toBe('INVALID_ARGUMENT')
+    expect(e.message).toContain("can't approve")
+  })
+
+  it('mergePullRequest checks the expected head, maps strategies and close_source_branch', async () => {
+    detailRoutes()
+    api.route(`POST ${PR}/merge`, () => ({ body: bbPull(7, { state: 'MERGED', merge_commit: { hash: 'e'.repeat(40) } }) }))
+    const r = await bb.mergePullRequest(REPO, 7, { method: 'squash', title: 'T', message: 'M', expectedHeadSha: SHA, deleteSourceBranch: true })
+    expect(r).toEqual({ merged: true, sha: 'e'.repeat(40), message: 'Pull request #7 merged.' })
+    const merges = (): unknown[] => api.requests.filter((q) => q.method === 'POST').map((q) => q.body)
+    expect(merges()[0]).toEqual({ type: 'pullrequest_merge_parameters', merge_strategy: 'squash', close_source_branch: true, message: 'T\n\nM' })
+    await bb.mergePullRequest(REPO, 7, { method: 'rebase', title: 'ignored' })
+    expect(merges()[1]).toEqual({ type: 'pullrequest_merge_parameters', merge_strategy: 'fast_forward', close_source_branch: false })
+    await bb.mergePullRequest(REPO, 7, { method: 'merge' })
+    expect((merges()[2] as Record<string, unknown>).merge_strategy).toBe('merge_commit')
+  })
+
+  it('mergePullRequest refuses when the head moved or the strategy is not offered', async () => {
+    detailRoutes()
+    api.route(`POST ${PR}/merge`, () => ({ body: bbPull(7, { state: 'MERGED' }) }))
+    const e = await catchErr(bb.mergePullRequest(REPO, 7, { method: 'merge', expectedHeadSha: 'f'.repeat(40) }))
+    expect(e.code).toBe('CONFLICT')
+    expect(e.message).toMatch(/changed since it was reviewed/)
+    detailRoutes({
+      destination: { branch: { name: 'main', merge_strategies: ['squash'] }, commit: { hash: 'aaaaaaaaaaaa' }, repository: { full_name: 'acme/widgets' } },
+    })
+    await expect(bb.mergePullRequest(REPO, 7, { method: 'merge' })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(api.requests.some((q) => q.method === 'POST')).toBe(false)
+  })
+
+  it('mergePullRequest maps 400 conflicts to CONFLICT and 202 to in-progress', async () => {
+    detailRoutes()
+    api.route(`POST ${PR}/merge`, () => ({ status: 400, body: { type: 'error', error: { message: 'You can’t merge until you resolve all merge conflicts.' } } }))
+    const e = await catchErr(bb.mergePullRequest(REPO, 7, { method: 'merge' }))
+    expect(e.code).toBe('CONFLICT')
+    expect(e.message).toContain('resolve all merge conflicts')
+    expect(e.message).not.toContain(SECRET)
+    api.route(`POST ${PR}/merge`, () => ({ status: 202, headers: { location: 'https://api.bitbucket.org/2.0/x/task-status/1' }, body: { task_status: 'PENDING' } }))
+    expect(await bb.mergePullRequest(REPO, 7, { method: 'merge' })).toMatchObject({ merged: false, sha: null })
+  })
+
+  it('has no pull request refspec', () => {
+    expect(bb.pullRequestRefspec(REPO, 7)).toBeNull()
+  })
+})

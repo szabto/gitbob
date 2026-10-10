@@ -62,6 +62,29 @@ describe('getFileContents', () => {
     })
   })
 
+  it('staged: a rename with oldPath reads the old side from HEAD:<oldPath>', async () => {
+    const repo = createFixtureRepo()
+    repo.commit('init', { 'a.txt': 'one\ntwo\n' })
+    repo.git(['rm', '-q', 'a.txt'])
+    repo.write('sub/b.txt', 'one\nTWO\n')
+    repo.git(['add', 'sub/b.txt'])
+    expect(await getFileContents(repo.dir, { kind: 'staged', path: 'sub/b.txt', oldPath: 'a.txt' })).toEqual({
+      oldText: 'one\ntwo\n',
+      newText: 'one\nTWO\n',
+      binary: false,
+      tooLarge: false,
+    })
+    // Without oldPath the renamed file has no old side, as before.
+    expect(await getFileContents(repo.dir, { kind: 'staged', path: 'sub/b.txt' })).toMatchObject({
+      oldText: null,
+      newText: 'one\nTWO\n',
+    })
+    await expectGitError(
+      getFileContents(repo.dir, { kind: 'staged', path: 'sub/b.txt', oldPath: '../a.txt' }),
+      'INVALID_ARGUMENT',
+    )
+  })
+
   it('untracked: no old side', async () => {
     const repo = createFixtureRepo()
     repo.commit('init', { 'a.txt': 'x\n' })

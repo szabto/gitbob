@@ -1,4 +1,15 @@
-import { ProviderError, type CheckStatus, type CreatePullRequestInput, type ProviderKind, type RepoRef } from './types'
+import {
+  ProviderError,
+  type CheckStatus,
+  type CreatePullRequestInput,
+  type MergeMethod,
+  type MergePullRequestOptions,
+  type ProviderKind,
+  type PullRequestReviewer,
+  type RepoRef,
+  type ReviewEvent,
+  type ReviewerState,
+} from './types'
 
 // ---------------------------------------------------------------------------
 // Input validation
@@ -55,6 +66,104 @@ export function validateCreateInput(input: CreatePullRequestInput, maxBody = MAX
     throw new ProviderError('INVALID_ARGUMENT', 'Source and target branch must differ.')
   }
   return { title, body, sourceBranch, targetBranch, draft: input.draft === true }
+}
+
+/** Pull/merge request numbers: positive safe integers. */
+export function assertNumber(n: number): number {
+  if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1) {
+    throw new ProviderError('INVALID_ARGUMENT', 'Invalid pull request number.')
+  }
+  return n
+}
+
+/** Comment / review text: at most `max` characters; non-blank unless `allowEmpty`. */
+export function validateText(body: string, opts: { allowEmpty?: boolean; max?: number; what?: string } = {}): string {
+  const max = opts.max ?? MAX_BODY
+  const what = opts.what ?? 'Comment'
+  if (typeof body !== 'string') {
+    if (opts.allowEmpty && (body === undefined || body === null)) return ''
+    throw new ProviderError('INVALID_ARGUMENT', `${what} must be text.`)
+  }
+  if (body.length > max) throw new ProviderError('INVALID_ARGUMENT', `${what} is longer than ${max} characters.`)
+  if (body.includes('\0')) throw new ProviderError('INVALID_ARGUMENT', `${what} contains invalid characters.`)
+  if (!opts.allowEmpty && !body.trim()) throw new ProviderError('INVALID_ARGUMENT', `${what} is required.`)
+  return body
+}
+
+export const MERGE_METHODS: readonly MergeMethod[] = ['merge', 'squash', 'rebase']
+const REVIEW_EVENTS: readonly ReviewEvent[] = ['approve', 'comment', 'request-changes']
+
+/** Review event plus its text; comment and request-changes need a non-blank body. */
+export function validateReview(event: ReviewEvent, body: string): { event: ReviewEvent; body: string } {
+  if (!REVIEW_EVENTS.includes(event)) throw new ProviderError('INVALID_ARGUMENT', 'Invalid review action.')
+  const text = validateText(body, { allowEmpty: event === 'approve', what: 'Review comment' })
+  return { event, body: text }
+}
+
+export interface ValidatedMergeOptions {
+  method: MergeMethod
+  title: string | undefined
+  message: string | undefined
+  expectedHeadSha: string | undefined
+  deleteSourceBranch: boolean
+}
+
+export function validateMergeOptions(opts: MergePullRequestOptions): ValidatedMergeOptions {
+  if (!opts || !MERGE_METHODS.includes(opts.method)) throw new ProviderError('INVALID_ARGUMENT', 'Invalid merge method.')
+  let title: string | undefined
+  if (opts.title !== undefined && opts.title !== null) {
+    if (typeof opts.title !== 'string') throw new ProviderError('INVALID_ARGUMENT', 'Merge commit title must be text.')
+    title = opts.title.trim() || undefined
+    if (title && title.length > MAX_TITLE) {
+      throw new ProviderError('INVALID_ARGUMENT', `Merge commit title is longer than ${MAX_TITLE} characters.`)
+    }
+    if (title && CONTROL_RE.test(title)) throw new ProviderError('INVALID_ARGUMENT', 'Merge commit title must be a single line.')
+  }
+  let message: string | undefined
+  if (opts.message !== undefined && opts.message !== null) {
+    message = validateText(opts.message, { allowEmpty: true, what: 'Merge commit message' }) || undefined
+  }
+  const expectedHeadSha =
+    opts.expectedHeadSha !== undefined && opts.expectedHeadSha !== null ? assertSha(opts.expectedHeadSha) : undefined
+  return { method: opts.method, title, message, expectedHeadSha, deleteSourceBranch: opts.deleteSourceBranch === true }
+}
+
+/** `title` + blank line + `message`, or undefined when both are empty. */
+export function commitMessage(title: string | undefined, message: string | undefined): string | undefined {
+  if (title && message) return `${title}\n\n${message}`
+  return title ?? message
+}
+
+/** True when two commit ids (full or abbreviated) name the same commit. */
+export function sameSha(a: string, b: string): boolean {
+  const x = a.toLowerCase()
+  const y = b.toLowerCase()
+  return x.length >= y.length ? x.startsWith(y) : y.startsWith(x)
+}
+
+/** Re-throw a ProviderError with a different code and message, keeping its HTTP status. */
+export function recode(e: ProviderError, code: ProviderError['code'], message: string): ProviderError {
+  return new ProviderError(code, message, e.status !== undefined ? { status: e.status } : {})
+}
+
+/** The "<Label> said: ..." part of a ProviderError message, or ''. */
+export function providerDetail(e: ProviderError): string {
+  const i = e.message.indexOf(' said: ')
+  return i >= 0 ? e.message.slice(i + ' said: '.length) : ''
+}
+
+/** Merge reviewer entries by login; later entries win. Keeps first-seen order. */
+export function dedupeReviewers(entries: { login: string; state: ReviewerState }[]): PullRequestReviewer[] {
+  const map = new Map<string, ReviewerState>()
+  for (const e of entries) if (e.login) map.set(e.login, e.state)
+  return [...map].map(([login, state]) => ({ login, state }))
+}
+
+/** Parse a positive integer that providers sometimes send as a string ("12", GitLab "1000+" → null). */
+export function optCount(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isInteger(v) && v >= 0) return v
+  if (typeof v === 'string' && /^\d+$/.test(v)) return Number(v)
+  return null
 }
 
 export function clampLimit(limit: number | undefined): number {

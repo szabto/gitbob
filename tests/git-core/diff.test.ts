@@ -159,6 +159,40 @@ describe('getFileDiff', () => {
     expect(none).toMatchObject({ hunks: [], isNew: false, isDeleted: false, binary: false })
   })
 
+  it('diffs a staged rename when oldPath is given', async () => {
+    const repo = createFixtureRepo()
+    const body = Array.from({ length: 20 }, (_, i) => `line ${i}`).join('\n') + '\n'
+    repo.commit('init', { 'old name.txt': body, 'edited.txt': body })
+    repo.git(['mv', 'old name.txt', 'new name.txt'])
+    repo.git(['rm', '-q', 'edited.txt'])
+    repo.write('dir/edited2.txt', body.replace('line 3\n', 'line three\n'))
+    repo.git(['add', 'dir/edited2.txt'])
+
+    // Pure rename: no hunks, old path reported.
+    const pure = await getFileDiff(repo.dir, { kind: 'staged', path: 'new name.txt', oldPath: 'old name.txt' })
+    expect(pure).toMatchObject({ path: 'new name.txt', oldPath: 'old name.txt', isNew: false, isDeleted: false, hunks: [] })
+
+    // Rename with an edit: hunks of the content change only.
+    const edited = await getFileDiff(repo.dir, { kind: 'staged', path: 'dir/edited2.txt', oldPath: 'edited.txt' })
+    expect(edited).toMatchObject({ path: 'dir/edited2.txt', oldPath: 'edited.txt', isNew: false })
+    expect(edited.hunks).toHaveLength(1)
+    expect(edited.hunks[0]!.lines.filter((l) => l.type !== 'context').map((l) => `${l.type}:${l.content}`)).toEqual([
+      'del:line 3',
+      'add:line three',
+    ])
+
+    // Without oldPath the new path still diffs as an added file, as before.
+    const added = await getFileDiff(repo.dir, { kind: 'staged', path: 'new name.txt' })
+    expect(added).toMatchObject({ path: 'new name.txt', isNew: true })
+    expect(added.oldPath).toBeUndefined()
+    expect(added.hunks[0]!.lines).toHaveLength(20)
+
+    // oldPath equal to path is ignored; invalid oldPath is rejected.
+    const same = await getFileDiff(repo.dir, { kind: 'staged', path: 'new name.txt', oldPath: 'new name.txt' })
+    expect(same).toMatchObject({ isNew: true })
+    await expectGitError(getFileDiff(repo.dir, { kind: 'staged', path: 'new name.txt', oldPath: '../x' }), 'INVALID_ARGUMENT')
+  })
+
   it('diffs staged files on an unborn branch and deleted files', async () => {
     const repo = createFixtureRepo()
     repo.write('a.txt', 'a\n')

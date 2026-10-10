@@ -225,3 +225,44 @@ export function createSeededBareRepo(commits = 3): { bare: FixtureRepo; seed: Fi
   seed.git(['push', '-q', bare.dir, 'main', 'feature', 'v1'])
   return { bare, seed }
 }
+
+/**
+ * Leave `path` conflicted by merging branch `other` into `main`. Each side is file content, or
+ * null for "absent" (base: not yet added; ours/theirs: deleted on that side). Returns the path.
+ */
+export function makeSideConflict(
+  repo: FixtureRepo,
+  sides: { base: string | Buffer | null; ours: string | Buffer | null; theirs: string | Buffer | null },
+  path = 'conflict.bin',
+): string {
+  repo.commit('init', { 'init.txt': 'init\n' })
+  if (sides.base !== null) repo.commit('base', { [path]: sides.base })
+  repo.branch('other')
+  const side = (content: string | Buffer | null, message: string): void => {
+    if (content === null) {
+      if (sides.base !== null) repo.git(['rm', '-q', '--', path])
+      repo.commit(message)
+    } else repo.commit(message, { [path]: content })
+  }
+  side(sides.ours, 'ours')
+  repo.checkout('other')
+  side(sides.theirs, 'theirs')
+  repo.checkout('main')
+  try {
+    repo.git(['merge', '-q', '--no-ff', '-m', 'merge other', 'other'])
+  } catch {
+    /* expected: conflict */
+  }
+  return path
+}
+
+/** True if `git lfs` works with the git on PATH (CI images ship it; developer machines may not). */
+export function hasGitLfs(): boolean {
+  try {
+    return execFileSync('git', ['lfs', 'version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).startsWith(
+      'git-lfs/',
+    )
+  } catch {
+    return false
+  }
+}

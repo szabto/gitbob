@@ -157,7 +157,7 @@ export interface FileDiff {
 /** Where a file diff is taken from. */
 export type DiffTarget =
   | { kind: 'unstaged'; path: string }
-  | { kind: 'staged'; path: string }
+  | { kind: 'staged'; path: string; /** Original path of a staged rename. */ oldPath?: string }
   | { kind: 'untracked'; path: string }
   | { kind: 'commit'; sha: string; path: string; oldPath?: string }
 
@@ -415,4 +415,57 @@ export interface UpdateInfo {
   url: string | null
   /** The update can be downloaded and installed from inside the app (Windows, Linux AppImage). */
   canInstall?: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Git LFS and non-text conflicts
+
+export interface LfsTrackedPattern {
+  /** The pattern as written in the attributes file (git-lfs escapes spaces as `[[:space:]]`). */
+  pattern: string
+  /** Repository-relative attributes file that defines it, e.g. `.gitattributes` or `assets/.gitattributes`. */
+  source: string
+}
+
+export interface LfsFile {
+  path: string
+  /** Full sha256 object id. */
+  oid: string
+  /** True if the worktree has the real content (`*` in `git lfs ls-files`), false for a pointer (`-`). */
+  downloaded: boolean
+}
+
+export interface LfsStatus {
+  /** git-lfs is available to the git used by GitBob. */
+  installed: boolean
+  /** e.g. "git-lfs/3.7.1 (GitHub; darwin arm64; go 1.26.4)"; null when not installed. */
+  version: string | null
+  /** LFS filters are configured for this repository (any config scope: filter.lfs.process or .smudge). */
+  enabledInRepo: boolean
+  trackedPatterns: LfsTrackedPattern[]
+  /** LFS files in the checked-out tree (at most LFS_FILES_LIMIT). */
+  files: LfsFile[]
+  /** True if there were more than LFS_FILES_LIMIT files and the list was cut. */
+  filesTruncated: boolean
+}
+
+/**
+ * How a conflict can be resolved:
+ * - `content`: all three stages are text, so it can be merged line by line
+ * - `binary`: both sides exist but at least one is binary (NUL byte, `-diff`/`binary` attributes or
+ *   an LFS pointer) — pick a side
+ * - `modify-delete`: one side deleted the file (`deletedBy` says which)
+ * - `add-add`: both sides added the file (no base); text, so it can be merged
+ * - `other`: submodules, symlinks, rename/rename and other stage combinations
+ */
+export type ConflictKind = 'content' | 'binary' | 'modify-delete' | 'add-add' | 'other'
+
+export interface ConflictDescription {
+  kind: ConflictKind
+  /** Index stages present (1 = base, 2 = ours, 3 = theirs). */
+  stages: number[]
+  /** For modify/delete: the side that deleted the file. */
+  deletedBy: 'ours' | 'theirs' | null
+  /** True if any side is binary, whatever the kind. */
+  binary: boolean
 }

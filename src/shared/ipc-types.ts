@@ -1,5 +1,7 @@
 import type {
   AppInfo,
+  ConflictDescription,
+  LfsStatus,
   AppSettings,
   UpdateInfo,
   CheckStatus,
@@ -57,6 +59,14 @@ export interface IpcOutputs {
   'diff:apply-hunks': { applied: boolean }
   'conflict:get': ConflictVersions
   'conflict:save': void
+  'conflict:describe': ConflictDescription
+  /** resolved: false if the user declined the confirmation. */
+  'conflict:resolve-with': { resolved: boolean }
+  'lfs:status': LfsStatus
+  'lfs:install': void
+  'lfs:track': { changed: boolean }
+  'lfs:untrack': { changed: boolean }
+  'lfs:pull': { checkoutSkipped: boolean }
   'commit:create': CommitResult
   /** Full message of HEAD, or null on an unborn branch (used to prefill amend). */
   'commit:last-message': string | null

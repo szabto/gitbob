@@ -10,7 +10,15 @@ export { providerFetch, redact, assertAllowedBaseUrl, type AuthScheme, type Prov
 export { GitHubAdapter } from './github'
 export { GitLabAdapter } from './gitlab'
 export { BitbucketAdapter } from './bitbucket'
-export { AzureDevOpsAdapter } from './azure'
+export { AzureDevOpsAdapter, AZURE_VOTE } from './azure'
+export {
+  startDeviceFlow,
+  pollDeviceFlow,
+  type DeviceFlowStart,
+  type DeviceFlowToken,
+  type StartDeviceFlowOptions,
+  type PollDeviceFlowOptions,
+} from './oauth'
 
 export const PROVIDER_LABELS: Record<ProviderKind, string> = {
   github: 'GitHub',

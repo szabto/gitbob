@@ -65,6 +65,7 @@ export function useInvalidateRepo(repoPath: string) {
       void qc.invalidateQueries({ queryKey: ['reflog', repoPath] })
       void qc.invalidateQueries({ queryKey: ['worktrees', repoPath] })
       void qc.invalidateQueries({ queryKey: ['submodules', repoPath] })
+      void qc.invalidateQueries({ queryKey: ['lfs', repoPath] })
       if (opts.history !== false) {
         void qc.invalidateQueries({ queryKey: ['log', repoPath] })
         void qc.invalidateQueries({ queryKey: ['search', repoPath] })

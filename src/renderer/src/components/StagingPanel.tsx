@@ -97,7 +97,7 @@ export function StagingPanel({ repo, onStash }: { repo: RepositoryInfo; onStash:
             groups.staged.length > 0 ? { label: 'Unstage all', run: () => unstageAll.mutate() } : undefined
           }
           action={{ label: 'Unstage', run: (p) => unstage.mutate(p) }}
-          onOpen={(e) => showDiff({ kind: 'staged', path: e.path })}
+          onOpen={(e) => showDiff({ kind: 'staged', path: e.path, ...(e.origPath ? { oldPath: e.origPath } : {}) })}
           isActive={(e) => isActive({ kind: 'staged', path: e.path })}
           disabled={busy}
         />

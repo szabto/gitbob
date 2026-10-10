@@ -1,7 +1,7 @@
 import { constants, type Stats } from 'node:fs'
 import { lstat, open, readlink, realpath } from 'node:fs/promises'
 import { basename, dirname, join, sep } from 'node:path'
-import type { DiffTarget } from '@shared/types'
+import { stagedOldPath, type DiffTargetInput } from './diff'
 import { GitError } from './errors'
 import { resolveRepoPath } from './paths'
 import { runGit } from './runner'
@@ -168,7 +168,7 @@ function combine(oldSide: ContentSide, newSide: ContentSide): FileContents {
 /**
  * Both full sides of a file for `target`:
  * - unstaged: index (stage 0, or "ours" stage 2 for an unmerged file) vs worktree
- * - staged: HEAD vs index
+ * - staged: HEAD (`HEAD:<oldPath>` for a staged rename given `oldPath`) vs index
  * - untracked: nothing vs worktree
  * - commit: first parent (`oldPath` if renamed) vs the commit
  * A side that does not exist is null. Binary (NUL in the first 8000 bytes) or
@@ -176,7 +176,7 @@ function combine(oldSide: ContentSide, newSide: ContentSide): FileContents {
  */
 export async function getFileContents(
   repoPath: string,
-  target: DiffTarget,
+  target: DiffTargetInput,
   opts: { maxBytes?: number } = {},
 ): Promise<FileContents> {
   const path = target.path
@@ -196,7 +196,8 @@ export async function getFileContents(
     }
     case 'staged': {
       // On an unborn branch `HEAD:path` is simply missing.
-      const [head, index] = await lookupBlobs(repoPath, [`HEAD:${path}`, `:0:${path}`])
+      const oldPath = stagedOldPath(repoPath, target) ?? path
+      const [head, index] = await lookupBlobs(repoPath, [`HEAD:${oldPath}`, `:0:${path}`])
       const [oldSide, newSide] = await Promise.all([
         readBlob(repoPath, head ?? null, maxBytes),
         readBlob(repoPath, index ?? null, maxBytes),

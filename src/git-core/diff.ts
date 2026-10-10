@@ -6,6 +6,22 @@ import { runGit } from './runner'
 const SHA_RE = /^[0-9a-f]{4,64}$/i
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024
 
+/**
+ * A diff target that may name the old path of a staged rename (`{ kind: 'staged', path, oldPath }`),
+ * so the diff shows the rename and its content change instead of an added file.
+ */
+export type DiffTargetInput = DiffTarget | { kind: 'staged'; path: string; oldPath?: string }
+
+/** `oldPath` of a staged rename target, if given and different from `path` (validated). */
+export function stagedOldPath(repoPath: string, target: DiffTargetInput): string | undefined {
+  if (target.kind !== 'staged') return undefined
+  const oldPath = (target as { oldPath?: unknown }).oldPath
+  if (oldPath === undefined) return undefined
+  if (typeof oldPath !== 'string') throw new GitError('INVALID_ARGUMENT', 'Invalid path')
+  resolveRepoPath(repoPath, oldPath)
+  return oldPath === target.path ? undefined : oldPath
+}
+
 export type ParsedFileDiff = Omit<FileDiff, 'path' | 'truncated'> & { path?: string }
 
 /**
@@ -174,13 +190,15 @@ async function resolveCommit(repoPath: string, sha: string): Promise<{ sha: stri
 }
 
 /**
- * Diff of one file. `unstaged` = index vs worktree, `staged` = HEAD (or empty tree) vs index,
+ * Diff of one file. `unstaged` = index vs worktree, `staged` = HEAD (or empty tree) vs index
+ * (with `oldPath`: the staged rename `oldPath` -> `path`, reported with `oldPath` and the hunks of
+ * any content change),
  * `untracked` = whole file as added, `commit` = commit vs its first parent (root: vs empty tree).
  * Output larger than `maxBytes` is cut and returned with `truncated: true`.
  */
 export async function getFileDiff(
   repoPath: string,
-  target: DiffTarget,
+  target: DiffTargetInput,
   opts: { maxBytes?: number } = {},
 ): Promise<FileDiff> {
   resolveRepoPath(repoPath, target.path)
@@ -192,10 +210,13 @@ export async function getFileDiff(
     case 'unstaged':
       args = ['diff', ...DIFF_OPTS, '--no-relative', '-M', '--', target.path]
       break
-    case 'staged':
+    case 'staged': {
       // `--cached` without a commit compares against the empty tree on an unborn branch.
-      args = ['diff', '--cached', ...DIFF_OPTS, '--no-relative', '-M', '--', target.path]
+      // Both paths in the pathspec let rename detection pair the deletion with the addition.
+      const oldPath = stagedOldPath(repoPath, target)
+      args = ['diff', '--cached', ...DIFF_OPTS, '--no-relative', '-M', '--', target.path, ...(oldPath ? [oldPath] : [])]
       break
+    }
     case 'untracked':
       // Git handles `/dev/null` itself for --no-index on every platform (including Windows).
       args = ['diff', '--no-index', ...DIFF_OPTS, '--', '/dev/null', target.path]

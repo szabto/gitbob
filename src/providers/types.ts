@@ -11,6 +11,74 @@ export type { CheckStatus, ProviderKind, PullRequest, PullRequestState, RepoRef 
 
 
 
+export type MergeMethod = 'merge' | 'squash' | 'rebase'
+
+export type MergeableState = 'yes' | 'no' | 'conflicts' | 'unknown'
+
+export type ReviewerState = 'approved' | 'changes-requested' | 'commented' | 'pending'
+
+export interface PullRequestReviewer {
+  login: string
+  state: ReviewerState
+}
+
+/** A pull request with the extra data needed to review and merge it. */
+export interface PullRequestDetail extends PullRequest {
+  /** Description as markdown; empty when there is none. */
+  body: string
+  /** Target commit the provider compares against (Bitbucket: abbreviated hash). */
+  baseSha: string | null
+  /** Current head commit of the source branch (Bitbucket: abbreviated hash). */
+  headSha: string | null
+  /**
+   * 'yes' = the provider reports it can merge; 'no' = blocked (closed, draft, failing policy or
+   * protection rule); 'conflicts' = merge conflicts; 'unknown' = the provider is still computing.
+   */
+  mergeable: MergeableState
+  /** Merge methods the repository allows, when the provider says; otherwise every method supported. */
+  mergeMethods: MergeMethod[]
+  reviewers: PullRequestReviewer[]
+  additions: number | null
+  deletions: number | null
+  changedFiles: number | null
+  /** The source branch lives in another repository (fork). */
+  headRepoIsFork: boolean
+}
+
+export interface PullRequestComment {
+  id: string
+  author: string
+  /** Markdown. */
+  body: string
+  createdAt: string
+  /** File path for inline (diff) comments. */
+  path?: string
+  /** Line in the new version of the file for inline comments. */
+  line?: number
+}
+
+export type ReviewEvent = 'approve' | 'comment' | 'request-changes'
+
+export interface MergePullRequestOptions {
+  method: MergeMethod
+  /** Commit title (merge/squash). Single line. */
+  title?: string
+  /** Commit message body (merge/squash). */
+  message?: string
+  /** Refuse to merge if the head moved past this commit since it was reviewed. */
+  expectedHeadSha?: string
+  deleteSourceBranch?: boolean
+}
+
+export interface MergePullRequestResult {
+  /** False when the provider accepted the request but completes it asynchronously. */
+  merged: boolean
+  /** Resulting merge/squash commit, when known. */
+  sha: string | null
+  /** User-facing summary. */
+  message: string
+}
+
 export interface ProviderUser {
   login: string
   name: string | null
@@ -38,6 +106,18 @@ export interface ProviderAdapter {
   createPullRequest(repo: RepoRef, input: CreatePullRequestInput): Promise<PullRequest>
   /** Browser URL that starts creating a pull request from `branch`. Pure; no network. */
   pullRequestUrlForBranch?(repo: RepoRef, branch: string): string
+  getPullRequest(repo: RepoRef, number: number): Promise<PullRequestDetail>
+  /** General and inline comments, oldest first (at most 3 pages per comment source). */
+  listComments(repo: RepoRef, number: number): Promise<PullRequestComment[]>
+  addComment(repo: RepoRef, number: number, body: string): Promise<PullRequestComment>
+  /** `body` is required for 'comment' and 'request-changes', optional for 'approve'. */
+  submitReview(repo: RepoRef, number: number, event: ReviewEvent, body: string): Promise<void>
+  mergePullRequest(repo: RepoRef, number: number, opts: MergePullRequestOptions): Promise<MergePullRequestResult>
+  /**
+   * Remote ref to fetch the pull request locally (`git fetch <remote> <ref>`), or null when the
+   * provider exposes none (Bitbucket Cloud: fetch the source branch instead). Pure; no network.
+   */
+  pullRequestRefspec(repo: RepoRef, number: number): string | null
 }
 
 export interface AdapterOptions {
@@ -68,6 +148,8 @@ export type ProviderErrorCode =
   | 'NETWORK'
   | 'BAD_RESPONSE'
   | 'INVALID_ARGUMENT'
+  /** The pull request cannot be merged (conflicts, blocked, or its head changed). */
+  | 'CONFLICT'
 
 /** Error with a user-facing message. Messages are redacted and never contain the token. */
 export class ProviderError extends Error {

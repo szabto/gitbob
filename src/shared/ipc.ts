@@ -56,7 +56,7 @@ const repoPaths = z.array(repoPathSchema).min(1).max(10_000)
 
 export const diffTargetSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unstaged'), path: repoPathSchema }),
-  z.object({ kind: z.literal('staged'), path: repoPathSchema }),
+  z.object({ kind: z.literal('staged'), path: repoPathSchema, oldPath: repoPathSchema.optional() }),
   z.object({ kind: z.literal('untracked'), path: repoPathSchema }),
   z.object({ kind: z.literal('commit'), sha: shaSchema, path: repoPathSchema, oldPath: repoPathSchema.optional() }),
 ])
@@ -109,6 +109,13 @@ export const ipcInputSchemas = {
       .max(10_000),
   }),
   'conflict:get': z.object({ repoPath: absolutePath, path: repoPathSchema }),
+  'conflict:describe': z.object({ repoPath: absolutePath, path: repoPathSchema }),
+  'conflict:resolve-with': z.object({ repoPath: absolutePath, path: repoPathSchema, choice: z.enum(['ours', 'theirs', 'delete']) }),
+  'lfs:status': z.object({ repoPath: absolutePath }),
+  'lfs:install': z.object({ repoPath: absolutePath }),
+  'lfs:track': z.object({ repoPath: absolutePath, pattern: z.string().min(1).max(200) }),
+  'lfs:untrack': z.object({ repoPath: absolutePath, pattern: z.string().min(1).max(200) }),
+  'lfs:pull': z.object({ repoPath: absolutePath }),
   'conflict:save': z.object({
     repoPath: absolutePath,
     path: repoPathSchema,

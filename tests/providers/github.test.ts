@@ -259,3 +259,223 @@ describe('GitHubAdapter', () => {
     expect(() => createAdapter('github', { token: ' ' })).toThrow(ProviderError)
   })
 })
+
+describe('GitHubAdapter review & merge', () => {
+  const P = '/repos/octo-org/hello-world'
+
+  function detailRoutes(over: Record<string, unknown> = {}, repoBody: Record<string, unknown> = {}): void {
+    api.route(`GET ${P}/pulls/7`, () => ({
+      body: ghPull(7, {
+        body: '## Summary\nDoes things',
+        mergeable: true,
+        mergeable_state: 'clean',
+        additions: 10,
+        deletions: 3,
+        changed_files: 2,
+        head: { ref: 'feature/7', sha: SHA, repo: { id: 1, full_name: 'octo-org/hello-world' } },
+        base: { ref: 'main', sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', repo: { id: 1, full_name: 'octo-org/hello-world' } },
+        requested_reviewers: [{ login: 'carol' }],
+        requested_teams: [{ slug: 'core' }],
+        ...over,
+      }),
+    }))
+    api.route(`GET ${P}/pulls/7/reviews`, () => ({
+      body: [
+        { id: 1, user: { login: 'alice' }, state: 'CHANGES_REQUESTED', body: 'fix', submitted_at: '2024-01-01T00:00:00Z' },
+        { id: 2, user: { login: 'alice' }, state: 'APPROVED', body: '', submitted_at: '2024-01-02T00:00:00Z' },
+        { id: 3, user: { login: 'alice' }, state: 'COMMENTED', body: 'nit', submitted_at: '2024-01-03T00:00:00Z' },
+        { id: 4, user: { login: 'bob' }, state: 'COMMENTED', body: '', submitted_at: '2024-01-03T00:00:00Z' },
+        { id: 5, user: { login: 'dave' }, state: 'APPROVED', body: '', submitted_at: '2024-01-03T00:00:00Z' },
+        { id: 6, user: { login: 'dave' }, state: 'DISMISSED', body: '', submitted_at: '2024-01-04T00:00:00Z' },
+      ],
+    }))
+    api.route(`GET ${P}`, () => ({
+      body: { full_name: 'octo-org/hello-world', allow_merge_commit: true, allow_squash_merge: true, allow_rebase_merge: false, ...repoBody },
+    }))
+  }
+
+  it('getPullRequest maps detail, reviewers and allowed merge methods', async () => {
+    detailRoutes()
+    const d = await gh.getPullRequest(REPO, 7)
+    expect(d).toMatchObject({
+      number: 7,
+      body: '## Summary\nDoes things',
+      headSha: SHA,
+      baseSha: 'a'.repeat(40),
+      mergeable: 'yes',
+      mergeMethods: ['merge', 'squash'],
+      additions: 10,
+      deletions: 3,
+      changedFiles: 2,
+      headRepoIsFork: false,
+    })
+    expect(d.reviewers).toEqual([
+      { login: 'alice', state: 'approved' },
+      { login: 'bob', state: 'commented' },
+      { login: 'dave', state: 'commented' },
+      { login: 'carol', state: 'pending' },
+      { login: 'team:core', state: 'pending' },
+    ])
+  })
+
+  it.each([
+    [{ mergeable: null, mergeable_state: 'unknown' }, 'unknown'],
+    [{ mergeable: false, mergeable_state: 'dirty' }, 'conflicts'],
+    [{ mergeable: true, mergeable_state: 'blocked' }, 'no'],
+    [{ mergeable: true, mergeable_state: 'unstable' }, 'yes'],
+    [{ draft: true }, 'no'],
+    [{ state: 'closed', merged_at: '2024-01-01T00:00:00Z' }, 'no'],
+  ])('maps mergeability %j → %s', async (over, expected) => {
+    detailRoutes(over)
+    expect((await gh.getPullRequest(REPO, 7)).mergeable).toBe(expected)
+  })
+
+  it('detects forks (including deleted forks) and falls back to all methods without push access', async () => {
+    detailRoutes({ head: { ref: 'patch-1', sha: SHA, repo: { id: 99, full_name: 'stranger/hello-world' } } }, {
+      allow_merge_commit: undefined,
+      allow_squash_merge: undefined,
+      allow_rebase_merge: undefined,
+    })
+    const d = await gh.getPullRequest(REPO, 7)
+    expect(d.headRepoIsFork).toBe(true)
+    expect(d.mergeMethods).toEqual(['merge', 'squash', 'rebase'])
+    detailRoutes({ head: { ref: 'patch-1', sha: SHA, repo: null } })
+    expect((await gh.getPullRequest(REPO, 7)).headRepoIsFork).toBe(true)
+  })
+
+  it('listComments merges issue, inline and review comments across pages, oldest first', async () => {
+    api.route(`GET ${P}/issues/7/comments`, (req, base) => {
+      const page = Number(req.query.get('page') ?? '1')
+      const headers: Record<string, string> =
+        page < 3 ? { link: `<${base}${P}/issues/7/comments?per_page=2&page=${page + 1}>; rel="next"` } : {}
+      return {
+        headers,
+        body: [
+          { id: page * 10 + 1, user: { login: 'u' }, body: `c${page}a`, created_at: `2024-01-0${page}T01:00:00Z` },
+          { id: page * 10 + 2, user: { login: 'u' }, body: `c${page}b`, created_at: `2024-01-0${page}T02:00:00Z` },
+        ],
+      }
+    })
+    api.route(`GET ${P}/pulls/7/comments`, () => ({
+      body: [
+        { id: 500, user: { login: 'r' }, body: 'inline', created_at: '2024-01-01T01:30:00Z', path: 'src/a.ts', line: 12 },
+        { id: 501, user: { login: 'r' }, body: 'outdated', created_at: '2024-01-04T00:00:00Z', path: 'src/b.ts', line: null, original_line: 4 },
+      ],
+    }))
+    api.route(`GET ${P}/pulls/7/reviews`, () => ({
+      body: [
+        { id: 900, user: { login: 'alice' }, state: 'APPROVED', body: 'LGTM', submitted_at: '2024-01-05T00:00:00Z' },
+        { id: 901, user: { login: 'bob' }, state: 'COMMENTED', body: '', submitted_at: '2024-01-05T00:00:00Z' },
+      ],
+    }))
+    const comments = await gh.listComments(REPO, 7)
+    expect(api.requests.filter((r) => r.pathname.endsWith('/issues/7/comments'))).toHaveLength(3)
+    expect(comments.map((c) => c.id)).toEqual([
+      'issue:11',
+      'review-comment:500',
+      'issue:12',
+      'issue:21',
+      'issue:22',
+      'issue:31',
+      'issue:32',
+      'review-comment:501',
+      'review:900',
+    ])
+    expect(comments[1]).toEqual({ id: 'review-comment:500', author: 'r', body: 'inline', createdAt: '2024-01-01T01:30:00Z', path: 'src/a.ts', line: 12 })
+    expect(comments.find((c) => c.id === 'review-comment:501')!.line).toBe(4)
+  })
+
+  it('addComment posts an issue comment', async () => {
+    api.route(`POST ${P}/issues/7/comments`, (req) => ({
+      status: 201,
+      body: { id: 77, user: { login: 'octocat' }, body: (req.body as { body: string }).body, created_at: '2024-02-01T00:00:00Z' },
+    }))
+    expect(await gh.addComment(REPO, 7, 'Thanks!')).toEqual({ id: 'issue:77', author: 'octocat', body: 'Thanks!', createdAt: '2024-02-01T00:00:00Z' })
+    expect(api.requests[0]!.body).toEqual({ body: 'Thanks!' })
+  })
+
+  it('submitReview sends APPROVE / COMMENT / REQUEST_CHANGES', async () => {
+    api.route(`POST ${P}/pulls/7/reviews`, () => ({ body: { id: 1, state: 'APPROVED' } }))
+    await gh.submitReview(REPO, 7, 'approve', '')
+    await gh.submitReview(REPO, 7, 'comment', 'Looks fine')
+    await gh.submitReview(REPO, 7, 'request-changes', 'Please add tests')
+    expect(api.requests.map((r) => r.body)).toEqual([
+      { event: 'APPROVE' },
+      { event: 'COMMENT', body: 'Looks fine' },
+      { event: 'REQUEST_CHANGES', body: 'Please add tests' },
+    ])
+  })
+
+  it('submitReview validates locally and maps 422', async () => {
+    await expect(gh.submitReview(REPO, 7, 'comment', '  ')).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    await expect(gh.submitReview(REPO, 7, 'request-changes', '')).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    await expect(gh.submitReview(REPO, 7, 'bogus' as never, 'x')).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(api.requests).toHaveLength(0)
+    api.route(`POST ${P}/pulls/7/reviews`, () => ({
+      status: 422,
+      body: { message: 'Unprocessable Entity', errors: ['Can not approve your own pull request'] },
+    }))
+    const e = await catchErr(gh.submitReview(REPO, 7, 'approve', ''))
+    expect(e.code).toBe('INVALID_ARGUMENT')
+    expect(e.message).toContain('Can not approve your own pull request')
+  })
+
+  it('mergePullRequest sends method, sha and commit text', async () => {
+    api.route(`PUT ${P}/pulls/7/merge`, () => ({ body: { sha: 'b'.repeat(40), merged: true, message: 'Pull Request successfully merged' } }))
+    const r = await gh.mergePullRequest(REPO, 7, { method: 'squash', title: 'Feature (#7)', message: 'details', expectedHeadSha: SHA })
+    expect(r).toEqual({ merged: true, sha: 'b'.repeat(40), message: 'Pull Request successfully merged' })
+    expect(api.requests[0]!.body).toEqual({ merge_method: 'squash', sha: SHA, commit_title: 'Feature (#7)', commit_message: 'details' })
+    await gh.mergePullRequest(REPO, 7, { method: 'rebase', title: 'ignored' })
+    expect(api.requests[1]!.body).toEqual({ merge_method: 'rebase' })
+  })
+
+  it('mergePullRequest maps 405 (not mergeable) and 409 (head changed) to CONFLICT', async () => {
+    api.route(`PUT ${P}/pulls/7/merge`, () => ({ status: 405, body: { message: 'Pull Request is not mergeable' } }))
+    const e1 = await catchErr(gh.mergePullRequest(REPO, 7, { method: 'merge' }))
+    expect(e1.code).toBe('CONFLICT')
+    expect(e1.message).toContain('Pull Request is not mergeable')
+    expect(e1.message).not.toContain(TOKEN)
+    api.route(`PUT ${P}/pulls/7/merge`, () => ({ status: 409, body: { message: 'Head branch was modified. Review and try the merge again.' } }))
+    const e2 = await catchErr(gh.mergePullRequest(REPO, 7, { method: 'merge', expectedHeadSha: SHA }))
+    expect(e2.code).toBe('CONFLICT')
+    expect(e2.status).toBe(409)
+    expect(e2.message).toMatch(/changed since it was reviewed/)
+  })
+
+  it('mergePullRequest deletes the head branch only for same-repository pull requests', async () => {
+    detailRoutes()
+    api.route(`PUT ${P}/pulls/7/merge`, () => ({ body: { sha: 'c'.repeat(40), merged: true, message: 'merged' } }))
+    api.route(`DELETE ${P}/git/refs/heads/feature/7`, () => ({ status: 204 }))
+    const r = await gh.mergePullRequest(REPO, 7, { method: 'merge', deleteSourceBranch: true })
+    expect(r.message).toContain('Deleted branch feature/7')
+    expect(api.requests.some((q) => q.method === 'DELETE' && q.pathname === `${P}/git/refs/heads/feature/7`)).toBe(true)
+
+    api.requests.length = 0
+    detailRoutes({ head: { ref: 'feature/7', sha: SHA, repo: { id: 99, full_name: 'fork/hello-world' } } })
+    const r2 = await gh.mergePullRequest(REPO, 7, { method: 'merge', deleteSourceBranch: true })
+    expect(r2.merged).toBe(true)
+    expect(r2.message).toContain('fork')
+    expect(api.requests.some((q) => q.method === 'DELETE')).toBe(false)
+  })
+
+  it.each([
+    [{ method: 'octopus' }],
+    [{ method: 'merge', expectedHeadSha: 'zzz' }],
+    [{ method: 'merge', title: 'a\nb' }],
+    [{ method: 'merge', message: 'x'.repeat(65_537) }],
+  ])('mergePullRequest rejects %j without a request', async (opts) => {
+    await expect(gh.mergePullRequest(REPO, 7, opts as never)).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(api.requests).toHaveLength(0)
+  })
+
+  it('validates numbers and bodies, and returns the PR refspec', async () => {
+    for (const n of [0, -1, 1.5, Number.NaN]) {
+      await expect(gh.getPullRequest(REPO, n)).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    }
+    await expect(gh.addComment(REPO, 7, '')).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    await expect(gh.addComment(REPO, 7, 'x'.repeat(65_537))).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(api.requests).toHaveLength(0)
+    expect(gh.pullRequestRefspec(REPO, 7)).toBe('refs/pull/7/head')
+    expect(() => gh.pullRequestRefspec(REPO, 0)).toThrow(ProviderError)
+  })
+})

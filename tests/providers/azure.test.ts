@@ -199,3 +199,174 @@ describe('AzureDevOpsAdapter', () => {
     expect(az.pullRequestUrlForBranch(REPO, 'feature/x')).toBe(`${REPO_WEB}/pullrequestcreate?sourceRef=feature%2Fx`)
   })
 })
+
+describe('AzureDevOpsAdapter review & merge', () => {
+  const PR = `${R}/pullrequests/7`
+  const ME = '0d1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8'
+
+  function detailRoute(over: Record<string, unknown> = {}): void {
+    api.route(`GET ${PR}`, () => ({
+      body: azPull(7, {
+        lastMergeSourceCommit: { commitId: SHA },
+        lastMergeTargetCommit: { commitId: 'a'.repeat(40) },
+        reviewers: [
+          { uniqueName: 'a@contoso.com', vote: 10 },
+          { uniqueName: 'b@contoso.com', vote: 5 },
+          { uniqueName: 'c@contoso.com', vote: 0, isRequired: true },
+          { uniqueName: 'd@contoso.com', vote: -5 },
+          { displayName: '[My Project]\\Team', vote: -10, isContainer: true },
+        ],
+        ...over,
+      }),
+    }))
+  }
+
+  it('getPullRequest maps votes, commits and mergeStatus', async () => {
+    detailRoute()
+    expect(await az.getPullRequest(REPO, 7)).toMatchObject({
+      number: 7,
+      body: 'Adding a new feature',
+      headSha: SHA,
+      baseSha: 'a'.repeat(40),
+      mergeable: 'yes',
+      mergeMethods: ['merge', 'squash', 'rebase'],
+      reviewers: [
+        { login: 'a@contoso.com', state: 'approved' },
+        { login: 'b@contoso.com', state: 'approved' },
+        { login: 'c@contoso.com', state: 'pending' },
+        { login: 'd@contoso.com', state: 'changes-requested' },
+        { login: '[My Project]\\Team', state: 'changes-requested' },
+      ],
+      additions: null,
+      headRepoIsFork: false,
+    })
+    expect(api.requests[0]!.query.get('api-version')).toBe('7.1')
+  })
+
+  it.each([
+    [{ mergeStatus: 'conflicts' }, 'conflicts'],
+    [{ mergeStatus: 'queued' }, 'unknown'],
+    [{ mergeStatus: 'rejectedByPolicy' }, 'no'],
+    [{ isDraft: true }, 'no'],
+    [{ status: 'completed' }, 'no'],
+  ])('maps mergeability %j → %s', async (over, expected) => {
+    detailRoute(over)
+    expect((await az.getPullRequest(REPO, 7)).mergeable).toBe(expected)
+  })
+
+  it('detects fork pull requests', async () => {
+    detailRoute({ forkSource: { name: 'refs/heads/f', repository: { name: 'web-app-fork' } } })
+    expect((await az.getPullRequest(REPO, 7)).headRepoIsFork).toBe(true)
+  })
+
+  it('listComments flattens threads, skipping system and deleted comments', async () => {
+    api.route(`GET ${R}/pullRequests/7/threads`, () => ({
+      body: {
+        count: 3,
+        value: [
+          {
+            id: 1,
+            comments: [
+              { id: 1, content: 'general', commentType: 'text', author: { uniqueName: 'a@contoso.com' }, publishedDate: '2024-06-02T00:00:00Z' },
+              { id: 2, content: 'reply', commentType: 'text', author: { uniqueName: 'b@contoso.com' }, publishedDate: '2024-06-03T00:00:00Z' },
+              { id: 3, content: 'gone', commentType: 'text', isDeleted: true, author: {}, publishedDate: '2024-06-03T00:00:00Z' },
+            ],
+          },
+          {
+            id: 2,
+            threadContext: { filePath: '/src/app.ts', rightFileStart: { line: 42, offset: 1 } },
+            comments: [{ id: 1, content: 'inline', commentType: 'text', author: { displayName: 'Dee' }, publishedDate: '2024-06-01T00:00:00Z' }],
+          },
+          { id: 3, comments: [{ id: 1, content: 'Normal Paulk voted 10', commentType: 'system', author: {}, publishedDate: '2024-06-01T00:00:00Z' }] },
+        ],
+      },
+    }))
+    expect(await az.listComments(REPO, 7)).toEqual([
+      { id: '2:1', author: 'Dee', body: 'inline', createdAt: '2024-06-01T00:00:00Z', path: '/src/app.ts', line: 42 },
+      { id: '1:1', author: 'a@contoso.com', body: 'general', createdAt: '2024-06-02T00:00:00Z' },
+      { id: '1:2', author: 'b@contoso.com', body: 'reply', createdAt: '2024-06-03T00:00:00Z' },
+    ])
+  })
+
+  it('addComment creates an active thread', async () => {
+    api.route(`POST ${R}/pullRequests/7/threads`, (req) => {
+      const b = req.body as { comments: { content: string }[] }
+      return {
+        body: { id: 9, status: 'active', comments: [{ id: 1, content: b.comments[0]!.content, commentType: 'text', author: { uniqueName: 'me@contoso.com' }, publishedDate: '2024-07-01T00:00:00Z' }] },
+      }
+    })
+    expect(await az.addComment(REPO, 7, 'nice')).toEqual({ id: '9:1', author: 'me@contoso.com', body: 'nice', createdAt: '2024-07-01T00:00:00Z' })
+    expect(api.requests[0]!.body).toEqual({ comments: [{ parentCommentId: 0, content: 'nice', commentType: 1 }], status: 1 })
+  })
+
+  it('submitReview votes as the connectionData user and posts the body as a thread', async () => {
+    api.route('GET /contoso/_apis/connectionData', () => ({ body: { authenticatedUser: { id: ME, providerDisplayName: 'Me' } } }))
+    api.route(`PUT ${R}/pullRequests/7/reviewers/${ME}`, (req) => ({ body: { id: ME, vote: (req.body as { vote: number }).vote } }))
+    api.route(`POST ${R}/pullRequests/7/threads`, () => ({ body: { id: 1, comments: [] } }))
+    await az.submitReview(REPO, 7, 'approve', '')
+    await az.submitReview(REPO, 7, 'request-changes', 'please rename')
+    await az.submitReview(REPO, 7, 'comment', 'just a note')
+    expect(api.requests.map((r) => `${r.method} ${r.pathname}`)).toEqual([
+      'GET /contoso/_apis/connectionData',
+      `PUT ${R}/pullRequests/7/reviewers/${ME}`,
+      // connectionData is cached per organization
+      `PUT ${R}/pullRequests/7/reviewers/${ME}`,
+      `POST ${R}/pullRequests/7/threads`,
+      `POST ${R}/pullRequests/7/threads`,
+    ])
+    expect(api.requests[1]!.body).toEqual({ vote: 10 })
+    expect(api.requests[2]!.body).toEqual({ vote: -5 })
+    expect((api.requests[3]!.body as { comments: { content: string }[] }).comments[0]!.content).toBe('please rename')
+  })
+
+  it('mergePullRequest completes with the expected head and strategy', async () => {
+    api.route(`PATCH ${PR}`, (req) => {
+      const b = req.body as Record<string, unknown>
+      return { body: azPull(7, { status: 'completed', lastMergeCommit: { commitId: 'c'.repeat(40) }, completionOptions: b.completionOptions }) }
+    })
+    const r = await az.mergePullRequest(REPO, 7, { method: 'squash', title: 'T', message: 'M', expectedHeadSha: SHA, deleteSourceBranch: true })
+    expect(r).toEqual({ merged: true, sha: 'c'.repeat(40), message: 'Pull request 7 completed.' })
+    expect(api.requests[0]!.body).toEqual({
+      status: 'completed',
+      lastMergeSourceCommit: { commitId: SHA },
+      completionOptions: { mergeStrategy: 'squash', deleteSourceBranch: true, mergeCommitMessage: 'T\n\nM' },
+    })
+  })
+
+  it('mergePullRequest reads the current head when none is given and reports async completion', async () => {
+    detailRoute()
+    api.route(`PATCH ${PR}`, () => ({ body: azPull(7, { status: 'active', mergeStatus: 'queued' }) }))
+    const r = await az.mergePullRequest(REPO, 7, { method: 'rebase' })
+    expect(r.merged).toBe(false)
+    expect(r.message).toMatch(/completing/)
+    const patch = api.requests.find((q) => q.method === 'PATCH')!
+    expect(patch.body).toEqual({
+      status: 'completed',
+      lastMergeSourceCommit: { commitId: SHA },
+      completionOptions: { mergeStrategy: 'rebase', deleteSourceBranch: false },
+    })
+    await az.mergePullRequest(REPO, 7, { method: 'merge' })
+    expect((api.requests.filter((q) => q.method === 'PATCH')[1]!.body as { completionOptions: { mergeStrategy: string } }).completionOptions.mergeStrategy).toBe('noFastForward')
+  })
+
+  it('mergePullRequest maps stale head (409), policy errors (400) and conflicts to CONFLICT', async () => {
+    api.route(`PATCH ${PR}`, () => ({ status: 409, body: { message: 'TF401192: The source branch was updated after the pull request was last evaluated.' } }))
+    const e1 = await catchErr(az.mergePullRequest(REPO, 7, { method: 'merge', expectedHeadSha: SHA }))
+    expect(e1).toMatchObject({ code: 'CONFLICT', status: 409 })
+    expect(e1.message).toContain('TF401192')
+    expect(e1.message).not.toContain(PAT)
+    api.route(`PATCH ${PR}`, () => ({ status: 400, body: { message: 'TF401181: The pull request cannot be completed because of policy.' } }))
+    expect((await catchErr(az.mergePullRequest(REPO, 7, { method: 'merge', expectedHeadSha: SHA }))).code).toBe('CONFLICT')
+    api.route(`PATCH ${PR}`, () => ({ body: azPull(7, { status: 'active', mergeStatus: 'conflicts' }) }))
+    const e3 = await catchErr(az.mergePullRequest(REPO, 7, { method: 'merge', expectedHeadSha: SHA }))
+    expect(e3.code).toBe('CONFLICT')
+    expect(e3.message).toMatch(/conflicts/)
+  })
+
+  it('returns the merge refspec and validates input', async () => {
+    expect(az.pullRequestRefspec(REPO, 7)).toBe('refs/pull/7/merge')
+    await expect(az.addComment(REPO, 7, '')).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    await expect(az.mergePullRequest(REPO, -2, { method: 'merge' })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(api.requests).toHaveLength(0)
+  })
+})

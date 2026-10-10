@@ -16,7 +16,8 @@ import { discardPaths, stageAll, stagePaths, unstageAll, unstagePaths } from '@g
 import { getFileDiff } from '@git-core/diff'
 import { getFileContents } from '@git-core/contents'
 import { applyHunks } from '@git-core/patch'
-import { getConflictVersions, saveConflictResolution } from '@git-core/conflicts'
+import { describeConflict, getConflictVersions, resolveConflictWith, saveConflictResolution } from '@git-core/conflicts'
+import { getLfsStatus, installLfs, pullLfs, trackPattern, untrackPattern } from '@git-core/lfs'
 import { createCommit, getLastCommitMessage } from '@git-core/commit'
 import {
   checkoutDetached,
@@ -182,6 +183,27 @@ export function registerIpc(ctx: IpcContext): void {
       return { applied: true }
     },
     'conflict:get': ({ repoPath, path }) => getConflictVersions(requireOpened(repoPath), path),
+    'conflict:describe': ({ repoPath, path }) => describeConflict(requireOpened(repoPath), path),
+    'conflict:resolve-with': async ({ repoPath, path, choice }, event) => {
+      requireOpened(repoPath)
+      const confirmed = await confirmDestructive(event, {
+        message:
+          choice === 'delete'
+            ? `Resolve the conflict by deleting ${path}?`
+            : `Resolve the conflict by keeping the ${choice === 'ours' ? 'current branch' : 'incoming'} version of ${path}?`,
+        detail: 'The file in your working folder is replaced with that version and marked resolved.',
+        confirmLabel: choice === 'delete' ? 'Delete file' : 'Use this version',
+      })
+      if (!confirmed) return { resolved: false }
+      await resolveConflictWith(repoPath, path, choice)
+      return { resolved: true }
+    },
+    'lfs:status': ({ repoPath }) => getLfsStatus(requireOpened(repoPath)),
+    'lfs:install': ({ repoPath }) => installLfs(requireOpened(repoPath)),
+    'lfs:track': async ({ repoPath, pattern }) => ({ changed: (await trackPattern(requireOpened(repoPath), pattern)).changed }),
+    'lfs:untrack': async ({ repoPath, pattern }) => ({ changed: (await untrackPattern(requireOpened(repoPath), pattern)).changed }),
+    'lfs:pull': ({ repoPath }, event) =>
+      ctx.network.run(event.sender, (net) => pullLfs(requireOpened(repoPath), { ...(net.env ? { env: net.env } : {}), ...(net.signal ? { signal: net.signal } : {}) }), repoPath),
     'conflict:save': ({ repoPath, path, content, markResolved }) =>
       saveConflictResolution(requireOpened(repoPath), path, content, { markResolved }),
     'commit:create': ({ repoPath, message, amend }) => createCommit(requireOpened(repoPath), message, { amend }),

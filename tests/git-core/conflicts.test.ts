@@ -1,7 +1,13 @@
-import { chmodSync, readFileSync, readdirSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync, readdirSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { getConflictVersions, saveConflictResolution } from '@git-core/conflicts'
+import {
+  describeConflict,
+  getConflictKind,
+  getConflictVersions,
+  resolveConflictWith,
+  saveConflictResolution,
+} from '@git-core/conflicts'
 import { GitError } from '@git-core/errors'
 import { getStatus } from '@git-core/status'
 import { parseConflicts, resolveConflicts } from '@shared/conflict-markers'
@@ -10,6 +16,7 @@ import {
   createFixtureRepo,
   makeDivergedBranches,
   makeMergeConflict,
+  makeSideConflict,
   makeTempDir,
   type FixtureRepo,
 } from '../helpers/fixture'
@@ -224,5 +231,133 @@ describe('saveConflictResolution', () => {
     const path = makeMergeConflict(repo)
     await saveConflictResolution(repo.dir, path, 'a\r\nb\r\n', { markResolved: true })
     expect(readFileSync(join(repo.dir, path)).toString('latin1')).toBe('a\r\nb\r\n')
+  })
+})
+
+/** Minimal PNG-looking bytes (signature + IHDR start, containing NUL bytes) varying by `n`. */
+const png = (n: number): Buffer =>
+  Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]), Buffer.from(`IHDR${n}`)])
+
+describe('describeConflict / getConflictKind', () => {
+  it('classifies text, binary, modify/delete and add/add conflicts', async () => {
+    const text = createFixtureRepo()
+    expect(await getConflictKind(text.dir, makeMergeConflict(text))).toBe('content')
+
+    const bin = createFixtureRepo()
+    const p = makeSideConflict(bin, { base: png(0), ours: png(1), theirs: png(2) }, 'img.png')
+    expect(await describeConflict(bin.dir, p)).toEqual({ kind: 'binary', stages: [1, 2, 3], deletedBy: null, binary: true })
+
+    const delOurs = createFixtureRepo()
+    makeSideConflict(delOurs, { base: 'base\n', ours: null, theirs: 'mod\n' }, 'md.txt')
+    expect(await describeConflict(delOurs.dir, 'md.txt')).toMatchObject({ kind: 'modify-delete', deletedBy: 'ours', stages: [1, 3] })
+
+    const delTheirs = createFixtureRepo()
+    makeSideConflict(delTheirs, { base: 'base\n', ours: 'mod\n', theirs: null }, 'md.txt')
+    expect(await describeConflict(delTheirs.dir, 'md.txt')).toMatchObject({ kind: 'modify-delete', deletedBy: 'theirs', stages: [1, 2] })
+
+    const addAdd = createFixtureRepo()
+    makeSideConflict(addAdd, { base: null, ours: 'mine\n', theirs: 'yours\n' }, 'aa.txt')
+    expect(await describeConflict(addAdd.dir, 'aa.txt')).toMatchObject({ kind: 'add-add', stages: [2, 3], binary: false })
+
+    const addAddBin = createFixtureRepo()
+    makeSideConflict(addAddBin, { base: null, ours: png(1), theirs: png(2) }, 'aa.png')
+    expect(await getConflictKind(addAddBin.dir, 'aa.png')).toBe('binary')
+  })
+
+  it('treats text files marked binary by attributes as binary', async () => {
+    const repo = createFixtureRepo()
+    repo.commit('attrs', { '.gitattributes': '*.dat binary\n' })
+    makeSideConflict(repo, { base: 'a\n', ours: 'b\n', theirs: 'c\n' }, 'x.dat')
+    expect(await getConflictKind(repo.dir, 'x.dat')).toBe('binary')
+  })
+
+  it('refuses paths that are not conflicted', async () => {
+    const repo = createFixtureRepo()
+    makeMergeConflict(repo)
+    repo.write('clean.txt', 'c\n')
+    await expectGitError(getConflictKind(repo.dir, 'clean.txt'), 'INVALID_ARGUMENT', /Not a conflicted file/)
+    await expectGitError(getConflictKind(repo.dir, '../x'), 'INVALID_ARGUMENT')
+  })
+})
+
+describe('resolveConflictWith', () => {
+  it('takes ours or theirs for a binary conflict, touching no other path', async () => {
+    for (const choice of ['ours', 'theirs'] as const) {
+      const repo = createFixtureRepo()
+      const p = makeSideConflict(repo, { base: png(0), ours: png(1), theirs: png(2) }, 'img.png')
+      repo.write('init.txt', 'local edit\n')
+      repo.write('untracked.txt', 'u\n')
+      await resolveConflictWith(repo.dir, p, choice)
+      const want = choice === 'ours' ? png(1) : png(2)
+      expect(readFileSync(join(repo.dir, p)).equals(want)).toBe(true)
+      expect(await unmergedPaths(repo)).toEqual([])
+      expect(repo.git(['rev-parse', `:0:${p}`])).toBe(repo.git(['hash-object', '--', p]))
+      // Other paths are untouched: the local edit stays unstaged, the untracked file stays.
+      expect(read(repo, 'init.txt')).toBe('local edit\n')
+      expect(repo.git(['diff', '--name-only'])).toBe('init.txt')
+      expect(repo.git(['diff', '--cached', '--name-only', '--', 'init.txt'])).toBe('')
+      expect(repo.git(['ls-files', '--others', '--exclude-standard'])).toBe('untracked.txt')
+    }
+  })
+
+  it('modify/delete: keeping the deleting side removes the file, keeping the other stages it', async () => {
+    // We deleted, they modified.
+    const a = createFixtureRepo()
+    makeSideConflict(a, { base: 'base\n', ours: null, theirs: 'mod\n' }, 'md.txt')
+    await resolveConflictWith(a.dir, 'md.txt', 'ours')
+    expect(existsSync(join(a.dir, 'md.txt'))).toBe(false)
+    expect(await unmergedPaths(a)).toEqual([])
+    expect(a.git(['ls-files', '--', 'md.txt'])).toBe('')
+
+    const b = createFixtureRepo()
+    makeSideConflict(b, { base: 'base\n', ours: null, theirs: 'mod\n' }, 'md.txt')
+    await resolveConflictWith(b.dir, 'md.txt', 'theirs')
+    expect(read(b, 'md.txt')).toBe('mod\n')
+    expect(b.git(['cat-file', 'blob', ':0:md.txt'])).toBe('mod')
+
+    // We modified, they deleted.
+    const c = createFixtureRepo()
+    makeSideConflict(c, { base: 'base\n', ours: 'mod\n', theirs: null }, 'md.txt')
+    await resolveConflictWith(c.dir, 'md.txt', 'theirs')
+    expect(existsSync(join(c.dir, 'md.txt'))).toBe(false)
+    expect(await unmergedPaths(c)).toEqual([])
+
+    const d = createFixtureRepo()
+    makeSideConflict(d, { base: 'base\n', ours: 'mod\n', theirs: null }, 'md.txt')
+    await resolveConflictWith(d.dir, 'md.txt', 'ours')
+    expect(read(d, 'md.txt')).toBe('mod\n')
+    expect(await unmergedPaths(d)).toEqual([])
+  })
+
+  it('add/add: takes a side or deletes the file', async () => {
+    const a = createFixtureRepo()
+    makeSideConflict(a, { base: null, ours: 'mine\n', theirs: 'yours\n' }, 'aa.txt')
+    await resolveConflictWith(a.dir, 'aa.txt', 'theirs')
+    expect(read(a, 'aa.txt')).toBe('yours\n')
+    expect(await unmergedPaths(a)).toEqual([])
+
+    const b = createFixtureRepo()
+    makeSideConflict(b, { base: null, ours: 'mine\n', theirs: 'yours\n' }, 'aa.txt')
+    await resolveConflictWith(b.dir, 'aa.txt', 'delete')
+    expect(existsSync(join(b.dir, 'aa.txt'))).toBe(false)
+    expect(await unmergedPaths(b)).toEqual([])
+    expect(b.git(['ls-files', '--', 'aa.txt'])).toBe('')
+  })
+
+  it('refuses non-conflicted paths and invalid choices without changing anything', async () => {
+    const repo = createFixtureRepo()
+    const p = makeMergeConflict(repo)
+    repo.write('other.txt', 'keep\n')
+    await expectGitError(resolveConflictWith(repo.dir, 'other.txt', 'theirs'), 'INVALID_ARGUMENT', /Not a conflicted file/)
+    await expectGitError(resolveConflictWith(repo.dir, 'other.txt', 'delete'), 'INVALID_ARGUMENT')
+    await expectGitError(resolveConflictWith(repo.dir, '../x', 'ours'), 'INVALID_ARGUMENT')
+    await expectGitError(resolveConflictWith(repo.dir, p, 'both' as never), 'INVALID_ARGUMENT')
+    expect(read(repo, 'other.txt')).toBe('keep\n')
+    expect(await unmergedPaths(repo)).toEqual([p])
+    // After resolving once, the path is no longer conflicted.
+    await resolveConflictWith(repo.dir, p, 'ours')
+    expect(read(repo, p)).toBe('ours\n')
+    await expectGitError(resolveConflictWith(repo.dir, p, 'theirs'), 'INVALID_ARGUMENT')
+    expect(read(repo, p)).toBe('ours\n')
   })
 })
