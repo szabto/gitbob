@@ -2,7 +2,13 @@ import { create } from 'zustand'
 import type { DiffTarget, RepositoryInfo } from '@shared/types'
 
 interface AppState {
+  /** Open repositories, one per tab. */
+  tabs: RepositoryInfo[]
+  /** The active tab's repository; null shows the start screen (e.g. a new, empty tab). */
   repo: RepositoryInfo | null
+  /** Show the start screen in a new tab without closing the others. */
+  newTab: () => void
+  closeTab: (root: string) => void
   selectedSha: string | null
   /** True when the working-tree (WIP) entry is selected instead of a commit. */
   wipSelected: boolean
@@ -30,7 +36,19 @@ interface AppState {
   showDiff: (target: DiffTarget | null) => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
+const RESET = {
+  selectedSha: null,
+  wipSelected: false,
+  revealSha: null,
+  diffTarget: null,
+  selectedStash: null,
+  conflictPath: null,
+  blame: null,
+  rebaseBase: null,
+} as const
+
+export const useAppStore = create<AppState>((set, get) => ({
+  tabs: [],
   repo: null,
   selectedSha: null,
   wipSelected: false,
@@ -43,8 +61,31 @@ export const useAppStore = create<AppState>((set) => ({
   rebaseBase: null,
   openRebase: (rebaseBase) => set({ rebaseBase }),
   openConflict: (conflictPath) => set({ conflictPath, diffTarget: null, blame: null }),
-  setRepo: (repo) =>
-    set({ repo, selectedSha: null, wipSelected: false, revealSha: null, diffTarget: null, selectedStash: null, conflictPath: null, blame: null, rebaseBase: null }),
+  setRepo: (repo) => {
+    if (!repo) {
+      // "Close": close the active tab.
+      const cur = get().repo
+      if (cur) get().closeTab(cur.root)
+      return
+    }
+    const tabs = get().tabs
+    set({
+      ...RESET,
+      repo,
+      tabs: tabs.some((t) => t.root === repo.root) ? tabs.map((t) => (t.root === repo.root ? repo : t)) : [...tabs, repo],
+    })
+  },
+  newTab: () => set({ ...RESET, repo: null }),
+  closeTab: (root) => {
+    const { tabs, repo } = get()
+    const idx = tabs.findIndex((t) => t.root === root)
+    const next = tabs.filter((t) => t.root !== root)
+    if (repo?.root === root) {
+      set({ ...RESET, tabs: next, repo: next[Math.min(idx, next.length - 1)] ?? null })
+    } else {
+      set({ tabs: next })
+    }
+  },
   select: (sha) => set({ selectedSha: sha, wipSelected: false, diffTarget: null, selectedStash: null }),
   selectWip: () => set({ selectedSha: null, wipSelected: true, diffTarget: null, selectedStash: null }),
   selectStash: (stash) => set({ selectedStash: stash, selectedSha: null, wipSelected: false, diffTarget: null }),

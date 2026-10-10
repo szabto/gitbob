@@ -29,6 +29,7 @@ export interface IpcOutputs {
   'repo:open': RepositoryInfo
   'repo:pick': RepositoryInfo | null
   'repo:recent': RecentRepository[]
+  'repo:activate': void
   'repo:refs': GitRef[]
   'repo:head': HeadState
   'log:page': CommitPage

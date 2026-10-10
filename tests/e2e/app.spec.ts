@@ -121,13 +121,49 @@ test('opens a repository via the dialog, remembers it, and reports invalid folde
     await app.close()
   }
 
-  // The repository is listed under recents after a restart and can be reopened.
+  // After a restart the tab is restored, and the repository is listed under recents in a new tab.
   ;({ app, page } = await launch({ userData }))
   try {
+    await expect(page.getByTestId('repo-tab')).toHaveCount(1)
+    await expect(page.getByTestId('commit-row')).toHaveCount(8)
+    await page.getByRole('button', { name: 'New tab' }).click()
     const recent = page.getByRole('button', { name: new RegExp(repo.dir.split('/').pop()!) })
     await expect(recent).toBeVisible()
     await recent.click()
+    await expect(page.getByTestId('repo-tab')).toHaveCount(1)
     await expect(page.getByTestId('commit-row')).toHaveCount(8)
+  } finally {
+    await app.close()
+  }
+})
+
+test('opens several repositories in tabs, switches and closes them', async () => {
+  const a = buildRepo().repo
+  const b = createFixtureRepo()
+  b.commit('only commit in b', { 'b.txt': 'b' })
+  const { app, page } = await launch({ repo: a.dir, userData: makeTempDir('gitbob-ud-') })
+  try {
+    await expect(page.getByTestId('commit-row')).toHaveCount(8)
+    await app.evaluate(({ dialog }, p) => {
+      dialog.showOpenDialog = (() => Promise.resolve({ canceled: false, filePaths: [p] })) as typeof dialog.showOpenDialog
+    }, b.dir)
+    await page.getByRole('button', { name: 'New tab' }).click()
+    await page.getByRole('button', { name: 'Open Repository…' }).click()
+    await expect(page.getByTestId('repo-tab')).toHaveCount(2)
+    await expect(page.getByTestId('commit-row')).toHaveCount(1)
+
+    // Switch back to the first tab.
+    await page.getByTestId('repo-tab').first().click()
+    await expect(page.getByTestId('commit-row')).toHaveCount(8)
+
+    // Live refresh follows the visible tab.
+    a.write('new.txt', 'x')
+    await expect(page.getByTestId('wip-row')).toBeVisible({ timeout: 10_000 })
+
+    // Close the active tab: the other one becomes active.
+    await page.getByRole('button', { name: `Close ${a.dir.split('/').pop()}` }).click()
+    await expect(page.getByTestId('repo-tab')).toHaveCount(1)
+    await expect(page.getByTestId('commit-row')).toHaveCount(1)
   } finally {
     await app.close()
   }

@@ -4,6 +4,7 @@ export const IPC_CHANNELS = [
   'repo:open',
   'repo:pick',
   'repo:recent',
+  'repo:activate',
   'repo:refs',
   'repo:head',
   'log:page',

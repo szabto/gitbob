@@ -58,7 +58,7 @@ export interface IpcContext {
  * scoped call must target one of these, so a compromised renderer cannot
  * point Git at arbitrary directories.
  */
-const openedRepos = new Set<string>()
+const openedRepos = new Map<string, RepositoryInfo>()
 
 function requireOpened(repoPath: string): string {
   if (!openedRepos.has(repoPath)) {
@@ -69,7 +69,7 @@ function requireOpened(repoPath: string): string {
 
 export async function openAndRegister(path: string, ctx: IpcContext): Promise<RepositoryInfo> {
   const info = await openRepository(path)
-  openedRepos.add(info.root)
+  openedRepos.set(info.root, info)
   ctx.onRepositoryOpened?.(info)
   await ctx.recent.add(info.root, info.name).catch(() => {
     /* recents are best-effort */
@@ -107,6 +107,11 @@ export function registerIpc(ctx: IpcContext): void {
       return openAndRegister(picked, ctx)
     },
     'repo:recent': () => ctx.recent.list(),
+    'repo:activate': async ({ repoPath }) => {
+      // Switching tabs: watch the now-visible repository.
+      const info = openedRepos.get(requireOpened(repoPath))!
+      ctx.onRepositoryOpened?.(info)
+    },
     'repo:refs': ({ repoPath }) => listRefs(requireOpened(repoPath)),
     'repo:head': ({ repoPath }) => getHead(requireOpened(repoPath)),
     'log:page': ({ repoPath, skip, limit }) => getCommitPage(requireOpened(repoPath), { skip, limit }),

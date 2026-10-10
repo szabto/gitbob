@@ -61,6 +61,7 @@ export const ipcInputSchemas = {
   'repo:open': z.object({ path: absolutePath }),
   'repo:pick': z.object({}).strict(),
   'repo:recent': z.object({}).strict(),
+  'repo:activate': z.object({ repoPath: absolutePath }),
   'repo:refs': z.object({ repoPath: absolutePath }),
   'repo:head': z.object({ repoPath: absolutePath }),
   'log:page': z.object({
