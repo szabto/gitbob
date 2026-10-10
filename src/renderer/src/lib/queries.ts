@@ -59,6 +59,7 @@ export function useInvalidateRepo(repoPath: string) {
       void qc.invalidateQueries({ queryKey: ['head', repoPath] })
       void qc.invalidateQueries({ queryKey: ['refs', repoPath] })
       void qc.invalidateQueries({ queryKey: ['remotes', repoPath] })
+      void qc.invalidateQueries({ queryKey: ['stashes', repoPath] })
       if (opts.history !== false) {
         void qc.invalidateQueries({ queryKey: ['log', repoPath] })
         void qc.invalidateQueries({ queryKey: ['search', repoPath] })
@@ -88,5 +89,18 @@ export function useHistorySearch(repoPath: string, query: string) {
     queryFn: () => call('log:search', { repoPath, query }),
     enabled: query.trim().length > 0,
     placeholderData: (prev) => prev,
+  })
+}
+
+export function useStashes(repoPath: string) {
+  return useQuery({ queryKey: ['stashes', repoPath], queryFn: () => call('stash:list', { repoPath }) })
+}
+
+export function useStashFiles(repoPath: string, stash: { index: number; sha: string } | null) {
+  return useQuery({
+    queryKey: ['stash-files', repoPath, stash?.sha],
+    queryFn: () => call('stash:files', { repoPath, index: stash!.index, sha: stash!.sha }),
+    enabled: !!stash,
+    staleTime: Infinity,
   })
 }

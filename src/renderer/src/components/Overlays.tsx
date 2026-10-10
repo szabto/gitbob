@@ -95,7 +95,7 @@ function PromptForm({
         onMouseDown={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault()
-          if (value.trim()) onClose(value.trim())
+          if (value.trim() || prompt.allowEmpty) onClose(value.trim())
         }}
         onKeyDown={(e) => {
           if (e.key === 'Escape') onClose(null)
@@ -115,6 +115,16 @@ function PromptForm({
               <option key={c}>{c}</option>
             ))}
           </select>
+        ) : prompt.multiline ? (
+          <textarea
+            autoFocus
+            rows={4}
+            value={value}
+            placeholder={prompt.placeholder}
+            onChange={(e) => setValue(e.target.value)}
+            aria-label={prompt.label}
+            className="w-full resize-none rounded border border-border bg-bg px-2 py-1.5 outline-none focus:border-accent"
+          />
         ) : (
           <input
             autoFocus
@@ -131,7 +141,7 @@ function PromptForm({
           </button>
           <button
             type="submit"
-            disabled={!value.trim()}
+            disabled={!value.trim() && !prompt.allowEmpty}
             className="rounded bg-accent px-3 py-1 font-medium text-[#0b1220] disabled:opacity-40"
           >
             {prompt.confirmLabel ?? 'OK'}

@@ -1,4 +1,9 @@
 import type {
+  FileChange,
+  ReflogEntry,
+  ResetResult,
+  StashEntry,
+  TagInfo,
   RemoteInfo,
   CommitResult,
   FileDiff,
@@ -47,6 +52,24 @@ export interface IpcOutputs {
   'remote:pull': void
   /** False if the user declined the force-push confirmation. */
   'remote:push': { pushed: boolean }
+  'stash:list': StashEntry[]
+  'stash:create': { created: boolean }
+  'stash:apply': void
+  'stash:drop': { dropped: boolean }
+  'stash:files': FileChange[]
+  'tag:list': TagInfo[]
+  'tag:create': void
+  'tag:delete': { deleted: boolean }
+  'tag:push': void
+  /** `done: false` if the user declined the confirmation. */
+  'history:reset': ResetResult & { done: boolean }
+  'history:revert': void
+  'history:cherry-pick': void
+  'op:continue': { operation: string }
+  /** `operation: null` if the user declined the confirmation. */
+  'op:abort': { operation: string | null }
+  'op:skip': { operation: string }
+  'reflog:get': ReflogEntry[]
   'credentials:respond': void
   /** True if a running network operation was cancelled. */
   'op:cancel': boolean

@@ -5,7 +5,7 @@ import { useRepoMutation, useStatus } from '../lib/queries'
 import { groupStatus, statusBadge } from '../lib/status'
 import { useAppStore } from '../state/store'
 
-export function StagingPanel({ repo }: { repo: RepositoryInfo }) {
+export function StagingPanel({ repo, onStash }: { repo: RepositoryInfo; onStash: () => void }) {
   const repoPath = repo.root
   const status = useStatus(repoPath)
   const showDiff = useAppStore((s) => s.showDiff)
@@ -35,10 +35,19 @@ export function StagingPanel({ repo }: { repo: RepositoryInfo }) {
       <div className="flex h-7 shrink-0 items-center border-b border-border px-3 text-xs font-semibold text-muted">
         Working changes
         {status.data?.branch.head && <span className="ml-1 font-normal">on {status.data.branch.head}</span>}
-        {status.data?.operation && (
+        {status.data?.operation ? (
           <span className="ml-auto rounded bg-warn/20 px-1.5 text-warn" data-testid="operation">
             {status.data.operation} in progress
           </span>
+        ) : (
+          <button
+            onClick={onStash}
+            disabled={busy || !status.data?.branch.oid || (groups.unstaged.length === 0 && groups.staged.length === 0)}
+            title="Save all changes to a stash and clean the working tree"
+            className="ml-auto rounded border border-border px-2 py-0.5 font-normal text-fg hover:bg-fg/5 disabled:opacity-40"
+          >
+            Stash…
+          </button>
         )}
       </div>
 

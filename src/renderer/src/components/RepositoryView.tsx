@@ -12,7 +12,9 @@ import { Logo } from './Welcome'
 import { StagingPanel } from './StagingPanel'
 import { DiffView } from './DiffView'
 import { useRepoActions } from '../lib/actions'
-import { useRemotes } from '../lib/queries'
+import { useRemotes, useStashes } from '../lib/queries'
+import { StashPanel } from './StashPanel'
+import { OperationBanner } from './OperationBanner'
 import { useUiStore } from '../state/ui'
 
 interface Props {
@@ -84,6 +86,10 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
   const openMenu = useUiStore((s) => s.openMenu)
   const currentRefObj = refs.data?.find((r) => r.name === head.data?.ref)
   const remoteNames = (remotes.data ?? []).map((r) => r.name)
+  const stashes = useStashes(repo.root)
+  const selectedStash = useAppStore((s) => s.selectedStash)
+  const stashEntry = stashes.data?.find((s) => s.sha === selectedStash?.sha)
+  const branchLabel = currentBranchName(head.data?.ref ?? null)
 
   const currentBranch = head.data?.ref?.startsWith('refs/heads/') ? head.data.ref.slice('refs/heads/'.length) : null
 
@@ -176,9 +182,11 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
           refs={refs.data ?? []}
           currentRef={head.data?.ref ?? null}
           remotes={remoteNames}
+          stashes={stashes.data ?? []}
           actions={actions}
         />
         <main className="flex min-w-0 flex-1 flex-col">
+          {status.data && <OperationBanner status={status.data} actions={actions} />}
           {diffTarget ? (
             <DiffView repoPath={repo.root} target={diffTarget} />
           ) : history.isError ? (
@@ -203,6 +211,32 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
               onRowMenu={(e, commit) =>
                 openMenu(e.clientX, e.clientY, [
                   { label: 'Create branch here…', onSelect: () => void actions.createBranch(commit.sha) },
+                  { label: 'Create tag here…', onSelect: () => void actions.createTag(commit.sha) },
+                  'separator',
+                  {
+                    label: 'Cherry-pick this commit',
+                    disabled: repo.bare || commit.sha === head.data?.sha,
+                    onSelect: () => void actions.cherryPick(commit.sha),
+                  },
+                  { label: 'Revert this commit', disabled: repo.bare, onSelect: () => void actions.revert(commit.sha) },
+                  ...(head.data?.sha && !repo.bare
+                    ? ([
+                        'separator',
+                        {
+                          label: `Reset ${branchLabel} to here (soft: keep changes staged)`,
+                          onSelect: () => void actions.reset(commit.sha, 'soft'),
+                        },
+                        {
+                          label: `Reset ${branchLabel} to here (mixed: keep changes unstaged)`,
+                          onSelect: () => void actions.reset(commit.sha, 'mixed'),
+                        },
+                        {
+                          label: `Reset ${branchLabel} to here (hard: discard changes)…`,
+                          danger: true,
+                          onSelect: () => void actions.reset(commit.sha, 'hard'),
+                        },
+                      ] as const)
+                    : []),
                   {
                     label: 'Checkout this commit (detached)',
                     disabled: repo.bare,
@@ -216,7 +250,9 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
           )}
         </main>
         {wipSelected && !repo.bare ? (
-          <StagingPanel repo={repo} />
+          <StagingPanel repo={repo} onStash={() => void actions.stash()} />
+        ) : stashEntry ? (
+          <StashPanel repoPath={repo.root} stash={stashEntry} actions={actions} />
         ) : (
           selectedSha && <CommitDetailsPanel repoPath={repo.root} sha={selectedSha} refsBySha={refsBySha} />
         )}
@@ -263,4 +299,8 @@ function ToolbarButton({
       )}
     </span>
   )
+}
+
+function currentBranchName(ref: string | null): string {
+  return ref?.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : 'HEAD'
 }

@@ -11,7 +11,7 @@ import type { GitRef } from '@shared/types'
  */
 export function useRepoActions(repoPath: string) {
   const invalidate = useInvalidateRepo(repoPath)
-  const { showError, ask, setBusy } = useUiStore.getState()
+  const { showError, showNotice, ask, setBusy } = useUiStore.getState()
 
   const run = useCallback(
     async <T,>(label: string | null, fn: () => Promise<T>): Promise<T | undefined> => {
@@ -97,5 +97,65 @@ export function useRepoActions(repoPath: string) {
       if (url) await run(null, () => call('remote:add', { repoPath, name, url }))
     },
     removeRemote: (name: string) => run(null, () => call('remote:remove', { repoPath, name })),
+
+    // Stash
+    stash: async () => {
+      const message = await ask({
+        title: 'Stash changes',
+        label: 'Message (optional)',
+        placeholder: 'What were you working on?',
+        confirmLabel: 'Stash',
+        allowEmpty: true,
+      })
+      if (message === null) return
+      const res = await run(null, () => call('stash:create', { repoPath, message, includeUntracked: true }))
+      if (res && !res.created) showNotice('There were no local changes to stash.')
+    },
+    applyStash: (s: { index: number; sha: string }, pop: boolean) =>
+      run(null, () => call('stash:apply', { repoPath, index: s.index, sha: s.sha, pop })),
+    dropStash: (s: { index: number; sha: string }) =>
+      run(null, () => call('stash:drop', { repoPath, index: s.index, sha: s.sha })),
+
+    // Tags
+    createTag: async (target: string) => {
+      const name = await ask({ title: 'Create tag', label: 'Tag name', placeholder: 'v1.0.0', confirmLabel: 'Next' })
+      if (!name) return
+      const message = await ask({
+        title: `Create tag ${name}`,
+        label: 'Message (optional; makes an annotated tag)',
+        confirmLabel: 'Create tag',
+        allowEmpty: true,
+        multiline: true,
+      })
+      if (message === null) return
+      await run(null, () => call('tag:create', { repoPath, name, target, ...(message ? { message } : {}) }))
+    },
+    deleteTag: (name: string) => run(null, () => call('tag:delete', { repoPath, name })),
+    pushTag: async (name: string, remotes: string[]) => {
+      if (remotes.length === 0) {
+        showError(new Error('This repository has no remotes.'))
+        return
+      }
+      const remote =
+        remotes.length === 1
+          ? remotes[0]!
+          : await ask({ title: `Push tag ${name}`, label: 'Remote', choices: remotes, confirmLabel: 'Push' })
+      if (remote) await run('Pushing tag…', () => call('tag:push', { repoPath, name, remote }))
+    },
+
+    // History
+    reset: async (target: string, mode: 'soft' | 'mixed' | 'hard') => {
+      const res = await run(null, () => call('history:reset', { repoPath, target, mode }))
+      if (res?.done && res.backupStash) {
+        showNotice(
+          `Your uncommitted changes were saved as a backup stash (${res.backupStash.slice(0, 7)}). Find it under Stashes to restore them.`,
+        )
+      }
+    },
+    revert: (sha: string) => run(null, () => call('history:revert', { repoPath, sha })),
+    cherryPick: (sha: string) => run(null, () => call('history:cherry-pick', { repoPath, shas: [sha] })),
+    continueOperation: () => run(null, () => call('op:continue', { repoPath })),
+    abortOperation: () => run(null, () => call('op:abort', { repoPath })),
+    skipOperation: () => run(null, () => call('op:skip', { repoPath })),
   }
 }

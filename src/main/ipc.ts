@@ -24,6 +24,10 @@ import {
 } from '@git-core/branches'
 import { addRemote, fetch, listRemotes, pull, push, removeRemote, type NetworkOptions } from '@git-core/remotes'
 import type { NetworkSession } from './network'
+import { applyStash, createStash, dropStash, getStashFiles, listStashes } from '@git-core/stash'
+import { createTag, deleteTag, listTags, pushTag } from '@git-core/tags'
+import { abortOperation, cherryPick, continueOperation, reset, revert, skipOperation } from '@git-core/history'
+import { getReflog } from '@git-core/reflog'
 import type { RecentRepositoryStore } from './recent'
 import { z } from 'zod'
 
@@ -172,6 +176,67 @@ export function registerIpc(ctx: IpcContext): void {
       await ctx.network.run(event.sender, (net) => push(repoPath, { ...net, branch, remote, setUpstream: track, force }))
       return { pushed: true }
     },
+    'stash:list': ({ repoPath }) => listStashes(requireOpened(repoPath)),
+    'stash:create': ({ repoPath, message, includeUntracked }) =>
+      createStash(requireOpened(repoPath), { includeUntracked, ...(message?.trim() ? { message: message.trim() } : {}) }),
+    'stash:apply': ({ repoPath, index, sha, pop }) =>
+      applyStash(requireOpened(repoPath), index, { pop, restoreIndex: true, expectedSha: sha }),
+    'stash:drop': async ({ repoPath, index, sha }, event) => {
+      requireOpened(repoPath)
+      const confirmed = await confirmDestructive(event, {
+        message: `Delete stash@{${index}}?`,
+        detail: 'The stashed changes will be removed. They can only be recovered with low-level Git tools.',
+        confirmLabel: 'Delete stash',
+      })
+      if (!confirmed) return { dropped: false }
+      await dropStash(repoPath, index, { expectedSha: sha })
+      return { dropped: true }
+    },
+    'stash:files': ({ repoPath, index, sha }) => getStashFiles(requireOpened(repoPath), index, { expectedSha: sha }),
+    'tag:list': ({ repoPath }) => listTags(requireOpened(repoPath)),
+    'tag:create': ({ repoPath, name, target, message }) =>
+      createTag(requireOpened(repoPath), name, target, message ? { message } : {}),
+    'tag:delete': async ({ repoPath, name }, event) => {
+      requireOpened(repoPath)
+      const confirmed = await confirmDestructive(event, {
+        message: `Delete tag "${name}"?`,
+        detail: 'The local tag is deleted. Copies already pushed to a remote are not affected.',
+        confirmLabel: 'Delete tag',
+      })
+      if (!confirmed) return { deleted: false }
+      await deleteTag(repoPath, name)
+      return { deleted: true }
+    },
+    'tag:push': ({ repoPath, name, remote }, event) =>
+      ctx.network.run(event.sender, (net) => pushTag(requireOpened(repoPath), remote, name, net)),
+    'history:reset': async ({ repoPath, target, mode }, event) => {
+      requireOpened(repoPath)
+      if (mode === 'hard') {
+        const confirmed = await confirmDestructive(event, {
+          message: `Hard reset to ${target.slice(0, 7)}?`,
+          detail:
+            'The current branch and all files are reset to this commit. GitBob first saves your uncommitted changes as a backup stash ("GitBob: backup before hard reset"), so you can restore them from the Stashes list.',
+          confirmLabel: 'Hard reset',
+        })
+        if (!confirmed) return { done: false, backupStash: null }
+      }
+      return { done: true, ...(await reset(repoPath, target, mode)) }
+    },
+    'history:revert': ({ repoPath, sha }) => revert(requireOpened(repoPath), sha),
+    'history:cherry-pick': ({ repoPath, shas }) => cherryPick(requireOpened(repoPath), shas),
+    'op:continue': ({ repoPath }) => continueOperation(requireOpened(repoPath)),
+    'op:abort': async ({ repoPath }, event) => {
+      requireOpened(repoPath)
+      const confirmed = await confirmDestructive(event, {
+        message: 'Abort the operation in progress?',
+        detail: 'The repository returns to the state before the operation started. Conflict resolutions you made are lost.',
+        confirmLabel: 'Abort',
+      })
+      if (!confirmed) return { operation: null }
+      return abortOperation(repoPath)
+    },
+    'op:skip': ({ repoPath }) => skipOperation(requireOpened(repoPath)),
+    'reflog:get': ({ repoPath, limit }) => getReflog(requireOpened(repoPath), 'HEAD', limit),
     'credentials:respond': async ({ id, answer }) => ctx.network.respond(id, answer),
     'op:cancel': async () => ctx.network.cancel(),
   }

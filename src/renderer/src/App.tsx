@@ -16,6 +16,8 @@ export function App() {
   const error = useUiStore((s) => s.error)
   const showError = useUiStore((s) => s.showError)
   const clearError = useUiStore((s) => s.clearError)
+  const notice = useUiStore((s) => s.notice)
+  const showNotice = useUiStore((s) => s.showNotice)
 
   const handleOpened = useCallback(
     (info: Parameters<typeof setRepo>[0]) => {
@@ -52,6 +54,14 @@ export function App() {
   return (
     <div className="flex h-full flex-col">
       {error && <ErrorBanner error={error} onDismiss={clearError} />}
+      {notice && (
+        <div role="status" data-testid="notice" className="flex items-start gap-3 border-b border-info/40 bg-info/10 px-4 py-2 text-sm">
+          <span className="flex-1 text-fg">{notice}</span>
+          <button onClick={() => showNotice(null)} aria-label="Dismiss notice" className="text-muted hover:text-fg">
+            ✕
+          </button>
+        </div>
+      )}
       {repo ? (
         <RepositoryView key={repo.root} repo={repo} onOpen={pickRepository} onClose={() => setRepo(null)} />
       ) : (

@@ -41,6 +41,13 @@ const fullBranchRef = z
   .max(300)
   .regex(/^refs\/(heads|remotes)\/[^\0]+$/, 'expected refs/heads/* or refs/remotes/*')
 
+const stashIndex = z.number().int().min(0).max(100_000)
+const tagName = z
+  .string()
+  .min(1)
+  .max(255)
+  .refine((n) => !n.startsWith('-') && !n.includes('\0'), 'invalid tag name')
+
 const repoPaths = z.array(repoPathSchema).min(1).max(10_000)
 
 export const diffTargetSchema = z.discriminatedUnion('kind', [
@@ -96,6 +103,31 @@ export const ipcInputSchemas = {
   'remote:remove': z.object({ repoPath: absolutePath, name: remoteName }),
   'remote:fetch': z.object({ repoPath: absolutePath, remote: remoteName.optional(), prune: z.boolean().default(true) }),
   'remote:pull': z.object({ repoPath: absolutePath, mode: z.enum(['ff-only', 'merge', 'rebase']) }),
+  'stash:list': z.object({ repoPath: absolutePath }),
+  'stash:create': z.object({
+    repoPath: absolutePath,
+    message: z.string().max(1000).optional(),
+    includeUntracked: z.boolean().default(true),
+  }),
+  'stash:apply': z.object({ repoPath: absolutePath, index: stashIndex, sha: shaSchema, pop: z.boolean() }),
+  'stash:drop': z.object({ repoPath: absolutePath, index: stashIndex, sha: shaSchema }),
+  'stash:files': z.object({ repoPath: absolutePath, index: stashIndex, sha: shaSchema }),
+  'tag:list': z.object({ repoPath: absolutePath }),
+  'tag:create': z.object({
+    repoPath: absolutePath,
+    name: tagName,
+    target: shaSchema,
+    message: z.string().max(100_000).optional(),
+  }),
+  'tag:delete': z.object({ repoPath: absolutePath, name: tagName }),
+  'tag:push': z.object({ repoPath: absolutePath, name: tagName, remote: remoteName }),
+  'history:reset': z.object({ repoPath: absolutePath, target: shaSchema, mode: z.enum(['soft', 'mixed', 'hard']) }),
+  'history:revert': z.object({ repoPath: absolutePath, sha: shaSchema }),
+  'history:cherry-pick': z.object({ repoPath: absolutePath, shas: z.array(shaSchema).min(1).max(1000) }),
+  'op:continue': z.object({ repoPath: absolutePath }),
+  'op:abort': z.object({ repoPath: absolutePath }),
+  'op:skip': z.object({ repoPath: absolutePath }),
+  'reflog:get': z.object({ repoPath: absolutePath, limit: z.number().int().min(1).max(10_000).default(200) }),
   'credentials:respond': z.object({
     id: z.string().regex(/^[0-9a-f]{32}$/),
     answer: z.string().max(4096).nullable(),

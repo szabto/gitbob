@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { GitRef } from '@shared/types'
+import type { GitRef, StashEntry } from '@shared/types'
 import { useAppStore } from '../state/store'
 import { useUiStore, type MenuEntry } from '../state/ui'
 import type { useRepoActions } from '../lib/actions'
@@ -10,13 +10,17 @@ export function Sidebar({
   refs,
   currentRef,
   remotes,
+  stashes,
   actions,
 }: {
   refs: GitRef[]
   currentRef: string | null
   remotes: string[]
+  stashes: StashEntry[]
   actions: Actions
 }) {
+  const selectStash = useAppStore((s) => s.selectStash)
+  const selectedStash = useAppStore((s) => s.selectedStash)
   const reveal = useAppStore((s) => s.reveal)
   const openMenu = useUiStore((s) => s.openMenu)
   const local = refs.filter((r) => r.kind === 'head')
@@ -104,7 +108,44 @@ export function Sidebar({
       </Section>
       <Section title="Tags" count={tags.length} testId="tags">
         {tags.map((r) => (
-          <RefItem key={r.name} gitRef={r} active={false} onClick={() => reveal(r.target)} />
+          <RefItem
+            key={r.name}
+            gitRef={r}
+            active={false}
+            onClick={() => reveal(r.target)}
+            onMenu={(e) =>
+              openMenu(e.clientX, e.clientY, [
+                { label: `Push tag ${r.shortName}…`, onSelect: () => void actions.pushTag(r.shortName, remotes) },
+                'separator',
+                { label: `Delete tag ${r.shortName}…`, danger: true, onSelect: () => void actions.deleteTag(r.shortName) },
+              ])
+            }
+          />
+        ))}
+      </Section>
+      <Section title="Stashes" count={stashes.length} testId="stashes">
+        {stashes.map((s) => (
+          <li key={s.sha}>
+            <button
+              data-testid="stash-item"
+              title={s.message}
+              onClick={() => selectStash({ index: s.index, sha: s.sha })}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                openMenu(e.clientX, e.clientY, [
+                  { label: 'Pop (apply and delete)', onSelect: () => void actions.applyStash(s, true) },
+                  { label: 'Apply', onSelect: () => void actions.applyStash(s, false) },
+                  'separator',
+                  { label: 'Delete…', danger: true, onSelect: () => void actions.dropStash(s) },
+                ])
+              }}
+              className={`flex w-full items-center gap-2 truncate py-0.5 pr-3 pl-7 text-left hover:bg-panel-2 ${
+                selectedStash?.sha === s.sha ? 'bg-accent/20' : ''
+              }`}
+            >
+              <span className="truncate">{s.message}</span>
+            </button>
+          </li>
         ))}
       </Section>
     </aside>

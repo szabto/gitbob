@@ -10,6 +10,9 @@ interface AppState {
   revealSha: string | null
   /** File diff shown in the main area instead of the graph. */
   diffTarget: DiffTarget | null
+  /** Stash shown in the right panel. */
+  selectedStash: { index: number; sha: string } | null
+  selectStash: (stash: { index: number; sha: string } | null) => void
   setRepo: (repo: RepositoryInfo | null) => void
   select: (sha: string | null) => void
   selectWip: () => void
@@ -24,10 +27,13 @@ export const useAppStore = create<AppState>((set) => ({
   wipSelected: false,
   revealSha: null,
   diffTarget: null,
-  setRepo: (repo) => set({ repo, selectedSha: null, wipSelected: false, revealSha: null, diffTarget: null }),
-  select: (sha) => set({ selectedSha: sha, wipSelected: false, diffTarget: null }),
-  selectWip: () => set({ selectedSha: null, wipSelected: true, diffTarget: null }),
-  reveal: (sha) => set({ selectedSha: sha, wipSelected: false, revealSha: sha, diffTarget: null }),
+  selectedStash: null,
+  setRepo: (repo) =>
+    set({ repo, selectedSha: null, wipSelected: false, revealSha: null, diffTarget: null, selectedStash: null }),
+  select: (sha) => set({ selectedSha: sha, wipSelected: false, diffTarget: null, selectedStash: null }),
+  selectWip: () => set({ selectedSha: null, wipSelected: true, diffTarget: null, selectedStash: null }),
+  selectStash: (stash) => set({ selectedStash: stash, selectedSha: null, wipSelected: false, diffTarget: null }),
+  reveal: (sha) => set({ selectedSha: sha, wipSelected: false, revealSha: sha, diffTarget: null, selectedStash: null }),
   clearReveal: () => set({ revealSha: null }),
   showDiff: (target) => set({ diffTarget: target }),
 }))

@@ -17,10 +17,17 @@ export interface PromptOptions {
   placeholder?: string
   /** Optional choices rendered as a select instead of a text input. */
   choices?: string[]
+  /** Allow submitting an empty value (resolves to ''). */
+  allowEmpty?: boolean
+  /** Render a multi-line text area. */
+  multiline?: boolean
 }
 
 interface UiState {
   error: ApiError | null
+  /** Informational message (e.g. where a backup was saved). */
+  notice: string | null
+  showNotice: (message: string | null) => void
   menu: { x: number; y: number; items: MenuEntry[] } | null
   prompt: (PromptOptions & { resolve: (value: string | null) => void }) | null
   /** Label of the currently running long operation (fetch/pull/push), if any. */
@@ -43,6 +50,8 @@ export function toApiError(err: unknown): ApiError {
 
 export const useUiStore = create<UiState>((set, get) => ({
   error: null,
+  notice: null,
+  showNotice: (notice) => set({ notice }),
   menu: null,
   prompt: null,
   busy: null,

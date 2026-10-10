@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { CommitSummary, GitRef } from '@shared/types'
-import { computeGraphLayout } from '@git-graph/layout'
+import { useGraphLayout } from '../lib/useGraphLayout'
 import { useAppStore } from '../state/store'
 import { formatShortDate, shortSha } from '../lib/format'
 import { GraphCell, LANE_WIDTH, ROW_HEIGHT } from './GraphCell'
@@ -46,7 +46,7 @@ export function CommitGraph({
   const [matches, setMatches] = useState<Set<string> | null>(null)
   const clearReveal = useAppStore((s) => s.clearReveal)
 
-  const layout = useMemo(() => computeGraphLayout(commits), [commits])
+  const layout = useGraphLayout(commits)
   const indexBySha = useMemo(() => new Map(commits.map((c, i) => [c.sha, i])), [commits])
   const graphLanes = Math.min(layout.width, MAX_GRAPH_LANES)
   const graphColumnWidth = Math.max(graphLanes * LANE_WIDTH + 12, 64)
