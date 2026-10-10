@@ -14,7 +14,9 @@ const rendererDevUrl = process.env.ELECTRON_RENDERER_URL
 const rendererFile = join(import.meta.dirname, '../renderer/index.html')
 const rendererFileUrl = pathToFileURL(rendererFile).href
 // Packaged builds embed the icon via electron-builder; this covers dev runs and Linux/Windows windows.
-const iconPath = join(import.meta.dirname, '../../resources/icon.png')
+const iconPath = app.isPackaged
+  ? join(process.resourcesPath, 'icon.png')
+  : join(import.meta.dirname, '../../resources/icon.png')
 
 let mainWindow: BrowserWindow | null = null
 let activeWatcher: RepositoryWatcher | null = null

@@ -1,0 +1,40 @@
+appId: app.gitbob.desktop
+productName: GitBob
+copyright: Copyright © 2026 GitBob
+directories:
+  output: release/${version}
+  buildResources: resources
+files:
+  - out/**
+  - package.json
+  - "!**/*.map"
+extraResources:
+  - from: resources/icon.png
+    to: icon.png
+asar: true
+mac:
+  category: public.app-category.developer-tools
+  icon: resources/icon.png
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  # Signing/notarization are configured in CI with Developer ID credentials (not set up yet).
+  identity: null
+  hardenedRuntime: true
+dmg:
+  title: GitBob ${version}
+win:
+  icon: resources/icon.png
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  icon: resources/icon.png
+  category: Development
+  target: [AppImage, deb]
+  maintainer: GitBob <hello@gitbob.app>
