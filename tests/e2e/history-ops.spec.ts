@@ -177,3 +177,26 @@ test('hard reset asks first and saves uncommitted changes as a backup stash', as
     await app.close()
   }
 })
+
+test('reflog finds a commit lost by a hard reset and rescues it as a branch', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1\n' })
+  const lost = repo.commit('precious work', { 'a.txt': '2\n' })
+  repo.git(['reset', '-q', '--hard', 'HEAD~1'])
+  const { app, page } = await launch(repo.dir)
+  try {
+    await expect(page.getByTestId('commit-row')).toHaveCount(1)
+    await page.getByTestId('reflog').getByRole('button', { name: /Reflog/ }).click()
+    const entry = page.locator(`[data-testid="reflog-item"][data-sha="${lost}"]`).first()
+    await expect(entry).toContainText('precious work')
+
+    await entry.click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Create branch here…' }).click()
+    await page.getByLabel('Branch name').fill('rescued')
+    await page.getByRole('button', { name: 'Create' }).click()
+    await expect(page.getByTestId('head-label')).toHaveText('rescued')
+    expect(repo.rev('rescued')).toBe(lost)
+  } finally {
+    await app.close()
+  }
+})

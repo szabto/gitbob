@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useReflog } from '../lib/queries'
+import { formatShortDate, shortSha } from '../lib/format'
 import type { GitRef, StashEntry } from '@shared/types'
 import { useAppStore } from '../state/store'
 import { useUiStore, type MenuEntry } from '../state/ui'
@@ -12,12 +14,16 @@ export function Sidebar({
   remotes,
   stashes,
   actions,
+  repoPath,
+  currentBranch,
 }: {
   refs: GitRef[]
   currentRef: string | null
   remotes: string[]
   stashes: StashEntry[]
   actions: Actions
+  repoPath: string
+  currentBranch: string | null
 }) {
   const selectStash = useAppStore((s) => s.selectStash)
   const selectedStash = useAppStore((s) => s.selectedStash)
@@ -148,7 +154,66 @@ export function Sidebar({
           </li>
         ))}
       </Section>
+      <ReflogSection repoPath={repoPath} currentBranch={currentBranch} actions={actions} />
     </aside>
+  )
+}
+
+/** Where HEAD has been: the safety net for finding "lost" commits after resets or rebases. */
+function ReflogSection({
+  repoPath,
+  currentBranch,
+  actions,
+}: {
+  repoPath: string
+  currentBranch: string | null
+  actions: Actions
+}) {
+  const [open, setOpen] = useState(false)
+  const reflog = useReflog(repoPath, open)
+  const reveal = useAppStore((s) => s.reveal)
+  const openMenu = useUiStore((s) => s.openMenu)
+  const target = currentBranch ?? 'HEAD'
+
+  return (
+    <Section
+      title="Reflog"
+      count={reflog.data?.length ?? 0}
+      testId="reflog"
+      open={open}
+      onToggle={() => setOpen(!open)}
+    >
+      {reflog.isPending && open && <li className="px-7 py-0.5 text-xs text-muted">Loading…</li>}
+      {reflog.data?.length === 0 && <li className="px-7 py-0.5 text-xs text-muted">No entries</li>}
+      {reflog.data?.map((e) => (
+        <li key={e.selector}>
+          <button
+            data-testid="reflog-item"
+            data-sha={e.sha}
+            title={`${e.selector} · ${e.message}`}
+            onClick={() => reveal(e.sha)}
+            onContextMenu={(ev) => {
+              ev.preventDefault()
+              openMenu(ev.clientX, ev.clientY, [
+                { label: 'Create branch here…', onSelect: () => void actions.createBranch(e.sha) },
+                { label: 'Checkout this commit (detached)', onSelect: () => void actions.checkoutCommit(e.sha) },
+                'separator',
+                { label: `Reset ${target} to here (mixed)`, onSelect: () => void actions.reset(e.sha, 'mixed') },
+                { label: `Reset ${target} to here (hard)…`, danger: true, onSelect: () => void actions.reset(e.sha, 'hard') },
+              ])
+            }}
+            className="flex w-full flex-col items-start py-0.5 pr-3 pl-7 text-left hover:bg-panel-2"
+          >
+            <span className="flex w-full items-center gap-1.5 text-xs">
+              <span className="font-mono text-muted">{shortSha(e.sha)}</span>
+              <span className="rounded bg-panel-2 px-1 text-[10px] text-muted">{e.action}</span>
+              <span className="ml-auto text-[10px] text-muted">{formatShortDate(e.time)}</span>
+            </span>
+            <span className="w-full truncate text-xs">{e.message}</span>
+          </button>
+        </li>
+      ))}
+    </Section>
   )
 }
 
@@ -158,14 +223,20 @@ function Section({
   testId,
   action,
   children,
+  open: controlledOpen,
+  onToggle,
 }: {
   title: string
   count: number
   testId: string
   action?: { label: string; title: string; onClick: () => void }
   children: React.ReactNode
+  open?: boolean
+  onToggle?: () => void
 }) {
-  const [open, setOpen] = useState(true)
+  const [localOpen, setLocalOpen] = useState(true)
+  const open = controlledOpen ?? localOpen
+  const setOpen = (v: boolean): void => (onToggle ? onToggle() : setLocalOpen(v))
   return (
     <section className="mb-1" data-testid={testId}>
       <div className="flex items-center pr-2">

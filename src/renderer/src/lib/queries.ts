@@ -61,6 +61,7 @@ export function useInvalidateRepo(repoPath: string) {
       void qc.invalidateQueries({ queryKey: ['refs', repoPath] })
       void qc.invalidateQueries({ queryKey: ['remotes', repoPath] })
       void qc.invalidateQueries({ queryKey: ['stashes', repoPath] })
+      void qc.invalidateQueries({ queryKey: ['reflog', repoPath] })
       if (opts.history !== false) {
         void qc.invalidateQueries({ queryKey: ['log', repoPath] })
         void qc.invalidateQueries({ queryKey: ['search', repoPath] })
@@ -112,5 +113,13 @@ export function useFileContents(repoPath: string, target: DiffTarget | null, ena
     queryFn: () => call('diff:contents', { repoPath, target: target! }),
     enabled: !!target && enabled,
     staleTime: target?.kind === 'commit' ? Infinity : 0,
+  })
+}
+
+export function useReflog(repoPath: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['reflog', repoPath],
+    queryFn: () => call('reflog:get', { repoPath, limit: 200 }),
+    enabled,
   })
 }

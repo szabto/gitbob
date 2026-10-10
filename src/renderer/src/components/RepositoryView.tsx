@@ -188,6 +188,8 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
           remotes={remoteNames}
           stashes={stashes.data ?? []}
           actions={actions}
+          repoPath={repo.root}
+          currentBranch={currentBranch}
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {status.data && <OperationBanner status={status.data} actions={actions} />}
