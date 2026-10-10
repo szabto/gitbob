@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            args: --mac --arm64 --x64
+          - name: Windows
+            os: windows-latest
+            args: --win --x64
+          - name: Linux
+            os: ubuntu-latest
+            args: --linux --x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Package and publish to the GitHub release
+        run: npx electron-builder ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Unsigned until signing certificates are configured as secrets.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'

@@ -15,11 +15,7 @@ asar: true
 mac:
   category: public.app-category.developer-tools
   icon: resources/icon.png
-  target:
-    - target: dmg
-      arch: [arm64, x64]
-    - target: zip
-      arch: [arm64, x64]
+  target: [dmg, zip]
   # Signing/notarization are configured in CI with Developer ID credentials (not set up yet).
   identity: null
   hardenedRuntime: true
@@ -27,9 +23,7 @@ dmg:
   title: GitBob ${version}
 win:
   icon: resources/icon.png
-  target:
-    - target: nsis
-      arch: [x64, arm64]
+  target: [nsis]
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -37,4 +31,12 @@ linux:
   icon: resources/icon.png
   category: Development
   target: [AppImage, deb]
-  maintainer: GitBob <hello@gitbob.app>
+  maintainer: Tamás <szabto@gmail.com>
+  synopsis: Free desktop Git client
+  executableName: gitbob
+publish:
+  provider: github
+  owner: szabto
+  repo: gitbob
+  releaseType: prerelease
+artifactName: GitBob-${version}-${os}-${arch}.${ext}
