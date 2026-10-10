@@ -196,6 +196,7 @@ export const ipcInputSchemas = {
   'credentials:respond': z.object({
     id: z.string().regex(/^[0-9a-f]{32}$/),
     answer: z.string().max(4096).nullable(),
+    remember: z.boolean().default(false),
   }),
   'op:cancel': z.object({}).strict(),
   'remote:push': z.object({

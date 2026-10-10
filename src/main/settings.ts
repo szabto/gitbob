@@ -5,9 +5,11 @@ export type ThemeSetting = 'system' | 'light' | 'dark'
 
 export interface Settings {
   theme: ThemeSetting
+  /** The user chose "Remember" once: let GitBob's git calls use the OS credential helper. */
+  usePlatformCredentialHelper: boolean
 }
 
-const DEFAULTS: Settings = { theme: 'system' }
+const DEFAULTS: Settings = { theme: 'system', usePlatformCredentialHelper: false }
 
 /** Small JSON settings file in userData. Unknown or invalid values fall back to defaults. */
 export class SettingsStore {
@@ -22,6 +24,7 @@ export class SettingsStore {
     try {
       const raw = JSON.parse(await readFile(this.file, 'utf8')) as Partial<Settings>
       if (raw.theme === 'system' || raw.theme === 'light' || raw.theme === 'dark') this.data.theme = raw.theme
+      if (typeof raw.usePlatformCredentialHelper === 'boolean') this.data.usePlatformCredentialHelper = raw.usePlatformCredentialHelper
     } catch {
       /* first run or unreadable file: defaults */
     }

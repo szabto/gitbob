@@ -120,7 +120,7 @@ export function registerIpc(ctx: IpcContext): void {
       // Where to clone is chosen in a native dialog, never sent by the renderer.
       const parent = await pickFolder(event, 'Choose where to clone the repository', 'Clone here')
       if (!parent) return null
-      const { path } = await ctx.network.run(event.sender, (net) => cloneRepository(url, parent, net))
+      const { path } = await ctx.network.run(event.sender, (net) => cloneRepository(url, parent, net), parent)
       return openAndRegister(path, ctx)
     },
     'repo:init': async (_input, event) => {
@@ -212,11 +212,13 @@ export function registerIpc(ctx: IpcContext): void {
       return { removed: true }
     },
     'remote:fetch': ({ repoPath, remote, prune }, event) =>
-      ctx.network.run(event.sender, (net: NetworkOptions) =>
-        fetch(requireOpened(repoPath), { ...net, prune, ...(remote ? { remote } : {}) }),
+      ctx.network.run(
+        event.sender,
+        (net: NetworkOptions) => fetch(requireOpened(repoPath), { ...net, prune, ...(remote ? { remote } : {}) }),
+        repoPath,
       ),
     'remote:pull': ({ repoPath, mode }, event) =>
-      ctx.network.run(event.sender, (net) => pull(requireOpened(repoPath), { ...net, mode })),
+      ctx.network.run(event.sender, (net) => pull(requireOpened(repoPath), { ...net, mode }), repoPath),
     'remote:push': async ({ repoPath, branch, remote, setUpstream: track, force }, event) => {
       requireOpened(repoPath)
       if (force !== 'none') {
@@ -228,7 +230,7 @@ export function registerIpc(ctx: IpcContext): void {
         })
         if (!confirmed) return { pushed: false }
       }
-      await ctx.network.run(event.sender, (net) => push(repoPath, { ...net, branch, remote, setUpstream: track, force }))
+      await ctx.network.run(event.sender, (net) => push(repoPath, { ...net, branch, remote, setUpstream: track, force }), repoPath)
       return { pushed: true }
     },
     'stash:list': ({ repoPath }) => listStashes(requireOpened(repoPath)),
@@ -263,7 +265,7 @@ export function registerIpc(ctx: IpcContext): void {
       return { deleted: true }
     },
     'tag:push': ({ repoPath, name, remote }, event) =>
-      ctx.network.run(event.sender, (net) => pushTag(requireOpened(repoPath), remote, name, net)),
+      ctx.network.run(event.sender, (net) => pushTag(requireOpened(repoPath), remote, name, net), repoPath),
     'history:reset': async ({ repoPath, target, mode }, event) => {
       requireOpened(repoPath)
       if (mode === 'hard') {
@@ -341,10 +343,11 @@ export function registerIpc(ctx: IpcContext): void {
           ...(net.env ? { env: net.env } : {}),
           ...(net.signal ? { signal: net.signal } : {}),
         }),
+        repoPath,
       ),
     'commit:signature': ({ repoPath, sha }) => getSignature(requireOpened(repoPath), sha),
     'settings:get': async () => ctx.getSettings(),
-    'credentials:respond': async ({ id, answer }) => ctx.network.respond(id, answer),
+    'credentials:respond': async ({ id, answer, remember }) => ctx.network.respond(id, answer, remember),
     'op:cancel': async () => ctx.network.cancel(),
   }
 

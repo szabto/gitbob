@@ -18,6 +18,7 @@
     "src/shared/**/*",
     "src/git-core/**/*",
     "src/git-graph/**/*",
+    "src/providers/**/*",
     "tests/**/*"
   ],
   "exclude": [

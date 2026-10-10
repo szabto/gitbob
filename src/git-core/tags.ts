@@ -2,6 +2,7 @@ import { GitError } from './errors'
 import { assertValidRemoteName, type NetworkOptions } from './remotes'
 import { runGit, type RunOptions } from './runner'
 import type { TagInfo } from '@shared/types'
+import { networkEnv } from './network-env'
 export type { TagInfo }
 
 
@@ -128,12 +129,7 @@ export async function deleteTag(repoPath: string, name: string): Promise<void> {
 type TagNetworkOptions = Pick<NetworkOptions, 'env' | 'signal'>
 
 async function networkRunOptions(repoPath: string, opts: TagNetworkOptions): Promise<RunOptions> {
-  const env: Record<string, string> = { ...opts.env }
-  // Fail fast instead of hanging on an invisible ssh prompt, unless the user configured ssh.
-  if (!process.env.GIT_SSH_COMMAND && !process.env.GIT_SSH && !env.GIT_SSH_COMMAND) {
-    const cfg = await runGit(['config', '--get', 'core.sshCommand'], { cwd: repoPath, okExitCodes: [0, 1] })
-    if (!cfg.stdout.trim()) env.GIT_SSH_COMMAND = 'ssh -o BatchMode=yes'
-  }
+  const env = await networkEnv(repoPath, opts.env ?? {})
   return { cwd: repoPath, env, timeoutMs: NETWORK_TIMEOUT, ...(opts.signal ? { signal: opts.signal } : {}) }
 }
 

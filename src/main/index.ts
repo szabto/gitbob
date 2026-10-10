@@ -21,7 +21,7 @@ const iconPath = app.isPackaged
 
 let mainWindow: BrowserWindow | null = null
 let activeWatcher: RepositoryWatcher | null = null
-const network = new NetworkSession()
+let network: NetworkSession | null = null
 
 function isTrustedUrl(url: string): boolean {
   if (rendererDevUrl && url.startsWith(rendererDevUrl)) return true
@@ -89,6 +89,13 @@ void app.whenReady().then(async () => {
   // nativeTheme.themeSource themes native dialogs/menus; the renderer gets the choice via IPC.
   nativeTheme.themeSource = (await settings.load()).theme
 
+  network = new NetworkSession({
+    usePlatformHelper: () => settings.get().usePlatformCredentialHelper,
+    enablePlatformHelper: async () => {
+      if (!settings.get().usePlatformCredentialHelper) await settings.update({ usePlatformCredentialHelper: true })
+    },
+  })
+
   const ctx: IpcContext = {
     getSettings: () => settings.get(),
     recent: new RecentRepositoryStore(app.getPath('userData')),
@@ -134,7 +141,7 @@ void app.whenReady().then(async () => {
 
 app.on('will-quit', () => {
   activeWatcher?.stop()
-  void network.dispose()
+  void network?.dispose()
 })
 
 app.on('window-all-closed', () => {

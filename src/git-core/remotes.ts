@@ -3,6 +3,7 @@ import { GitError } from './errors'
 import { runGit, type RunOptions } from './runner'
 import { assertValidBranchName } from './branches'
 import { parseProgress } from './askpass'
+import { networkEnv } from './network-env'
 
 const REMOTE_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
@@ -24,16 +25,6 @@ export interface NetworkOptions {
   onProgress?: (p: { phase: string; percent: number }) => void
 }
 
-async function networkEnv(repoPath: string, extra: Record<string, string> = {}): Promise<Record<string, string>> {
-  const env: Record<string, string> = { ...extra }
-  // Make ssh fail fast instead of hanging on a host-key or passphrase prompt nobody can see,
-  // unless the user configured their own ssh command.
-  if (!process.env.GIT_SSH_COMMAND && !process.env.GIT_SSH) {
-    const cfg = await runGit(['config', '--get', 'core.sshCommand'], { cwd: repoPath, okExitCodes: [0, 1] })
-    if (!cfg.stdout.trim()) env.GIT_SSH_COMMAND = 'ssh -o BatchMode=yes'
-  }
-  return env
-}
 
 function networkError(e: unknown): never {
   if (e instanceof GitError && e.code === 'GIT_FAILED') {

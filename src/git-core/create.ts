@@ -5,6 +5,7 @@ import { assertValidBranchName } from './branches'
 import { GitError } from './errors'
 import type { NetworkOptions } from './remotes'
 import { runGit } from './runner'
+import { networkEnv } from './network-env'
 
 /** Cloning a large repository can take a long time; it must still never hang forever. */
 const CLONE_TIMEOUT = 60 * 60_000
@@ -70,16 +71,6 @@ export function assertValidCloneUrl(url: string): void {
   bad('use an https://, ssh://, git:// or file:// URL, user@host:path, or an absolute local path')
 }
 
-async function sshEnv(cwd: string, extra: Record<string, string> = {}): Promise<Record<string, string>> {
-  const env: Record<string, string> = { ...extra }
-  // Same policy as remotes.ts: fail fast instead of hanging on an invisible ssh prompt,
-  // unless the user configured their own ssh command.
-  if (!process.env.GIT_SSH_COMMAND && !process.env.GIT_SSH && !extra.GIT_SSH_COMMAND && !extra.GIT_SSH) {
-    const cfg = await runGit(['config', '--get', 'core.sshCommand'], { cwd, okExitCodes: [0, 1] })
-    if (!cfg.stdout.trim()) env.GIT_SSH_COMMAND = 'ssh -o BatchMode=yes'
-  }
-  return env
-}
 
 function mapNetworkError(e: unknown): never {
   if (e instanceof GitError && e.code === 'GIT_FAILED') {
@@ -182,7 +173,7 @@ export async function cloneRepository(url: string, parentDir: string, opts: Clon
   try {
     await runGit(args, {
       cwd: parent,
-      env: await sshEnv(parent, opts.env),
+      env: await networkEnv(parent, opts.env),
       timeoutMs: CLONE_TIMEOUT,
       ...(opts.signal ? { signal: opts.signal } : {}),
       ...(onProgress

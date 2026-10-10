@@ -19,6 +19,8 @@ export interface AskpassPrompt {
   prompt: string
   /** True when the answer is a secret (password, token, passphrase). */
   secret: boolean
+  /** ssh's "continue connecting (yes/no/[fingerprint])?" host-key question. */
+  confirm: boolean
 }
 
 export type PromptHandler = (p: AskpassPrompt) => Promise<string | null>
@@ -42,6 +44,10 @@ sock.on('error', () => process.exit(1))
 
 export function isSecretPrompt(prompt: string): boolean {
   return /password|passphrase|token|secret/i.test(prompt)
+}
+
+export function isConfirmPrompt(prompt: string): boolean {
+  return /\(yes\/no(\/\[fingerprint\])?\)\??\s*$/i.test(prompt.trim())
 }
 
 export class AskpassServer {
@@ -115,7 +121,7 @@ export class AskpassServer {
       }
       if (req.token !== this.token || typeof req.prompt !== 'string') return sock.end('{}')
       const prompt = req.prompt
-      this.onPrompt({ prompt, secret: isSecretPrompt(prompt) })
+      this.onPrompt({ prompt, secret: isSecretPrompt(prompt), confirm: isConfirmPrompt(prompt) })
         .then((answer) => sock.end(JSON.stringify(answer === null ? {} : { answer })))
         .catch(() => sock.end('{}'))
     })

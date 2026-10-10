@@ -4,6 +4,7 @@ import { GitError } from './errors'
 import { LITERAL_PATHSPECS_ENV, validateRepoPaths } from './paths'
 import { runGit } from './runner'
 import type { SubmoduleInfo } from '@shared/types'
+import { networkEnv } from './network-env'
 export type { SubmoduleInfo }
 
 
@@ -119,16 +120,6 @@ export async function listSubmodules(repoPath: string): Promise<SubmoduleInfo[]>
   })
 }
 
-async function networkEnv(repoPath: string, extra: Record<string, string> = {}): Promise<Record<string, string>> {
-  const env: Record<string, string> = { ...extra }
-  // Same policy as remotes.ts: make ssh fail fast instead of waiting on an invisible prompt,
-  // unless the user configured their own ssh command.
-  if (!process.env.GIT_SSH_COMMAND && !process.env.GIT_SSH) {
-    const cfg = await runGit(['config', '--get', 'core.sshCommand'], { cwd: repoPath, okExitCodes: [0, 1] })
-    if (!cfg.stdout.trim()) env.GIT_SSH_COMMAND = 'ssh -o BatchMode=yes'
-  }
-  return env
-}
 
 /**
  * `git submodule update` (checks out the recorded commits; may clone/fetch over the network).

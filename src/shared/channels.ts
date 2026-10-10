@@ -74,6 +74,7 @@ export const IPC_EVENTS = [
   'repo:changed',
   'credentials:request',
   'credentials:cancel',
+  'credentials:saved',
   'op:progress',
   'theme:changed',
   'menu:clone-repository',

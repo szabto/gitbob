@@ -1,11 +1,12 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { basename, dirname, join, resolve } from 'node:path'
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import { cleanupFixtures, cloneFixtureRepo, createFixtureRepo, makeTempDir, type FixtureRepo } from '../helpers/fixture'
 import { startHttpGitServer } from '../helpers/http-git-server'
 
 const appDir = resolve(import.meta.dirname, '../..')
 
-async function launch(repo: string): Promise<{ app: ElectronApplication; page: Page }> {
+async function launch(repo: string, extraEnv: Record<string, string> = {}): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({
     args: [appDir, repo],
     env: {
@@ -18,6 +19,7 @@ async function launch(repo: string): Promise<{ app: ElectronApplication; page: P
       GIT_COMMITTER_EMAIL: 'e2e@example.com',
       GIT_CONFIG_NOSYSTEM: '1',
       GIT_CONFIG_GLOBAL: join(makeTempDir('gitbob-home-'), '.gitconfig'),
+      ...extraEnv,
     },
   })
   const page = await app.firstWindow()
@@ -169,11 +171,11 @@ test('prompts for HTTPS credentials and can cancel the prompt', async () => {
     await page.getByRole('button', { name: 'Fetch' }).click()
     const dialog = page.getByTestId('credential-dialog')
     await expect(dialog).toContainText('Username for')
-    await dialog.locator('input').fill('alice')
+    await dialog.locator('#credential-input').fill('alice')
     await dialog.getByRole('button', { name: 'Continue' }).click()
     await expect(dialog).toContainText('Password for')
-    await expect(dialog.locator('input')).toHaveAttribute('type', 'password')
-    await dialog.locator('input').fill('hunter2')
+    await expect(dialog.locator('#credential-input')).toHaveAttribute('type', 'password')
+    await dialog.locator('#credential-input').fill('hunter2')
     await dialog.getByRole('button', { name: 'Continue' }).click()
 
     await expect(page.locator('[data-testid="ref-item"][data-ref="refs/remotes/origin/from-server"]')).toBeVisible()
@@ -182,5 +184,102 @@ test('prompts for HTTPS credentials and can cancel the prompt', async () => {
   } finally {
     await app.close()
     await server.close()
+  }
+})
+
+test('remembers HTTPS credentials through the configured credential helper', async () => {
+  test.skip(process.platform === 'win32', 'askpass helper test is POSIX-only for now')
+  const seed = createFixtureRepo()
+  seed.commit('seed', { 'f.txt': '1\n' })
+  const bare = createFixtureRepo({ bare: true })
+  seed.git(['push', '-q', bare.dir, 'main'])
+  const server = await startHttpGitServer({ projectRoot: dirname(bare.dir), username: 'alice', password: 'hunter2' })
+  const work = createFixtureRepo()
+  work.commit('local', { 'l.txt': 'l' })
+  work.git(['remote', 'add', 'origin', `${server.url}/${basename(bare.dir)}`])
+  // Test-only helper so the real system keychain is never touched.
+  const store = join(makeTempDir('gitbob-creds-'), 'creds')
+  work.git(['config', 'credential.helper', `store --file=${store}`])
+
+  const { app, page } = await launch(work.dir)
+  try {
+    await page.getByRole('button', { name: 'Fetch' }).click()
+    const dialog = page.getByTestId('credential-dialog')
+    await dialog.locator('input[id="credential-input"]').fill('alice')
+    await dialog.getByRole('button', { name: 'Continue' }).click()
+    await expect(dialog).toContainText('Password for')
+    await dialog.locator('input[id="credential-input"]').fill('hunter2')
+    await dialog.getByTestId('remember-credentials').check()
+    await dialog.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByTestId('notice')).toContainText('were saved')
+    expect(readFileSync(store, 'utf8')).toContain('alice:hunter2@127.0.0.1')
+
+    // The next fetch uses the saved credentials: no prompt.
+    seed.commit('more', { 'f.txt': '2\n' })
+    seed.git(['push', '-q', bare.dir, 'main'])
+    await page.getByRole('button', { name: 'Fetch' }).click()
+    await expect(page.locator(`[data-sha="${seed.head()}"]`)).toBeVisible()
+    await expect(page.getByTestId('credential-dialog')).toHaveCount(0)
+  } finally {
+    await app.close()
+    await server.close()
+  }
+})
+
+test('asks for an SSH key passphrase and to trust a new host', async () => {
+  test.skip(process.platform === 'win32', 'askpass helper test is POSIX-only for now')
+  const seed = createFixtureRepo()
+  seed.commit('over ssh', { 'a.txt': '1' })
+  const bare = createFixtureRepo({ bare: true })
+  seed.git(['push', '-q', bare.dir, 'main'])
+  const work = createFixtureRepo()
+  work.commit('local', { 'l.txt': 'l' })
+  work.git(['remote', 'add', 'origin', `ssh://git.example.test${bare.dir}`])
+  // Stand-in for OpenSSH that asks through $SSH_ASKPASS like the real one, then runs git locally.
+  const fakeSsh = join(makeTempDir('gitbob-ssh-'), 'fake-ssh')
+  writeFileSync(
+    fakeSsh,
+    [
+      '#!/bin/sh',
+      'for last; do :; done',
+      'marker="$(dirname "$0")/known"',
+      'pass=$("$SSH_ASKPASS" "Enter passphrase for key \'/home/test/.ssh/id_ed25519\': ") || exit 255',
+      '[ "$pass" = "open sesame" ] || { echo "Permission denied (publickey)." >&2; exit 255; }',
+      'if [ ! -f "$marker" ]; then',
+      '  ok=$("$SSH_ASKPASS" "The authenticity of host \'git.example.test\' can\'t be established.',
+      'ED25519 key fingerprint is SHA256:Zm9vYmFy.',
+      'Are you sure you want to continue connecting (yes/no/[fingerprint])? ") || exit 255',
+      '  [ "$ok" = "yes" ] || { echo "Host key verification failed." >&2; exit 255; }',
+      '  touch "$marker"',
+      'fi',
+      'exec sh -c "$last"',
+      '',
+    ].join('\n'),
+  )
+  chmodSync(fakeSsh, 0o755)
+  const { app, page } = await launch(work.dir, { GIT_SSH_COMMAND: fakeSsh })
+  try {
+    await page.getByRole('button', { name: 'Fetch' }).click()
+    const dialog = page.getByTestId('credential-dialog')
+    await expect(dialog).toContainText('Enter passphrase for key')
+    await expect(dialog.getByTestId('remember-credentials')).toHaveCount(0)
+    await dialog.locator('input').fill('open sesame')
+    await dialog.getByRole('button', { name: 'Continue' }).click()
+
+    const hostKey = page.getByTestId('host-key-dialog')
+    await expect(hostKey).toContainText('SHA256:Zm9vYmFy')
+    await hostKey.getByRole('button', { name: 'Trust and connect' }).click()
+    // Git may start ssh again; answer the passphrase each time it asks.
+    for (let i = 0; i < 3; i++) {
+      if (await page.locator('[data-ref="refs/remotes/origin/main"]').count()) break
+      if (await dialog.count()) {
+        await dialog.locator('input').fill('open sesame')
+        await dialog.getByRole('button', { name: 'Continue' }).click()
+      }
+      await page.waitForTimeout(500)
+    }
+    await expect(page.locator('[data-testid="ref-item"][data-ref="refs/remotes/origin/main"]')).toBeVisible()
+  } finally {
+    await app.close()
   }
 })

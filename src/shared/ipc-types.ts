@@ -120,7 +120,17 @@ export interface IpcEvents {
   /** The working tree, index or refs of an opened repository changed on disk (debounced). */
   'repo:changed': { repoPath: string }
   /** Git needs a username/password/token; answer with credentials:respond. */
-  'credentials:request': { id: string; prompt: string; secret: boolean }
+  'credentials:request': {
+    id: string
+    prompt: string
+    secret: boolean
+    /** ssh host-key question: answer "yes" to trust, or cancel. */
+    confirm: boolean
+    /** git https username/password prompt that may be saved to the OS keychain. */
+    rememberable: boolean
+  }
+  /** Remembered credentials were (or could not be) handed to a secure credential helper. */
+  'credentials:saved': { host: string; saved: boolean }
   /** A pending credentials request is no longer needed (operation finished or cancelled). */
   'credentials:cancel': { id: string }
   /** Progress of the running network operation. */
