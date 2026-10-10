@@ -23,21 +23,21 @@ export function groupStatus(status: WorkingTreeStatus | undefined): StatusGroups
 export function statusBadge(code: StatusCode): { label: string; cls: string; title: string } {
   switch (code) {
     case 'A':
-      return { label: 'A', cls: 'text-emerald-400', title: 'Added' }
+      return { label: 'A', cls: 'text-ok', title: 'Added' }
     case '?':
-      return { label: 'N', cls: 'text-emerald-400', title: 'Untracked (new)' }
+      return { label: 'N', cls: 'text-ok', title: 'Untracked (new)' }
     case 'M':
-      return { label: 'M', cls: 'text-amber-300', title: 'Modified' }
+      return { label: 'M', cls: 'text-warn', title: 'Modified' }
     case 'D':
-      return { label: 'D', cls: 'text-red-400', title: 'Deleted' }
+      return { label: 'D', cls: 'text-err', title: 'Deleted' }
     case 'R':
-      return { label: 'R', cls: 'text-sky-300', title: 'Renamed' }
+      return { label: 'R', cls: 'text-info', title: 'Renamed' }
     case 'C':
-      return { label: 'C', cls: 'text-sky-300', title: 'Copied' }
+      return { label: 'C', cls: 'text-info', title: 'Copied' }
     case 'T':
-      return { label: 'T', cls: 'text-violet-300', title: 'Type changed' }
+      return { label: 'T', cls: 'text-purple', title: 'Type changed' }
     case 'U':
-      return { label: 'U', cls: 'text-red-300', title: 'Conflicted' }
+      return { label: 'U', cls: 'text-err', title: 'Conflicted' }
     default:
       return { label: '·', cls: 'text-muted', title: 'Unmodified' }
   }

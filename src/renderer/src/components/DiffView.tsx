@@ -11,8 +11,8 @@ const targetLabel: Record<DiffTarget['kind'], string> = {
 
 const lineCls: Record<DiffLine['type'], string> = {
   context: '',
-  add: 'bg-emerald-500/12 text-emerald-100',
-  del: 'bg-red-500/12 text-red-100',
+  add: 'bg-ok/12',
+  del: 'bg-err/12',
   'no-newline': 'text-muted italic',
 }
 
@@ -63,7 +63,7 @@ export function DiffView({ repoPath, target }: { repoPath: string; target: DiffT
           </table>
         )}
         {diff.data?.truncated && (
-          <div className="p-3 text-center text-amber-300">Diff truncated: the file is too large to display fully.</div>
+          <div className="p-3 text-center text-warn">Diff truncated: the file is too large to display fully.</div>
         )}
       </div>
     </div>
@@ -73,7 +73,7 @@ export function DiffView({ repoPath, target }: { repoPath: string; target: DiffT
 function HunkRows({ header, lines }: { header: string; lines: DiffLine[] }) {
   return (
     <>
-      <tr className="bg-sky-500/10 text-sky-300">
+      <tr className="bg-info/10 text-info">
         <td colSpan={3} className="px-3 py-0.5">
           {header}
         </td>

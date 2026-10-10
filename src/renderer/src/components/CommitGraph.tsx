@@ -136,10 +136,10 @@ export function CommitGraph({
               <span className="font-mono text-xs text-muted">// WIP</span>
               <span>Working changes</span>
               {wip.unstaged > 0 && (
-                <span className="rounded bg-amber-500/15 px-1.5 text-xs text-amber-200">{wip.unstaged} unstaged</span>
+                <span className="rounded bg-warn/15 px-1.5 text-xs text-warn">{wip.unstaged} unstaged</span>
               )}
               {wip.staged > 0 && (
-                <span className="rounded bg-emerald-500/15 px-1.5 text-xs text-emerald-200">{wip.staged} staged</span>
+                <span className="rounded bg-ok/15 px-1.5 text-xs text-ok">{wip.staged} staged</span>
               )}
             </div>
           </div>
@@ -166,7 +166,7 @@ export function CommitGraph({
                 }}
                 data-match={matches?.has(commit.sha) ? 'true' : undefined}
                 className={`absolute left-0 flex w-full cursor-default items-center ${
-                  selected ? 'bg-accent/20' : 'hover:bg-white/[0.03]'
+                  selected ? 'bg-accent/20' : 'hover:bg-fg/[0.03]'
                 } ${dimmed ? 'opacity-35' : ''}`}
                 style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
               >

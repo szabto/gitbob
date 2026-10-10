@@ -36,14 +36,14 @@ export function StagingPanel({ repo }: { repo: RepositoryInfo }) {
         Working changes
         {status.data?.branch.head && <span className="ml-1 font-normal">on {status.data.branch.head}</span>}
         {status.data?.operation && (
-          <span className="ml-auto rounded bg-amber-500/20 px-1.5 text-amber-200" data-testid="operation">
+          <span className="ml-auto rounded bg-warn/20 px-1.5 text-warn" data-testid="operation">
             {status.data.operation} in progress
           </span>
         )}
       </div>
 
       {error && (
-        <div role="alert" className="border-b border-red-900/60 bg-red-950/60 px-3 py-1.5 text-xs text-red-200">
+        <div role="alert" className="border-b border-err/40 bg-err/10 px-3 py-1.5 text-xs text-err">
           {error.message}
         </div>
       )}
@@ -135,7 +135,7 @@ function FileSection({
           <button
             disabled={disabled}
             onClick={headerAction.run}
-            className="ml-auto rounded border border-border px-2 py-0.5 hover:bg-white/5 disabled:opacity-50"
+            className="ml-auto rounded border border-border px-2 py-0.5 hover:bg-fg/5 disabled:opacity-50"
           >
             {headerAction.label}
           </button>
@@ -152,7 +152,7 @@ function FileSection({
               data-testid="status-file"
               data-path={e.path}
               className={`group flex h-7 cursor-default items-center gap-2 px-3 font-mono text-xs ${
-                isActive(e) ? 'bg-accent/20' : 'hover:bg-white/[0.04]'
+                isActive(e) ? 'bg-accent/20' : 'hover:bg-fg/[0.04]'
               }`}
               onClick={() => onOpen(e)}
             >
@@ -173,7 +173,7 @@ function FileSection({
                     ev.stopPropagation()
                     secondaryAction.run([e.path])
                   }}
-                  className="hidden rounded px-1.5 py-0.5 font-sans text-red-300 group-hover:block hover:bg-red-500/20 disabled:opacity-50"
+                  className="hidden rounded px-1.5 py-0.5 font-sans text-err group-hover:block hover:bg-err/20 disabled:opacity-50"
                 >
                   {secondaryAction.label}
                 </button>
@@ -184,7 +184,7 @@ function FileSection({
                   ev.stopPropagation()
                   action.run([e.path])
                 }}
-                className="hidden rounded px-1.5 py-0.5 font-sans group-hover:block hover:bg-white/10 disabled:opacity-50"
+                className="hidden rounded px-1.5 py-0.5 font-sans group-hover:block hover:bg-fg/10 disabled:opacity-50"
               >
                 {action.label}
               </button>
@@ -271,7 +271,7 @@ function CommitComposer({ repoPath, stagedCount, unborn }: { repoPath: string; s
           }}
         />
         <span
-          className={`absolute top-1.5 right-2 text-xs ${summary.length > 72 ? 'text-amber-300' : 'text-muted'}`}
+          className={`absolute top-1.5 right-2 text-xs ${summary.length > 72 ? 'text-warn' : 'text-muted'}`}
         >
           {summary.length}
         </span>
@@ -288,7 +288,7 @@ function CommitComposer({ repoPath, stagedCount, unborn }: { repoPath: string; s
         }}
       />
       {commit.error && (
-        <div role="alert" className="selectable mb-2 text-xs whitespace-pre-wrap text-red-300" data-testid="commit-error">
+        <div role="alert" className="selectable mb-2 text-xs whitespace-pre-wrap text-err" data-testid="commit-error">
           {commit.error.message}
         </div>
       )}

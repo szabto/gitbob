@@ -5,13 +5,13 @@ import { formatDate, shortSha } from '../lib/format'
 import { RefBadge } from './RefBadge'
 
 const statusLabel: Record<FileChange['status'], { label: string; cls: string }> = {
-  A: { label: 'A', cls: 'text-emerald-400' },
-  M: { label: 'M', cls: 'text-amber-300' },
-  D: { label: 'D', cls: 'text-red-400' },
-  R: { label: 'R', cls: 'text-sky-300' },
-  C: { label: 'C', cls: 'text-sky-300' },
-  T: { label: 'T', cls: 'text-violet-300' },
-  U: { label: 'U', cls: 'text-red-300' },
+  A: { label: 'A', cls: 'text-ok' },
+  M: { label: 'M', cls: 'text-warn' },
+  D: { label: 'D', cls: 'text-err' },
+  R: { label: 'R', cls: 'text-info' },
+  C: { label: 'C', cls: 'text-info' },
+  T: { label: 'T', cls: 'text-purple' },
+  U: { label: 'U', cls: 'text-err' },
   X: { label: '?', cls: 'text-muted' },
 }
 
@@ -103,7 +103,7 @@ export function CommitDetailsPanel({
                 className={`-mx-1 flex cursor-default items-center gap-2 rounded px-1 py-0.5 ${
                   diffTarget?.kind === 'commit' && diffTarget.sha === details.data.sha && diffTarget.path === f.path
                     ? 'bg-accent/20'
-                    : 'hover:bg-white/[0.05]'
+                    : 'hover:bg-fg/[0.05]'
                 }`}
               >
                 <span className={`w-3 shrink-0 font-bold ${statusLabel[f.status].cls}`}>{statusLabel[f.status].label}</span>
@@ -115,8 +115,8 @@ export function CommitDetailsPanel({
                   <span className="text-muted">bin</span>
                 ) : (
                   <span className="shrink-0">
-                    <span className="text-emerald-400">+{f.additions}</span>{' '}
-                    <span className="text-red-400">-{f.deletions}</span>
+                    <span className="text-ok">+{f.additions}</span>{' '}
+                    <span className="text-err">-{f.deletions}</span>
                   </span>
                 )}
               </li>

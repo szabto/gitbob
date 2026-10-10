@@ -1,15 +1,87 @@
 @import 'tailwindcss';
 
+/* Theme tokens. Dark is the default; light applies when the OS (or the View → Theme
+   menu, via nativeTheme.themeSource) prefers light. */
+:root {
+  --gb-bg: #0f1115;
+  --gb-panel: #161920;
+  --gb-panel-2: #1c2029;
+  --gb-border: #262b36;
+  --gb-fg: #d7dce5;
+  --gb-muted: #8b93a3;
+  --gb-accent: #3ee0f5;
+  --gb-accent-2: #b46cff;
+  --gb-danger: #ff6b6b;
+  --gb-ok: #4ade80;
+  --gb-warn: #fcd34d;
+  --gb-err: #f87171;
+  --gb-info: #7dd3fc;
+  --gb-purple: #c4b5fd;
+  --gb-scroll: #2c3240;
+  --lane-0: #3ee0f5;
+  --lane-1: #b46cff;
+  --lane-2: #62d39a;
+  --lane-3: #f2b84b;
+  --lane-4: #e86fd2;
+  --lane-5: #ff7b72;
+  --lane-6: #9d8cff;
+  --lane-7: #46c7d6;
+  --lane-8: #d2a26b;
+  --lane-9: #a6d94f;
+  --lane-10: #ff9e5e;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --gb-bg: #ffffff;
+    --gb-panel: #f6f7f9;
+    --gb-panel-2: #eceef2;
+    --gb-border: #dcdfe5;
+    --gb-fg: #1d2330;
+    --gb-muted: #626b7c;
+    --gb-accent: #0aa5c0;
+    --gb-accent-2: #8b46e8;
+    --gb-danger: #d42f2f;
+    --gb-ok: #138a43;
+    --gb-warn: #a86a00;
+    --gb-err: #c92a2a;
+    --gb-info: #0b6fb8;
+    --gb-purple: #6d3fd1;
+    --gb-scroll: #c8ccd4;
+    --lane-0: #0aa5c0;
+    --lane-1: #8b46e8;
+    --lane-2: #1f9d5c;
+    --lane-3: #c98a00;
+    --lane-4: #c03aa8;
+    --lane-5: #e0473d;
+    --lane-6: #5b4fd6;
+    --lane-7: #138e9c;
+    --lane-8: #a46b2d;
+    --lane-9: #5f9a14;
+    --lane-10: #e0702a;
+    color-scheme: light;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--gb-bg);
+  --color-panel: var(--gb-panel);
+  --color-panel-2: var(--gb-panel-2);
+  --color-border: var(--gb-border);
+  --color-fg: var(--gb-fg);
+  --color-muted: var(--gb-muted);
+  --color-accent: var(--gb-accent);
+  --color-accent-2: var(--gb-accent-2);
+  --color-danger: var(--gb-danger);
+  --color-ok: var(--gb-ok);
+  --color-warn: var(--gb-warn);
+  --color-err: var(--gb-err);
+  --color-info: var(--gb-info);
+  --color-purple: var(--gb-purple);
+}
+
 @theme {
-  --color-bg: #0f1115;
-  --color-panel: #161920;
-  --color-panel-2: #1c2029;
-  --color-border: #262b36;
-  --color-fg: #d7dce5;
-  --color-muted: #8b93a3;
-  --color-accent: #3ee0f5;
-  --color-accent-2: #b46cff;
-  --color-danger: #ff6b6b;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, 'Helvetica Neue', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
@@ -39,7 +111,7 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2c3240;
+  background: var(--gb-scroll);
   border-radius: 6px;
   border: 2px solid var(--color-bg);
 }

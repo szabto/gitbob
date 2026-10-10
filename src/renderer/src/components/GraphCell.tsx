@@ -45,11 +45,11 @@ export const GraphCell = memo(function GraphCell({ row, width, isHead }: Props) 
         <path key={`o${i}`} d={outgoingPath(s)} stroke={laneColor(s.color)} strokeWidth={2} fill="none" />
       ))}
       {row.isMerge ? (
-        <circle cx={cx} cy={MID} r={4} fill={color} stroke="#0f1115" strokeWidth={1.5} />
+        <circle cx={cx} cy={MID} r={4} fill={color} stroke="var(--gb-bg)" strokeWidth={1.5} />
       ) : (
-        <circle cx={cx} cy={MID} r={6} fill={color} stroke="#0f1115" strokeWidth={2} />
+        <circle cx={cx} cy={MID} r={6} fill={color} stroke="var(--gb-bg)" strokeWidth={2} />
       )}
-      {isHead && <circle cx={cx} cy={MID} r={9} fill="none" stroke="#ffffff" strokeWidth={1.5} />}
+      {isHead && <circle cx={cx} cy={MID} r={9} fill="none" stroke="var(--gb-fg)" strokeWidth={1.5} />}
     </svg>
   )
 })

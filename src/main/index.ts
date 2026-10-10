@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, nativeTheme, session, shell, type IpcMainInvokeEvent } from 'electron'
 import { isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { registerIpc, openAndRegister, type IpcContext } from './ipc'
@@ -6,6 +6,7 @@ import { buildMenu } from './menu'
 import { RecentRepositoryStore } from './recent'
 import { RepositoryWatcher } from './watcher'
 import { NetworkSession } from './network'
+import { SettingsStore } from './settings'
 
 // Allow tests to isolate persisted state.
 if (process.env.GITBOB_USER_DATA) app.setPath('userData', resolve(process.env.GITBOB_USER_DATA))
@@ -48,7 +49,7 @@ function createWindow(): BrowserWindow {
     show: false,
     title: 'GitBob',
     icon: iconPath,
-    backgroundColor: '#0f1115',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f1115' : '#ffffff',
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -98,7 +99,19 @@ void app.whenReady().then(async () => {
     },
   }
   registerIpc(ctx)
-  buildMenu(() => mainWindow)
+
+  // nativeTheme.themeSource drives prefers-color-scheme in the renderer and native UI.
+  const settings = new SettingsStore(app.getPath('userData'))
+  nativeTheme.themeSource = (await settings.load()).theme
+  const rebuildMenu = (): void =>
+    buildMenu(() => mainWindow, {
+      theme: settings.get().theme,
+      onThemeChange: (theme) => {
+        nativeTheme.themeSource = theme
+        void settings.update({ theme }).then(rebuildMenu)
+      },
+    })
+  rebuildMenu()
   mainWindow = createWindow()
 
   const initialRepo = repoFromArgs(process.argv)

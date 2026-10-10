@@ -1,6 +1,11 @@
 import { Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron'
 
-export function buildMenu(getWindow: () => BrowserWindow | null): void {
+export interface MenuOptions {
+  theme: 'system' | 'light' | 'dark'
+  onThemeChange: (theme: 'system' | 'light' | 'dark') => void
+}
+
+export function buildMenu(getWindow: () => BrowserWindow | null, opts: MenuOptions): void {
   const isMac = process.platform === 'darwin'
   const send = (channel: string): void => getWindow()?.webContents.send(channel)
 
@@ -26,6 +31,16 @@ export function buildMenu(getWindow: () => BrowserWindow | null): void {
         { role: 'zoomOut' },
         { type: 'separator' },
         { role: 'togglefullscreen' },
+        { type: 'separator' },
+        {
+          label: 'Theme',
+          submenu: (['system', 'light', 'dark'] as const).map((t) => ({
+            label: t === 'system' ? 'Match System' : t === 'light' ? 'Light' : 'Dark',
+            type: 'radio' as const,
+            checked: opts.theme === t,
+            click: () => opts.onThemeChange(t),
+          })),
+        },
       ],
     },
     { role: 'windowMenu' },
