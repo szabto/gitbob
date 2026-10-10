@@ -29,6 +29,9 @@ export function SideBySideDiff({
       originalEditable: false,
       automaticLayout: true,
       renderSideBySide: true,
+      // Monaco falls back to inline below 900px by default; the diff pane is usually narrower.
+      useInlineViewWhenSpaceIsLimited: true,
+      renderSideBySideInlineBreakpoint: 520,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
       renderOverviewRuler: true,

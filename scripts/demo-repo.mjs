@@ -129,3 +129,49 @@ export function buildDemoRepo() {
 
   return { root, dir, home, cleanup: () => rmSync(root, { recursive: true, force: true }) }
 }
+
+/** A small repository stopped in the middle of a merge with a realistic conflict. */
+export function buildConflictRepo() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'gitbob-conflict-')))
+  const home = join(root, 'home')
+  mkdirSync(home)
+  const dir = join(root, 'aurora')
+  mkdirSync(dir)
+  let clock = Date.UTC(2026, 8, 1, 9, 0) / 1000
+  let who = PEOPLE[0]
+  const env = () => ({
+    PATH: process.env.PATH,
+    HOME: home,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
+    GIT_AUTHOR_NAME: who[0],
+    GIT_AUTHOR_EMAIL: who[1],
+    GIT_COMMITTER_NAME: who[0],
+    GIT_COMMITTER_EMAIL: who[1],
+    GIT_AUTHOR_DATE: `${clock} +0200`,
+    GIT_COMMITTER_DATE: `${clock} +0200`,
+  })
+  const git = (...args) => execFileSync('git', args, { cwd: dir, env: env(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const commit = (person, msg, file, content) => {
+    who = PEOPLE[person]
+    clock += 4 * 3600
+    writeFileSync(join(dir, file), content)
+    git('add', '-A')
+    git('commit', '-q', '-m', msg)
+  }
+  const settings = (units, refresh, extra = '') =>
+    `export const settings = {\n  defaultCity: 'Lisbon',\n  units: '${units}',\n  refreshMinutes: ${refresh},\n${extra}}\n`
+
+  git('init', '-q', '-b', 'main')
+  commit(0, 'Add dashboard settings', 'settings.ts', settings('metric', 30))
+  git('switch', '-q', '-c', 'feature/imperial-units')
+  commit(2, 'Default to imperial units for US users', 'settings.ts', settings('imperial', 30, "  locale: 'en-US',\n"))
+  git('switch', '-q', 'main')
+  commit(1, 'Refresh forecasts every 10 minutes', 'settings.ts', settings('metric', 10, "  showAlerts: true,\n"))
+  try {
+    git('merge', '-q', '--no-ff', '-m', 'Merge feature/imperial-units', 'feature/imperial-units')
+  } catch {
+    /* conflict expected */
+  }
+  return { root, dir, home, cleanup: () => rmSync(root, { recursive: true, force: true }) }
+}

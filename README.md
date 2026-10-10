@@ -126,6 +126,8 @@ When you change files, a **// WIP** row appears at the top of the graph. Click i
 3. **Describe it.** Type a short summary (and optionally a longer description).
 4. Click **Commit**. Done. Made a typo? Tick **Amend** to change the last commit instead.
 
+Want only part of a file in the commit? Every block of changes (a *hunk*) has its own **Stage hunk** button, and you can click individual green or red lines to select them and press **Stage 2 lines**. The same works backwards for **Unstage** and **Discard**. Prefer reading changes next to each other? Switch the diff to **Side by side** for a syntax-highlighted, two-column view.
+
 Changed your mind about a file? **Discard** throws away its unstaged edits after asking you first. Staged changes are kept, and brand-new files are moved to the Trash so you can still get them back.
 
 ### 4. Work with branches
@@ -170,7 +172,11 @@ Need to switch tasks with half-finished work? Click **Stash…** in Working chan
   <img src="docs/images/gitbob-stash.png" alt="A stash selected in the sidebar, with its files and Pop, Apply and Delete buttons" width="100%">
 </p>
 
-If a cherry-pick, revert, merge or rebase stops because of a conflict, a yellow banner tells you how many files need attention and offers **Continue**, **Skip** and **Abort**. Nothing is left half-done without you knowing.
+If a merge, rebase, cherry-pick or revert stops because of a conflict, a yellow banner tells you how many files need attention and offers **Continue**, **Skip** and **Abort**. Click a conflicted file in Working changes to open the conflict editor: your version and theirs side by side on top, the result below. Pick **Ours**, **Theirs** or **Both** for each conflict (or edit the result yourself), then **Save and mark resolved** and press **Continue**.
+
+<p align="center">
+  <img src="docs/images/gitbob-conflict.png" alt="The conflict editor: ours and theirs versions of settings.ts side by side on top, the editable result with conflict markers below, and Ours, Theirs and Both buttons for the conflict" width="100%">
+</p>
 
 <br>
 
@@ -209,6 +215,18 @@ Every screenshot in this README is the real app working on a real Git repository
   </tr>
   <tr>
     <td width="50%" valign="top">
+      <img src="docs/images/gitbob-side-by-side.png" alt="Side-by-side diff with syntax highlighting" width="100%">
+      <h3>Side by side, line by line</h3>
+      A two-column diff with syntax highlighting for about 80 languages, powered by the same editor as VS Code. In the unified view, stage, unstage or discard single hunks or hand-picked lines.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/gitbob-conflict.png" alt="Three-way conflict editor" width="100%">
+      <h3>Conflicts without fear</h3>
+      Ours and theirs side by side, an editable result below, one click per conflict. GitBob refuses to mark a file resolved while conflict markers remain.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
       <img src="docs/images/gitbob-search.png" alt="Searching the history for forecast: matching commits are highlighted and the rest are dimmed" width="100%">
       <h3>Find anything</h3>
       <kbd>⌘F</kbd> searches the whole history (not just what's on screen) by message, author, committer or commit id. Matches light up, everything else fades, and <kbd>Enter</kbd> jumps to the next one, loading older history when needed.
@@ -233,7 +251,7 @@ Every screenshot in this README is the real app working on a real Git repository
     </td>
     <td width="33%" valign="top">
       <h4>🧩 Working tree</h4>
-      Status with added, modified, deleted, renamed, untracked and conflicted files · stage/unstage files or everything · discard with confirmation (new files go to the Trash) · unified diffs · commit · amend · merge/rebase/cherry-pick in progress indicator · live refresh
+      Status with added, modified, deleted, renamed, untracked and conflicted files · stage/unstage files, hunks or single lines · discard with confirmation (new files go to the Trash) · unified and side-by-side diffs with syntax highlighting · three-way conflict editor · commit · amend · merge/rebase/cherry-pick in progress indicator · live refresh
     </td>
     <td width="33%" valign="top">
       <h4>🌿 Branches &amp; sync</h4>
@@ -259,7 +277,7 @@ Every screenshot in this README is the real app working on a real Git repository
 
 ### On the roadmap
 
-Interactive rebase, a side-by-side diff with syntax highlighting, line-by-line staging, a three-way merge conflict editor, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux.
+Interactive rebase, reflog browser, blame, worktrees and submodules, clone and init, repository tabs, GitHub/GitLab/Bitbucket/Azure DevOps integration, and signed installers for macOS, Windows and Linux.
 
 <br>
 
@@ -305,7 +323,7 @@ npm run dist:mac     # package for macOS (dmg + zip)
 ```
 
 - **Fast on big repositories:** measured on a generated 100,000-commit repository: the full history loads in about 3 seconds and the graph layout takes about 40 ms ([`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)).
-- **Tested against real Git:** more than 300 integration tests create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
+- **Tested against real Git:** more than 350 integration tests (including randomized partial-staging checks) create throwaway repositories (including local "servers" and an authenticated HTTP Git server) and check the results with Git itself; Playwright end-to-end tests click through the actual app.
 - **Secure by default:** sandboxed renderer without Node access, context isolation, strict Content Security Policy, schema-validated IPC, and Git can only be run on repositories you opened.
 
 <br>

@@ -5,7 +5,7 @@ import { _electron as electron } from '@playwright/test'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { buildDemoRepo } from './demo-repo.mjs'
+import { buildConflictRepo, buildDemoRepo } from './demo-repo.mjs'
 
 const appDir = resolve(import.meta.dirname, '..')
 const outDir = join(appDir, 'docs/images')
@@ -72,6 +72,14 @@ try {
   await page.getByTestId('staging-panel').waitFor()
   await page.locator('[data-testid="unstaged-files"] [data-path="src/App.tsx"]').click()
   await page.getByTestId('diff-table').waitFor()
+  // Side-by-side variant of the same diff.
+  await page.getByRole('button', { name: 'Side by side' }).click()
+  await page.getByTestId('side-by-side-diff').locator('.monaco-diff-editor').waitFor()
+  await page.waitForTimeout(800)
+  await shot(page, 'gitbob-side-by-side')
+  await page.getByRole('button', { name: 'Unified' }).click()
+  await page.getByTestId('diff-table').waitFor()
+
   await page.getByLabel('Commit summary').fill('Compose the dashboard layout')
   await page.getByLabel('Commit description').fill('Wire the city search and hourly chart into the main view.')
   await shot(page, 'gitbob-staging')
@@ -118,6 +126,20 @@ try {
   })
 
   await app.close()
+
+  // Conflict editor on a repository stopped in a merge.
+  const conflict = buildConflictRepo()
+  try {
+    ;({ app, page } = await launch([conflict.dir]))
+    await page.getByTestId('wip-row').click()
+    await page.locator('[data-testid="conflicted-files"] [data-path="settings.ts"]').click()
+    await page.getByTestId('conflict-result').locator('.monaco-editor').waitFor()
+    await page.waitForTimeout(1000)
+    await shot(page, 'gitbob-conflict')
+    await app.close()
+  } finally {
+    conflict.cleanup()
+  }
 
   // Welcome screen with the repository in recents.
   ;({ app, page } = await launch([]))

@@ -55,7 +55,15 @@ test('side-by-side diff renders both versions with Monaco', async () => {
     await page.getByRole('button', { name: 'Side by side' }).click()
     const editor = page.getByTestId('side-by-side-diff')
     await expect(editor.locator('.monaco-diff-editor')).toBeVisible()
+    await expect(editor.locator('.editor.original')).toBeVisible()
     await expect(editor.locator('.editor.original')).toContainText('export const b = 2')
+    // Really side by side: the original pane is left of the modified pane.
+    const [o, m] = await Promise.all([
+      editor.locator('.editor.original').boundingBox(),
+      editor.locator('.editor.modified').boundingBox(),
+    ])
+    expect(o!.width).toBeGreaterThan(100)
+    expect(o!.x + o!.width).toBeLessThanOrEqual(m!.x + 1)
     await expect(editor.locator('.editor.modified')).toContainText('export const c = 4')
     // The choice is remembered.
     expect(await page.evaluate(() => localStorage.getItem('gitbob.diffMode'))).toBe('split')
