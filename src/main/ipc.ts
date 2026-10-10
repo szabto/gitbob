@@ -413,6 +413,26 @@ export function registerIpc(ctx: IpcContext): void {
     'provider:pulls': ({ repoPath, state }) => ctx.providers.pullRequests(requireOpened(repoPath), state),
     'provider:checks': ({ repoPath, sha }) => ctx.providers.checks(requireOpened(repoPath), sha),
     'provider:create-pr': ({ repoPath, ...input }) => ctx.providers.createPullRequest(requireOpened(repoPath), input),
+    'provider:pr': ({ repoPath, number }) => ctx.providers.pullRequest(requireOpened(repoPath), number),
+    'provider:pr-comments': ({ repoPath, number }) => ctx.providers.comments(requireOpened(repoPath), number),
+    'provider:pr-comment': ({ repoPath, number, body }) => ctx.providers.addComment(requireOpened(repoPath), number, body),
+    'provider:pr-review': ({ repoPath, number, event, body }) => ctx.providers.review(requireOpened(repoPath), number, event, body),
+    'provider:pr-merge': async ({ repoPath, number, method, expectedHeadSha, deleteSourceBranch }, event) => {
+      requireOpened(repoPath)
+      const confirmed = await confirmDestructive(event, {
+        message: `Merge pull request #${number} (${method === 'merge' ? 'merge commit' : method})?`,
+        detail: `This merges on the hosting service for everyone${deleteSourceBranch ? ' and deletes the source branch' : ''}. GitBob refuses if the pull request changed since you loaded it.`,
+        confirmLabel: 'Merge',
+      })
+      if (!confirmed) return { done: false, merged: false, message: '' }
+      const res = await ctx.providers.merge(repoPath, number, { method, deleteSourceBranch, ...(expectedHeadSha ? { expectedHeadSha } : {}) })
+      return { done: true, merged: res.merged, message: res.message }
+    },
+    'provider:pr-changes': ({ repoPath, number }, event) =>
+      ctx.network.run(event.sender, (net) => ctx.providers.changes(requireOpened(repoPath), number, net), repoPath),
+    'provider:signin-start': ({ repoPath }) => ctx.providers.startGitHubSignIn(requireOpened(repoPath)),
+    'provider:signin-finish': ({ repoPath }) => ctx.providers.finishGitHubSignIn(requireOpened(repoPath)),
+    'provider:signin-cancel': async () => ctx.providers.cancelGitHubSignIn(),
     'credentials:respond': async ({ id, answer, remember }) => ctx.network.respond(id, answer, remember),
     'op:cancel': async () => ctx.network.cancel(),
   }

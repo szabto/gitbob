@@ -1,5 +1,31 @@
-import type { CheckStatus, ProviderKind, PullRequest, PullRequestState, RepoRef } from '@shared/types'
-export type { CheckStatus, ProviderKind, PullRequest, PullRequestState, RepoRef }
+import type {
+  CheckStatus,
+  MergeMethod,
+  MergeableState,
+  ProviderKind,
+  PullRequest,
+  PullRequestComment,
+  PullRequestDetail,
+  PullRequestReviewer,
+  PullRequestState,
+  RepoRef,
+  ReviewEvent,
+  ReviewerState,
+} from '@shared/types'
+export type {
+  CheckStatus,
+  MergeMethod,
+  MergeableState,
+  ProviderKind,
+  PullRequest,
+  PullRequestComment,
+  PullRequestDetail,
+  PullRequestReviewer,
+  PullRequestState,
+  RepoRef,
+  ReviewEvent,
+  ReviewerState,
+}
 /**
  * Plain-data types shared by the hosting-provider adapters (GitHub, GitLab, Bitbucket Cloud,
  * Azure DevOps). Everything here is serialisable so it can cross IPC unchanged, except
@@ -11,53 +37,12 @@ export type { CheckStatus, ProviderKind, PullRequest, PullRequestState, RepoRef 
 
 
 
-export type MergeMethod = 'merge' | 'squash' | 'rebase'
 
-export type MergeableState = 'yes' | 'no' | 'conflicts' | 'unknown'
 
-export type ReviewerState = 'approved' | 'changes-requested' | 'commented' | 'pending'
 
-export interface PullRequestReviewer {
-  login: string
-  state: ReviewerState
-}
 
-/** A pull request with the extra data needed to review and merge it. */
-export interface PullRequestDetail extends PullRequest {
-  /** Description as markdown; empty when there is none. */
-  body: string
-  /** Target commit the provider compares against (Bitbucket: abbreviated hash). */
-  baseSha: string | null
-  /** Current head commit of the source branch (Bitbucket: abbreviated hash). */
-  headSha: string | null
-  /**
-   * 'yes' = the provider reports it can merge; 'no' = blocked (closed, draft, failing policy or
-   * protection rule); 'conflicts' = merge conflicts; 'unknown' = the provider is still computing.
-   */
-  mergeable: MergeableState
-  /** Merge methods the repository allows, when the provider says; otherwise every method supported. */
-  mergeMethods: MergeMethod[]
-  reviewers: PullRequestReviewer[]
-  additions: number | null
-  deletions: number | null
-  changedFiles: number | null
-  /** The source branch lives in another repository (fork). */
-  headRepoIsFork: boolean
-}
 
-export interface PullRequestComment {
-  id: string
-  author: string
-  /** Markdown. */
-  body: string
-  createdAt: string
-  /** File path for inline (diff) comments. */
-  path?: string
-  /** Line in the new version of the file for inline comments. */
-  line?: number
-}
 
-export type ReviewEvent = 'approve' | 'comment' | 'request-changes'
 
 export interface MergePullRequestOptions {
   method: MergeMethod

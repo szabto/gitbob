@@ -1,5 +1,6 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { cleanupFixtures, createFixtureRepo, makeTempDir, type FixtureRepo } from '../helpers/fixture'
 
@@ -162,6 +163,66 @@ test('resolves a merge conflict in the conflict editor and finishes the merge', 
     await page.getByTestId('operation-banner').getByRole('button', { name: 'Continue' }).click()
     await expect(page.getByTestId('operation-banner')).toHaveCount(0)
     expect(repo.git(['rev-list', '--parents', '-n1', 'HEAD']).split(' ')).toHaveLength(3)
+  } finally {
+    await app.close()
+  }
+})
+
+test('a binary conflict is resolved by keeping one whole version', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'logo.png': Buffer.from([0x89, 0x50, 0, 1, 2, 3]) })
+  repo.branch('other')
+  repo.commit('ours logo', { 'logo.png': Buffer.from([0x89, 0x50, 0, 9, 9, 9]) })
+  repo.checkout('other')
+  repo.commit('theirs logo', { 'logo.png': Buffer.from([0x89, 0x50, 0, 7, 7, 7]) })
+  repo.checkout('main')
+  try {
+    repo.git(['merge', 'other', '-m', 'Merge other'])
+  } catch {
+    /* expected conflict */
+  }
+  const { app, page } = await launch(repo.dir)
+  try {
+    await page.getByTestId('wip-row').click()
+    await fileRow(page, 'conflicted-files', 'logo.png').click()
+    const choice = page.getByTestId('whole-file-conflict')
+    await expect(choice).toContainText('binary file')
+    await mockConfirm(app, 1)
+    await choice.getByRole('button', { name: /^Keep the .* version$/ }).last().click()
+    await expect(page.getByTestId('whole-file-conflict')).toHaveCount(0)
+    expect(repo.git(['ls-files', '-u'])).toBe('')
+    expect([...readFileSync(join(repo.dir, 'logo.png'))]).toEqual([0x89, 0x50, 0, 7, 7, 7])
+  } finally {
+    await app.close()
+  }
+})
+
+test('a staged rename shows as old → new with its content change', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'old-name.txt': lines() })
+  repo.git(['mv', 'old-name.txt', 'new-name.txt'])
+  repo.write('new-name.txt', lines({ 5: 'renamed and edited' }))
+  repo.git(['add', 'new-name.txt'])
+  const { app, page } = await launch(repo.dir)
+  try {
+    await page.getByTestId('wip-row').click()
+    await fileRow(page, 'staged-files', 'new-name.txt').click()
+    await expect(page.getByTestId('diff-path')).toContainText('old-name.txt → new-name.txt')
+    await expect(page.getByTestId('diff-table')).toContainText('renamed and edited')
+    await expect(page.getByTestId('diff-table')).not.toContainText('line 15')
+  } finally {
+    await app.close()
+  }
+})
+
+test('a repository using LFS without git-lfs installed shows a warning', async () => {
+  test.skip(spawnSync('git', ['lfs', 'version']).status === 0, 'git-lfs is installed here')
+  const repo = createFixtureRepo()
+  repo.commit('lfs', { '.gitattributes': '*.psd filter=lfs diff=lfs merge=lfs -text\n' })
+  const { app, page } = await launch(repo.dir)
+  try {
+    const lfs = page.getByTestId('lfs')
+    await expect(lfs.getByTestId('lfs-missing')).toContainText('git-lfs isn’t installed')
   } finally {
     await app.close()
   }

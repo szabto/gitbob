@@ -160,6 +160,8 @@ export type DiffTarget =
   | { kind: 'staged'; path: string; /** Original path of a staged rename. */ oldPath?: string }
   | { kind: 'untracked'; path: string }
   | { kind: 'commit'; sha: string; path: string; oldPath?: string }
+  /** Changes between two commits (e.g. a pull request: merge base → head). */
+  | { kind: 'range'; base: string; head: string; path: string; oldPath?: string }
 
 export interface CommitResult {
   sha: string
@@ -386,6 +388,8 @@ export interface ProviderStatus {
   user: string | null
   /** Encrypted token storage is available on this system. */
   canStoreTokens: boolean
+  /** "Sign in with GitHub" (device flow) is available. */
+  canSignIn: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -398,6 +402,8 @@ export interface AppSettings {
   /** Command id -> accelerator overrides, e.g. { "repo.fetch": "Mod+Shift+F" }. */
   shortcuts: Record<string, string>
   autoCheckUpdates: boolean
+  /** GitHub OAuth app client id for "Sign in with GitHub"; null uses the built-in one (if any). */
+  githubClientId: string | null
 }
 
 export interface AppInfo {
@@ -469,3 +475,51 @@ export interface ConflictDescription {
   /** True if any side is binary, whatever the kind. */
   binary: boolean
 }
+
+export type MergeMethod = 'merge' | 'squash' | 'rebase'
+
+export type MergeableState = 'yes' | 'no' | 'conflicts' | 'unknown'
+
+export type ReviewerState = 'approved' | 'changes-requested' | 'commented' | 'pending'
+
+export interface PullRequestReviewer {
+  login: string
+  state: ReviewerState
+}
+
+/** A pull request with the extra data needed to review and merge it. */
+export interface PullRequestDetail extends PullRequest {
+  /** Description as markdown; empty when there is none. */
+  body: string
+  /** Target commit the provider compares against (Bitbucket: abbreviated hash). */
+  baseSha: string | null
+  /** Current head commit of the source branch (Bitbucket: abbreviated hash). */
+  headSha: string | null
+  /**
+   * 'yes' = the provider reports it can merge; 'no' = blocked (closed, draft, failing policy or
+   * protection rule); 'conflicts' = merge conflicts; 'unknown' = the provider is still computing.
+   */
+  mergeable: MergeableState
+  /** Merge methods the repository allows, when the provider says; otherwise every method supported. */
+  mergeMethods: MergeMethod[]
+  reviewers: PullRequestReviewer[]
+  additions: number | null
+  deletions: number | null
+  changedFiles: number | null
+  /** The source branch lives in another repository (fork). */
+  headRepoIsFork: boolean
+}
+
+export interface PullRequestComment {
+  id: string
+  author: string
+  /** Markdown. */
+  body: string
+  createdAt: string
+  /** File path for inline (diff) comments. */
+  path?: string
+  /** Line in the new version of the file for inline comments. */
+  line?: number
+}
+
+export type ReviewEvent = 'approve' | 'comment' | 'request-changes'

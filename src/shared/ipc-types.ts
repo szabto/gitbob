@@ -1,5 +1,7 @@
 import type {
   AppInfo,
+  PullRequestComment,
+  PullRequestDetail,
   ConflictDescription,
   LfsStatus,
   AppSettings,
@@ -130,6 +132,17 @@ export interface IpcOutputs {
   /** null when the repository has no connected provider. */
   'provider:checks': CheckStatus | null
   'provider:create-pr': PullRequest
+  'provider:pr': PullRequestDetail
+  'provider:pr-comments': PullRequestComment[]
+  'provider:pr-comment': PullRequestComment
+  'provider:pr-review': void
+  /** done: false if the user declined the confirmation. */
+  'provider:pr-merge': { done: boolean; merged: boolean; message: string }
+  /** Merge base, head and changed files of the pull request (its commits are fetched locally). */
+  'provider:pr-changes': { base: string; head: string; files: import('./types').FileChange[] }
+  'provider:signin-start': { userCode: string; verificationUri: string }
+  'provider:signin-finish': { user: string }
+  'provider:signin-cancel': void
   'credentials:respond': void
   /** True if a running network operation was cancelled. */
   'op:cancel': boolean

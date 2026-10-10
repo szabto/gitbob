@@ -27,6 +27,9 @@ const iconPath = app.isPackaged
 
 let mainWindow: BrowserWindow | null = null
 
+/** Client id of GitBob's GitHub OAuth app (public, not a secret). Empty until the app is registered. */
+const BUILTIN_GITHUB_CLIENT_ID = ''
+
 /**
  * Automated tests and screenshot runs set GITBOB_HIDDEN=1: windows render offscreen and are
  * never shown, and on macOS the app gets no Dock icon and never takes focus, so test runs
@@ -146,7 +149,10 @@ void app.whenReady().then(async () => {
     updater,
     getSettings: () => settings.get(),
     updateSettings,
-    providers: new ProviderService(new TokenStore(app.getPath('userData'))),
+    providers: new ProviderService(
+      new TokenStore(app.getPath('userData')),
+      () => settings.get().githubClientId || process.env.GITBOB_GITHUB_CLIENT_ID || BUILTIN_GITHUB_CLIENT_ID || null,
+    ),
     recent: new RecentRepositoryStore(app.getPath('userData')),
     isTrustedSender,
     network,

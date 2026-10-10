@@ -13,6 +13,8 @@ export interface Settings {
   shortcuts: Record<string, string>
   /** Check GitHub Releases for a newer version at startup (off by default: no network without consent). */
   autoCheckUpdates: boolean
+  /** Client id of a GitHub OAuth app for "Sign in with GitHub" (device flow); null uses the built-in one. */
+  githubClientId: string | null
 }
 
 const DEFAULTS: Settings = {
@@ -21,6 +23,7 @@ const DEFAULTS: Settings = {
   gitPath: null,
   shortcuts: {},
   autoCheckUpdates: false,
+  githubClientId: null,
 }
 
 /** Small JSON settings file in userData. Unknown or invalid values fall back to defaults. */
@@ -46,6 +49,7 @@ export class SettingsStore {
         )
       }
       if (typeof raw.autoCheckUpdates === 'boolean') this.data.autoCheckUpdates = raw.autoCheckUpdates
+      if (typeof raw.githubClientId === 'string' && /^[A-Za-z0-9._-]{8,64}$/.test(raw.githubClientId)) this.data.githubClientId = raw.githubClientId
     } catch {
       /* first run or unreadable file: defaults */
     }

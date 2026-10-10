@@ -126,6 +126,12 @@ function General({ s, update }: { s: AppSettings; update: (p: SettingsPatch) => 
         </select>
       </Row>
       <Row
+        label="GitHub sign-in"
+        hint="Client ID of a GitHub OAuth app with device flow enabled. Leave empty to use access tokens only."
+      >
+        <ClientIdField value={s.githubClientId} onSave={(v) => void update({ githubClientId: v })} />
+      </Row>
+      <Row
         label="Remember passwords"
         hint="When on, passwords you choose to remember are kept in your system's secure credential store."
       >
@@ -347,5 +353,28 @@ function About({ s, update, version }: { s: AppSettings; update: (p: SettingsPat
         <span className="ml-2 text-xs text-muted">MIT License</span>
       </Row>
     </>
+  )
+}
+
+function ClientIdField({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) {
+  const [text, setText] = useState(value ?? '')
+  const valid = text === '' || /^[A-Za-z0-9._-]{8,64}$/.test(text)
+  return (
+    <div className="flex gap-2">
+      <input
+        aria-label="GitHub OAuth client ID"
+        value={text}
+        onChange={(e) => setText(e.target.value.trim())}
+        placeholder="Ov23li…"
+        className="min-w-0 flex-1 rounded border border-border bg-bg px-2 py-1 font-mono text-sm"
+      />
+      <button
+        disabled={!valid || text === (value ?? '')}
+        onClick={() => onSave(text || null)}
+        className="rounded border border-border px-2 py-1 text-sm hover:bg-panel-2 disabled:opacity-40"
+      >
+        Save
+      </button>
+    </div>
   )
 }

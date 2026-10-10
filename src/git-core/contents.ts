@@ -6,6 +6,7 @@ import { GitError } from './errors'
 import { resolveRepoPath } from './paths'
 import { runGit } from './runner'
 import type { FileContents } from '@shared/types'
+import { verifyCommit } from './diff'
 export type { FileContents }
 
 
@@ -212,6 +213,16 @@ export async function getFileContents(
       const specs = [`${sha}:${path}`]
       if (parent) specs.push(`${parent}:${target.oldPath ?? path}`)
       const [cur, prev] = await lookupBlobs(repoPath, specs)
+      const [oldSide, newSide] = await Promise.all([
+        readBlob(repoPath, prev ?? null, maxBytes),
+        readBlob(repoPath, cur ?? null, maxBytes),
+      ])
+      return combine(oldSide, newSide)
+    }
+    case 'range': {
+      if (target.oldPath !== undefined) resolveRepoPath(repoPath, target.oldPath)
+      const [base, head] = await Promise.all([verifyCommit(repoPath, target.base), verifyCommit(repoPath, target.head)])
+      const [prev, cur] = await lookupBlobs(repoPath, [`${base}:${target.oldPath ?? path}`, `${head}:${path}`])
       const [oldSide, newSide] = await Promise.all([
         readBlob(repoPath, prev ?? null, maxBytes),
         readBlob(repoPath, cur ?? null, maxBytes),

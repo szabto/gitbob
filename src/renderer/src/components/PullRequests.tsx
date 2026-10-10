@@ -5,6 +5,7 @@ import { call } from '../lib/api'
 import { useDialog } from '../lib/useDialog'
 import { usePullRequests } from '../lib/queries'
 import { useUiStore } from '../state/ui'
+import { useAppStore } from '../state/store'
 import type { useRepoActions } from '../lib/actions'
 
 export const PROVIDER_NAMES: Record<ProviderKind, string> = {
@@ -86,6 +87,19 @@ export function PullRequestsSection({
     }
   }
 
+  const signIn = async (): Promise<void> => {
+    try {
+      const { userCode, verificationUri } = await call('provider:signin-start', { repoPath })
+      useUiStore.getState().showNotice(`Enter the code ${userCode} on the GitHub page that just opened, then approve GitBob. Waiting…`)
+      window.open(verificationUri, '_blank')
+      const res = await call('provider:signin-finish', { repoPath })
+      showNotice(`Signed in to GitHub as ${res.user}.`)
+      refresh()
+    } catch (e) {
+      showError(e)
+    }
+  }
+
   return (
     <section className="mb-1" data-testid="pull-requests">
       <div className="flex items-center pr-2">
@@ -113,9 +127,16 @@ export function PullRequestsSection({
           {!status.connected ? (
             <div className="px-7 py-1">
               {status.canStoreTokens ? (
-                <button onClick={() => void connect()} className="rounded border border-border px-2 py-0.5 text-xs hover:bg-panel-2" data-testid="connect-provider">
-                  Connect {name}…
-                </button>
+                <div className="flex flex-col items-start gap-1">
+                  {status.canSignIn && (
+                    <button onClick={() => void signIn()} className="rounded bg-accent px-2 py-0.5 text-xs font-medium text-on-accent" data-testid="signin-github">
+                      Sign in with GitHub…
+                    </button>
+                  )}
+                  <button onClick={() => void connect()} className="rounded border border-border px-2 py-0.5 text-xs hover:bg-panel-2" data-testid="connect-provider">
+                    {status.canSignIn ? 'Use an access token…' : `Connect ${name}…`}
+                  </button>
+                </div>
               ) : (
                 <span className="text-xs text-warn">Secure token storage is not available on this system.</span>
               )}
@@ -135,7 +156,7 @@ export function PullRequestsSection({
                     <button
                       data-testid="pull-request"
                       title={`${pr.title}\n${pr.sourceBranch} → ${pr.targetBranch} · ${pr.author}`}
-                      onClick={() => /^https?:\/\//i.test(pr.url) && window.open(pr.url, '_blank')}
+                      onClick={() => useAppStore.getState().openPr(pr.number)}
                       onContextMenu={(e) => {
                         e.preventDefault()
                         openMenu(e.clientX, e.clientY, [

@@ -1,7 +1,23 @@
-import type { CheckStatus, ProviderKind, ProviderStatus, PullRequest, RepoRef } from '@shared/types'
+import type {
+  CheckStatus,
+  FileChange,
+  MergeMethod,
+  ProviderKind,
+  ProviderStatus,
+  PullRequest,
+  PullRequestComment,
+  PullRequestDetail,
+  RepoRef,
+  ReviewEvent,
+} from '@shared/types'
+import { fetchPullRequestRef } from '@git-core/pr-refs'
+import { fetch as gitFetch } from '@git-core/remotes'
+import { getRangeFiles, mergeBase } from '@git-core/range'
+import type { NetworkOptions } from '@git-core/remotes'
+import { runGit } from '@git-core/runner'
 import { listRemotes } from '@git-core/remotes'
 import { GitError } from '@git-core/errors'
-import { createAdapter, defaultApiBaseUrl, parseRemoteUrl, ProviderError, type ProviderAdapter } from '../providers'
+import { createAdapter, defaultApiBaseUrl, parseRemoteUrl, pollDeviceFlow, ProviderError, startDeviceFlow, type ProviderAdapter } from '../providers'
 import type { TokenStore } from './tokens'
 
 const tokenKey = (kind: ProviderKind, host: string): string => `${kind}:${host.toLowerCase()}`
@@ -17,8 +33,54 @@ function apiBase(ref: RepoRef): string {
 /** Provider integration for opened repositories: detection, tokens, pull requests, CI status. */
 export class ProviderService {
   private users = new Map<string, string>()
+  private oauth: { repoPath: string; deviceCode: string; interval: number; expiresIn: number; controller: AbortController } | null = null
 
-  constructor(private readonly tokens: TokenStore) {}
+  /** @param githubClientId GitHub OAuth app client id for device-flow sign-in (null disables it). */
+  constructor(
+    private readonly tokens: TokenStore,
+    private readonly githubClientId: () => string | null = () => null,
+  ) {}
+
+  /** Start "Sign in with GitHub": returns the code the user enters at the verification page. */
+  async startGitHubSignIn(repoPath: string): Promise<{ userCode: string; verificationUri: string }> {
+    const found = await this.detect(repoPath)
+    if (!found || found.ref.kind !== 'github') throw new GitError('INVALID_ARGUMENT', 'Sign-in is available for GitHub repositories.')
+    const clientId = this.githubClientId()
+    if (!clientId) throw new GitError('INVALID_ARGUMENT', 'GitHub sign-in is not configured. Use a personal access token instead.')
+    this.oauth?.controller.abort()
+    const baseUrl = process.env.GITBOB_TEST_GITHUB_OAUTH || `https://${found.ref.host}`
+    const flow = await mapErrors(() => startDeviceFlow({ clientId, scope: 'repo read:user', baseUrl }))
+    this.oauth = { repoPath, deviceCode: flow.deviceCode, interval: flow.interval, expiresIn: flow.expiresIn, controller: new AbortController() }
+    return { userCode: flow.userCode, verificationUri: flow.verificationUri }
+  }
+
+  /** Wait until the user approved in the browser, then store the token like a pasted one. */
+  async finishGitHubSignIn(repoPath: string): Promise<{ user: string }> {
+    const flow = this.oauth
+    if (!flow || flow.repoPath !== repoPath) throw new GitError('INVALID_ARGUMENT', 'No GitHub sign-in in progress.')
+    const clientId = this.githubClientId()!
+    const found = (await this.detect(repoPath))!
+    try {
+      const { accessToken } = await mapErrors(() =>
+        pollDeviceFlow({
+          clientId,
+          deviceCode: flow.deviceCode,
+          interval: flow.interval,
+          expiresIn: flow.expiresIn,
+          signal: flow.controller.signal,
+          baseUrl: process.env.GITBOB_TEST_GITHUB_OAUTH || `https://${found.ref.host}`,
+        }),
+      )
+      return await this.connect(repoPath, accessToken)
+    } finally {
+      if (this.oauth === flow) this.oauth = null
+    }
+  }
+
+  cancelGitHubSignIn(): void {
+    this.oauth?.controller.abort()
+    this.oauth = null
+  }
 
   /** First remote (origin preferred) that points at a recognized hosting service. */
   async detect(repoPath: string): Promise<{ ref: RepoRef; remote: string } | null> {
@@ -50,7 +112,8 @@ export class ProviderService {
   async status(repoPath: string): Promise<ProviderStatus> {
     const found = await this.detect(repoPath)
     const canStoreTokens = this.tokens.canStore()
-    if (!found) return { repo: null, remote: null, connected: false, user: null, canStoreTokens }
+    const canSignIn = !!this.githubClientId()
+    if (!found) return { repo: null, remote: null, connected: false, user: null, canStoreTokens, canSignIn: false }
     const key = tokenKey(found.ref.kind, found.ref.host)
     // Only checks that a token is saved: decrypting it would touch the OS keychain, which
     // must happen only when the token is actually used (listing pull requests, CI, …).
@@ -61,6 +124,7 @@ export class ProviderService {
       connected,
       user: connected ? (this.users.get(key) ?? null) : null,
       canStoreTokens,
+      canSignIn: canSignIn && found.ref.kind === 'github',
     }
   }
 
@@ -105,6 +169,69 @@ export class ProviderService {
     return mapErrors(() => this.adapterFor(found.ref, token).getChecks(found.ref, sha))
   }
 
+  async pullRequest(repoPath: string, number: number): Promise<PullRequestDetail> {
+    const { ref, adapter } = await this.connected(repoPath)
+    return mapErrors(() => adapter.getPullRequest(ref, number))
+  }
+
+  async comments(repoPath: string, number: number): Promise<PullRequestComment[]> {
+    const { ref, adapter } = await this.connected(repoPath)
+    return mapErrors(() => adapter.listComments(ref, number))
+  }
+
+  async addComment(repoPath: string, number: number, body: string): Promise<PullRequestComment> {
+    const { ref, adapter } = await this.connected(repoPath)
+    return mapErrors(() => adapter.addComment(ref, number, body))
+  }
+
+  async review(repoPath: string, number: number, event: ReviewEvent, body: string): Promise<void> {
+    const { ref, adapter } = await this.connected(repoPath)
+    await mapErrors(() => adapter.submitReview(ref, number, event, body))
+  }
+
+  async merge(
+    repoPath: string,
+    number: number,
+    opts: { method: MergeMethod; expectedHeadSha?: string; deleteSourceBranch: boolean },
+  ): Promise<{ merged: boolean; sha: string | null; message: string }> {
+    const { ref, adapter } = await this.connected(repoPath)
+    return mapErrors(() => adapter.mergePullRequest(ref, number, opts))
+  }
+
+  /**
+   * Bring the pull request's commits into the local repository and list what it changes
+   * (merge base of target and head → head), so the normal diff viewer can show them.
+   */
+  async changes(repoPath: string, number: number, net: NetworkOptions): Promise<PullRequestChanges> {
+    const found = await this.detect(repoPath)
+    if (!found) throw new GitError('NOT_FOUND', 'No supported hosting remote in this repository.')
+    const { ref, adapter } = await this.connected(repoPath)
+    const pr = await mapErrors(() => adapter.getPullRequest(ref, number))
+    const remote = found.remote
+    const refspec = adapter.pullRequestRefspec(ref, number)
+    let head: string
+    if (refspec) {
+      head = (await fetchPullRequestRef(repoPath, remote, refspec, number, net)).sha
+    } else {
+      if (pr.headRepoIsFork) {
+        throw new GitError('INVALID_ARGUMENT', 'This pull request comes from a fork, which GitBob cannot fetch for this provider yet.')
+      }
+      await gitFetch(repoPath, { ...net, remote, prune: false })
+      head = await this.resolveRef(repoPath, `refs/remotes/${remote}/${pr.sourceBranch}`)
+    }
+    // Make sure the target branch is current, then diff from the merge base like the provider does.
+    await gitFetch(repoPath, { ...net, remote, prune: false }).catch(() => {})
+    const target = await this.resolveRef(repoPath, `refs/remotes/${remote}/${pr.targetBranch}`)
+    const base = await mergeBase(repoPath, target, head)
+    return { base, head, files: await getRangeFiles(repoPath, base, head) }
+  }
+
+  private async resolveRef(repoPath: string, refName: string): Promise<string> {
+    const r = await runGit(['rev-parse', '-q', '--verify', `${refName}^{commit}`], { cwd: repoPath, okExitCodes: [0, 1] })
+    if (r.exitCode !== 0) throw new GitError('NOT_FOUND', `${refName.replace(/^refs\/remotes\//, '')} is not available locally; fetch first.`)
+    return r.stdout.trim()
+  }
+
   async createPullRequest(
     repoPath: string,
     input: { title: string; body: string; sourceBranch: string; targetBranch: string; draft: boolean },
@@ -112,6 +239,12 @@ export class ProviderService {
     const { ref, adapter } = await this.connected(repoPath)
     return mapErrors(() => adapter.createPullRequest(ref, input))
   }
+}
+
+export interface PullRequestChanges {
+  base: string
+  head: string
+  files: FileChange[]
 }
 
 /** Provider errors become GitErrors (already token-redacted) so they cross IPC like the rest. */

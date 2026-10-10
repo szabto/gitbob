@@ -239,6 +239,13 @@ export async function getFileDiff(
       ]
       break
     }
+    case 'range': {
+      if (target.oldPath !== undefined) resolveRepoPath(repoPath, target.oldPath)
+      const [base, head] = await Promise.all([verifyCommit(repoPath, target.base), verifyCommit(repoPath, target.head)])
+      const paths = target.oldPath && target.oldPath !== target.path ? [target.path, target.oldPath] : [target.path]
+      args = ['diff-tree', '-p', '-r', '-M', '--no-commit-id', ...DIFF_OPTS, base, head, '--', ...paths]
+      break
+    }
   }
 
   const r = await runGit(args, {
@@ -266,4 +273,12 @@ export async function getFileDiff(
   }
   if (parsed.oldPath !== undefined) result.oldPath = parsed.oldPath
   return result
+}
+
+/** Full sha of a commit given as a validated hex id; NOT_FOUND if it isn't in the repository. */
+export async function verifyCommit(repoPath: string, rev: string): Promise<string> {
+  if (!/^[0-9a-f]{4,64}$/i.test(rev)) throw new GitError('INVALID_ARGUMENT', 'Invalid commit id')
+  const r = await runGit(['rev-parse', '-q', '--verify', `${rev}^{commit}`], { cwd: repoPath, okExitCodes: [0, 1, 128] })
+  if (r.exitCode !== 0) throw new GitError('NOT_FOUND', `Commit ${rev} is not in this repository`)
+  return r.stdout.trim()
 }

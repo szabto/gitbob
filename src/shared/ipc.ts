@@ -45,6 +45,7 @@ const fullBranchRef = z
   .max(300)
   .regex(/^refs\/(heads|remotes)\/[^\0]+$/, 'expected refs/heads/* or refs/remotes/*')
 
+const prNumber = z.number().int().min(1).max(10_000_000)
 const stashIndex = z.number().int().min(0).max(100_000)
 const tagName = z
   .string()
@@ -59,6 +60,7 @@ export const diffTargetSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('staged'), path: repoPathSchema, oldPath: repoPathSchema.optional() }),
   z.object({ kind: z.literal('untracked'), path: repoPathSchema }),
   z.object({ kind: z.literal('commit'), sha: shaSchema, path: repoPathSchema, oldPath: repoPathSchema.optional() }),
+  z.object({ kind: z.literal('range'), base: shaSchema, head: shaSchema, path: repoPathSchema, oldPath: repoPathSchema.optional() }),
 ])
 
 export const ipcInputSchemas = {
@@ -210,6 +212,7 @@ export const ipcInputSchemas = {
         gitPath: z.null().optional(),
         shortcuts: z.record(z.string().regex(/^[a-z0-9.:-]{1,64}$/i), z.string().max(64)).optional(),
         autoCheckUpdates: z.boolean().optional(),
+        githubClientId: z.string().regex(/^[A-Za-z0-9._-]{8,64}$/).nullable().optional(),
       })
       .strict(),
   }),
@@ -233,6 +236,26 @@ export const ipcInputSchemas = {
   'provider:disconnect': z.object({ repoPath: absolutePath }),
   'provider:pulls': z.object({ repoPath: absolutePath, state: z.enum(['open', 'all']).default('open') }),
   'provider:checks': z.object({ repoPath: absolutePath, sha: shaSchema }),
+  'provider:pr': z.object({ repoPath: absolutePath, number: prNumber }),
+  'provider:pr-comments': z.object({ repoPath: absolutePath, number: prNumber }),
+  'provider:pr-comment': z.object({ repoPath: absolutePath, number: prNumber, body: z.string().trim().min(1).max(65_536) }),
+  'provider:pr-review': z.object({
+    repoPath: absolutePath,
+    number: prNumber,
+    event: z.enum(['approve', 'comment', 'request-changes']),
+    body: z.string().max(65_536),
+  }),
+  'provider:pr-merge': z.object({
+    repoPath: absolutePath,
+    number: prNumber,
+    method: z.enum(['merge', 'squash', 'rebase']),
+    expectedHeadSha: shaSchema.optional(),
+    deleteSourceBranch: z.boolean(),
+  }),
+  'provider:pr-changes': z.object({ repoPath: absolutePath, number: prNumber }),
+  'provider:signin-start': z.object({ repoPath: absolutePath }),
+  'provider:signin-finish': z.object({ repoPath: absolutePath }),
+  'provider:signin-cancel': z.object({}).strict(),
   'provider:create-pr': z.object({
     repoPath: absolutePath,
     title: z.string().trim().min(1).max(256),

@@ -16,6 +16,9 @@ interface AppState {
   revealSha: string | null
   /** File diff shown in the main area instead of the graph. */
   diffTarget: DiffTarget | null
+  /** Pull request shown in the main area. */
+  prNumber: number | null
+  openPr: (n: number | null) => void
   /** Active graph filter (branch/author/path); null shows everything. */
   historyFilter: HistoryFilter | null
   setHistoryFilter: (filter: HistoryFilter | null) => void
@@ -49,6 +52,7 @@ const RESET = {
   blame: null,
   rebaseBase: null,
   historyFilter: null,
+  prNumber: null,
 } as const
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -60,6 +64,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   diffTarget: null,
   selectedStash: null,
   conflictPath: null,
+  prNumber: null,
+  openPr: (prNumber) => set({ prNumber, diffTarget: null, blame: null, conflictPath: null }),
   historyFilter: null,
   setHistoryFilter: (historyFilter) => set({ historyFilter, selectedSha: null }),
   blame: null,

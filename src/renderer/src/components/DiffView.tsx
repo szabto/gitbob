@@ -10,6 +10,7 @@ const targetLabel: Record<DiffTarget['kind'], string> = {
   staged: 'Staged changes',
   untracked: 'New file',
   commit: 'Commit',
+  range: 'Pull request',
 }
 
 const lineCls: Record<DiffLine['type'], string> = {
@@ -38,6 +39,7 @@ export function DiffView({ repoPath, target }: { repoPath: string; target: DiffT
         <span className="rounded bg-panel-2 px-1.5 py-0.5 text-xs text-muted">
           {targetLabel[target.kind]}
           {target.kind === 'commit' ? ` ${target.sha.slice(0, 7)}` : ''}
+          {target.kind === 'range' ? ` ${target.base.slice(0, 7)}…${target.head.slice(0, 7)}` : ''}
         </span>
         <span className="truncate font-mono text-xs" data-testid="diff-path">
           {diff.data?.oldPath ? `${diff.data.oldPath} → ` : ''}
@@ -59,7 +61,12 @@ export function DiffView({ repoPath, target }: { repoPath: string; target: DiffT
           <button
             className="rounded border border-border px-2 py-0.5 text-xs hover:bg-panel-2"
             title="Show who last changed each line"
-            onClick={() => openBlame({ path: target.path, ...(target.kind === 'commit' ? { rev: target.sha } : {}) })}
+            onClick={() =>
+              openBlame({
+                path: target.path,
+                ...(target.kind === 'commit' ? { rev: target.sha } : target.kind === 'range' ? { rev: target.head } : {}),
+              })
+            }
           >
             Blame
           </button>

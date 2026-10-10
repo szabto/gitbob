@@ -16,6 +16,7 @@ import { useRemotes, useStashes } from '../lib/queries'
 import { StashPanel } from './StashPanel'
 import { OperationBanner } from './OperationBanner'
 import { BlameView } from './BlameView'
+import { PullRequestView } from './PullRequestView'
 import { RebaseDialog } from './RebaseDialog'
 import { CreatePullRequestDialog, PROVIDER_NAMES } from './PullRequests'
 import { useAppInfo, useProviderStatus } from '../lib/queries'
@@ -43,6 +44,7 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
   const diffTarget = useAppStore((s) => s.diffTarget)
   const conflictPath = useAppStore((s) => s.conflictPath)
   const blame = useAppStore((s) => s.blame)
+  const prNumber = useAppStore((s) => s.prNumber)
   const rebaseBase = useAppStore((s) => s.rebaseBase)
   const openRebase = useAppStore((s) => s.openRebase)
   const invalidate = useInvalidateRepo(repo.root)
@@ -206,7 +208,9 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {status.data && <OperationBanner status={status.data} actions={actions} />}
-          {blame ? (
+          {prNumber && provider.data?.repo && !diffTarget ? (
+            <PullRequestView repoPath={repo.root} number={prNumber} providerName={PROVIDER_NAMES[provider.data.repo.kind]} />
+          ) : blame ? (
             <BlameView repoPath={repo.root} path={blame.path} {...(blame.rev ? { rev: blame.rev } : {})} />
           ) : conflictPath ? (
             <Suspense fallback={<div className="p-4 text-xs text-muted">Loading editor…</div>}>
