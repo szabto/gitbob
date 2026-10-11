@@ -1,5 +1,6 @@
 import type {
   AppInfo,
+  FileHistoryPage,
   HostedRepository,
   ProviderAccount,
   PullRequestComment,
@@ -49,6 +50,7 @@ export interface IpcOutputs {
   /** Performance hints for a slow repository. */
   'repo:health': { suggestCommitGraph: boolean }
   'repo:write-commit-graph': void
+  'file:history': FileHistoryPage
   'repo:head': HeadState
   'log:page': CommitPage
   'log:search': { shas: string[]; truncated: boolean }

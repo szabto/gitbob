@@ -3,6 +3,7 @@ import { useChecks, useCommitDetails, useProviderStatus } from '../lib/queries'
 import { useQuery } from '@tanstack/react-query'
 import { call } from '../lib/api'
 import { useAppStore } from '../state/store'
+import { useUiStore } from '../state/ui'
 import { formatDate, shortSha } from '../lib/format'
 import { RefBadge } from './RefBadge'
 
@@ -38,6 +39,8 @@ export function CommitDetailsPanel({
   const select = useAppStore((s) => s.select)
   const showDiff = useAppStore((s) => s.showDiff)
   const diffTarget = useAppStore((s) => s.diffTarget)
+  const openFileHistory = useAppStore((s) => s.openFileHistory)
+  const openBlame = useAppStore((s) => s.openBlame)
 
   return (
     <aside className="flex w-[380px] shrink-0 flex-col border-l border-border bg-panel" data-testid="commit-details">
@@ -137,6 +140,13 @@ export function CommitDetailsPanel({
                 onClick={() =>
                   showDiff({ kind: 'commit', sha: details.data.sha, path: f.path, ...(f.oldPath ? { oldPath: f.oldPath } : {}) })
                 }
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  useUiStore.getState().openMenu(e.clientX, e.clientY, [
+                    { label: 'File history', onSelect: () => openFileHistory(f.path) },
+                    ...(f.status === 'D' ? [] : [{ label: 'Blame', onSelect: () => openBlame({ path: f.path, rev: details.data.sha }) }]),
+                  ])
+                }}
                 className={`-mx-1 flex cursor-default items-center gap-2 rounded px-1 py-0.5 ${
                   diffTarget?.kind === 'commit' && diffTarget.sha === details.data.sha && diffTarget.path === f.path
                     ? 'bg-accent/20'

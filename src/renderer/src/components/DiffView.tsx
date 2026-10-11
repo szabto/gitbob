@@ -26,10 +26,22 @@ const prefix: Record<DiffLine['type'], string> = { context: ' ', add: '+', del: 
 // Monaco is large; load it only when the side-by-side view is first used.
 const SideBySideDiff = lazy(() => import('./SideBySideDiff').then((m) => ({ default: m.SideBySideDiff })))
 
-export function DiffView({ repoPath, target }: { repoPath: string; target: DiffTarget }) {
+export function DiffView({
+  repoPath,
+  target,
+  onClose,
+  showHistoryButton = true,
+}: {
+  repoPath: string
+  target: DiffTarget
+  /** Embedded use (file history): replaces the default close (clearing the shown diff). */
+  onClose?: () => void
+  showHistoryButton?: boolean
+}) {
   const diff = useFileDiff(repoPath, target)
   const showDiff = useAppStore((s) => s.showDiff)
   const openBlame = useAppStore((s) => s.openBlame)
+  const openFileHistory = useAppStore((s) => s.openFileHistory)
   const mode = useUiStore((s) => s.diffMode)
   const setMode = useUiStore((s) => s.setDiffMode)
   const contents = useFileContents(repoPath, target, mode === 'split')
@@ -72,9 +84,18 @@ export function DiffView({ repoPath, target }: { repoPath: string; target: DiffT
             Blame
           </button>
         )}
+        {showHistoryButton && target.kind !== 'untracked' && (
+          <button
+            className="rounded border border-border px-2 py-0.5 text-xs hover:bg-panel-2"
+            title="Show every commit that changed this file"
+            onClick={() => openFileHistory(target.path)}
+          >
+            History
+          </button>
+        )}
         <button
           className="rounded border border-border px-2 py-0.5 text-xs hover:bg-panel-2"
-          onClick={() => showDiff(null)}
+          onClick={() => (onClose ? onClose() : showDiff(null))}
         >
           Close
         </button>

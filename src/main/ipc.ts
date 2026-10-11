@@ -45,6 +45,7 @@ import type { RecentRepositoryStore } from './recent'
 import type { UndoJournal } from './undo'
 import { RepoHealth } from './repo-health'
 import { writeCommitGraph } from '@git-core/maintenance'
+import { getFileHistory } from '@git-core/file-history'
 import { getOperation } from '@git-core/status'
 import { resolveRepoPath } from '@git-core/paths'
 import { headSnapshot, readRef, type HeadSnapshot, type UndoStep } from '@git-core/undo'
@@ -201,6 +202,7 @@ export function registerIpc(ctx: IpcContext): void {
     'log:search': ({ repoPath, query }) => searchCommits(requireOpened(repoPath), query),
     'commit:details': ({ repoPath, sha }) => getCommitDetails(requireOpened(repoPath), sha),
     'status:get': ({ repoPath }) => health.timeStatus(requireOpened(repoPath), () => getStatus(repoPath)),
+    'file:history': ({ repoPath, path, skip }) => getFileHistory(requireOpened(repoPath), path, { skip, limit: 500 }),
     'repo:health': async ({ repoPath }) => ({ suggestCommitGraph: await health.suggestCommitGraph(requireOpened(repoPath)) }),
     'repo:write-commit-graph': async ({ repoPath }) => {
       await writeCommitGraph(requireOpened(repoPath))

@@ -350,6 +350,22 @@ export interface RepoRef {
   webUrl: string
 }
 
+/** One commit in a file's history (renames followed). */
+export interface FileHistoryEntry {
+  commit: CommitSummary
+  /** How the commit changed the file: Added, Modified, Deleted, Renamed, Copied, Type change. */
+  status: 'A' | 'M' | 'D' | 'R' | 'C' | 'T' | 'U' | 'X'
+  /** The file's path in this commit. */
+  path: string
+  /** Previous path when this commit renamed or copied the file. */
+  oldPath?: string
+}
+
+export interface FileHistoryPage {
+  entries: FileHistoryEntry[]
+  hasMore: boolean
+}
+
 /** A repository the signed-in user can access on a hosting service (for cloning). */
 export interface HostedRepository {
   kind: ProviderKind

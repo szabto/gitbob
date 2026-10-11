@@ -9,6 +9,7 @@ export const IPC_CHANNELS = [
   'repo:init',
   'repo:refs',
   'repo:health',
+  'file:history',
   'repo:write-commit-graph',
   'repo:head',
   'log:page',

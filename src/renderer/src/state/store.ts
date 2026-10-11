@@ -22,6 +22,9 @@ interface AppState {
   /** Active graph filter (branch/author/path); null shows everything. */
   historyFilter: HistoryFilter | null
   setHistoryFilter: (filter: HistoryFilter | null) => void
+  /** File whose history is shown (replaces the graph). */
+  fileHistory: string | null
+  openFileHistory: (path: string | null) => void
   /** File shown in the blame view (replaces the graph). */
   blame: { path: string; rev?: string } | null
   openBlame: (blame: { path: string; rev?: string } | null) => void
@@ -50,6 +53,7 @@ const RESET = {
   selectedStash: null,
   conflictPath: null,
   blame: null,
+  fileHistory: null,
   rebaseBase: null,
   historyFilter: null,
   prNumber: null,
@@ -65,14 +69,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedStash: null,
   conflictPath: null,
   prNumber: null,
-  openPr: (prNumber) => set({ prNumber, diffTarget: null, blame: null, conflictPath: null }),
+  openPr: (prNumber) => set({ prNumber, diffTarget: null, blame: null, conflictPath: null, fileHistory: null }),
+  fileHistory: null,
+  openFileHistory: (fileHistory) => set({ fileHistory, diffTarget: null, blame: null, conflictPath: null }),
   historyFilter: null,
   setHistoryFilter: (historyFilter) => set({ historyFilter, selectedSha: null }),
   blame: null,
-  openBlame: (blame) => set({ blame, diffTarget: null, conflictPath: null }),
+  openBlame: (blame) => set({ blame, diffTarget: null, conflictPath: null, fileHistory: null }),
   rebaseBase: null,
   openRebase: (rebaseBase) => set({ rebaseBase }),
-  openConflict: (conflictPath) => set({ conflictPath, diffTarget: null, blame: null }),
+  openConflict: (conflictPath) => set({ conflictPath, diffTarget: null, blame: null, fileHistory: null }),
   setRepo: (repo) => {
     if (!repo) {
       // "Close": close the active tab.
@@ -101,7 +107,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   select: (sha) => set({ selectedSha: sha, wipSelected: false, diffTarget: null, selectedStash: null }),
   selectWip: () => set({ selectedSha: null, wipSelected: true, diffTarget: null, selectedStash: null }),
   selectStash: (stash) => set({ selectedStash: stash, selectedSha: null, wipSelected: false, diffTarget: null }),
-  reveal: (sha) => set({ selectedSha: sha, wipSelected: false, revealSha: sha, diffTarget: null, selectedStash: null }),
+  reveal: (sha) => set({ selectedSha: sha, wipSelected: false, revealSha: sha, diffTarget: null, selectedStash: null, fileHistory: null, blame: null }),
   clearReveal: () => set({ revealSha: null }),
-  showDiff: (target) => set({ diffTarget: target, conflictPath: null, blame: null }),
+  showDiff: (target) => set({ diffTarget: target, conflictPath: null, blame: null, fileHistory: null }),
 }))

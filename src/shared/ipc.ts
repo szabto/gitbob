@@ -72,6 +72,7 @@ export const ipcInputSchemas = {
   'repo:init': z.object({}).strict(),
   'repo:refs': z.object({ repoPath: absolutePath }),
   'repo:health': z.object({ repoPath: absolutePath }),
+  'file:history': z.object({ repoPath: absolutePath, path: z.string().min(1).max(4096), skip: z.number().int().min(0).max(10_000_000).default(0) }),
   'repo:write-commit-graph': z.object({ repoPath: absolutePath }),
   'repo:head': z.object({ repoPath: absolutePath }),
   'log:page': z.object({

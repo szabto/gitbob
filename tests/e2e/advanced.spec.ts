@@ -102,3 +102,45 @@ test('adds a worktree in a chosen folder and lists it', async () => {
     await app.close()
   }
 })
+
+test('file history follows renames and shows each commit’s change', async () => {
+  const repo = createFixtureRepo()
+  const body = 'line one\nline two\nline three\nline four\nline five\n'
+  repo.commit('add settings', { 'old-name.txt': body, 'other.txt': 'x' })
+  repo.commit('unrelated change', { 'other.txt': 'y' })
+  repo.git(['mv', 'old-name.txt', 'settings.txt'])
+  repo.commit('rename settings')
+  repo.commit('tune settings', { 'settings.txt': body.replace('line two', 'line TWO') })
+  const { app, page } = await launch(repo.dir)
+  try {
+    await row(page, 'tune settings').click()
+    await page.locator('[data-testid="details-file"][data-path="settings.txt"]').click()
+    await page.getByTestId('diff-view').getByRole('button', { name: 'History' }).click()
+
+    const view = page.getByTestId('file-history')
+    const entries = view.getByTestId('file-history-entry')
+    await expect(entries).toHaveCount(3)
+    await expect(entries.nth(0)).toContainText('tune settings')
+    await expect(entries.nth(1)).toContainText('Renamed from old-name.txt')
+    await expect(entries.nth(2)).toContainText('Added')
+    await expect(view.getByTestId('file-history-count')).toHaveText('3 commits')
+    await expect(view.getByTestId('diff-table')).toContainText('line TWO')
+
+    // The oldest entry shows the file as added under its old name.
+    await entries.nth(2).click()
+    await expect(view.getByTestId('diff-path')).toHaveText('old-name.txt')
+    await expect(view.locator('[data-line-type="add"]')).toHaveCount(5)
+
+    // Double-click jumps to the commit in the graph.
+    await entries.nth(1).dblclick()
+    await expect(page.getByTestId('file-history')).toHaveCount(0)
+    await expect(page.getByTestId('details-subject')).toHaveText('rename settings')
+
+    // Also reachable from a file's context menu in the commit details.
+    await page.locator('[data-testid="details-file"][data-path="settings.txt"]').click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'File history' }).click()
+    await expect(page.getByTestId('file-history-entry')).toHaveCount(3)
+  } finally {
+    await app.close()
+  }
+})

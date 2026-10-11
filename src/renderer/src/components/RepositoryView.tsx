@@ -16,6 +16,7 @@ import { useRemotes, useStashes, useUndoState } from '../lib/queries'
 import { StashPanel } from './StashPanel'
 import { OperationBanner } from './OperationBanner'
 import { SpeedUpBanner } from './SpeedUpBanner'
+import { FileHistoryView } from './FileHistoryView'
 import { BlameView } from './BlameView'
 import { PullRequestView } from './PullRequestView'
 import { RebaseDialog } from './RebaseDialog'
@@ -45,6 +46,7 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
   const diffTarget = useAppStore((s) => s.diffTarget)
   const conflictPath = useAppStore((s) => s.conflictPath)
   const blame = useAppStore((s) => s.blame)
+  const fileHistory = useAppStore((s) => s.fileHistory)
   const prNumber = useAppStore((s) => s.prNumber)
   const rebaseBase = useAppStore((s) => s.rebaseBase)
   const openRebase = useAppStore((s) => s.openRebase)
@@ -226,6 +228,8 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
           <SpeedUpBanner repoPath={repo.root} historyLoaded={!!history.data} />
           {prNumber && provider.data?.repo && !diffTarget ? (
             <PullRequestView repoPath={repo.root} number={prNumber} providerName={PROVIDER_NAMES[provider.data.repo.kind]} />
+          ) : fileHistory ? (
+            <FileHistoryView key={fileHistory} repoPath={repo.root} path={fileHistory} />
           ) : blame ? (
             <BlameView repoPath={repo.root} path={blame.path} {...(blame.rev ? { rev: blame.rev } : {})} />
           ) : conflictPath ? (
