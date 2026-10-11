@@ -381,7 +381,9 @@ test('GitKraken-style menus: edit, move and drop commits, fast-forward, compare,
 
     // Delete a branch on the server (confirmed natively).
     await menu(page.locator('[data-testid="ref-item"][data-ref="refs/remotes/origin/old-remote"]'), 'Delete origin/old-remote…')
-    await expect.poll(() => server.git(['branch', '--list', 'old-remote'])).toBe('')
+    // A push to the server: allow for slow CI machines, and surface GitBob's error if it fails.
+    await expect(page.getByTestId('notice').or(page.getByTestId('error-message'))).toContainText('Deleted origin/old-remote', { timeout: 60_000 })
+    expect(server.git(['branch', '--list', 'old-remote'])).toBe('')
   } finally {
     await app.close()
   }
