@@ -11,9 +11,10 @@ export function ContextMenu() {
   useLayoutEffect(() => {
     if (!menu || !ref.current) return
     const r = ref.current.getBoundingClientRect()
+    // Long menus are capped to the window (and scroll); never pushed above the top edge.
     setPos({
-      x: Math.min(menu.x, window.innerWidth - r.width - 4),
-      y: Math.min(menu.y, window.innerHeight - r.height - 4),
+      x: Math.max(4, Math.min(menu.x, window.innerWidth - r.width - 4)),
+      y: Math.max(4, Math.min(menu.y, window.innerHeight - r.height - 4)),
     })
   }, [menu])
 
@@ -39,8 +40,8 @@ export function ContextMenu() {
       ref={ref}
       role="menu"
       data-testid="context-menu"
-      className="fixed z-50 min-w-48 rounded-md border border-border bg-panel-2 py-1 shadow-xl shadow-black/50"
-      style={{ left: pos?.x ?? menu.x, top: pos?.y ?? menu.y }}
+      className="fixed z-50 min-w-48 overflow-y-auto rounded-md border border-border bg-panel-2 py-1 shadow-xl shadow-black/50"
+      style={{ left: pos?.x ?? menu.x, top: pos?.y ?? menu.y, maxHeight: 'calc(100vh - 8px)' }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {menu.items.map((item, i) =>

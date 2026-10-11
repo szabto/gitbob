@@ -421,3 +421,25 @@ test('profiles: own settings, open repositories and Git identity; switching rest
     await app.close()
   }
 })
+
+test('long context menus fit in a small window and scroll', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1\n' })
+  repo.branch('other')
+  repo.commit('second', { 'a.txt': '2\n' })
+  const { app, page } = await launch(repo.dir)
+  try {
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1000, 420))
+    await page.locator('[data-testid="ref-item"][data-ref="refs/heads/other"]').click({ button: 'right' })
+    const menu = page.getByTestId('context-menu')
+    const box = (await menu.boundingBox())!
+    const height = await page.evaluate(() => window.innerHeight)
+    expect(box.y).toBeGreaterThanOrEqual(0)
+    expect(box.y + box.height).toBeLessThanOrEqual(height)
+    // The last item is reachable (scrolled into view on click).
+    await page.getByRole('menuitem', { name: 'Create annotated tag here…' }).click()
+    await expect(page.getByLabel('Tag name')).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
