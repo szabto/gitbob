@@ -1,7 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { DiffTarget, RepositoryInfo, StatusEntry } from '@shared/types'
 import { call } from '../lib/api'
-import { useRepoMutation, useStatus } from '../lib/queries'
+import { useHistory, useRepoMutation, useStatus } from '../lib/queries'
+import {
+  addCoAuthor,
+  applyType,
+  CONVENTIONAL_TYPES,
+  currentType,
+  loadDraft,
+  recentCoAuthors,
+  saveDraft,
+  summaryHint,
+  usesConventionalCommits,
+} from '../lib/commit-message'
+import { useUiStore } from '../state/ui'
 import { groupStatus, statusBadge } from '../lib/status'
 import { useAppStore } from '../state/store'
 
@@ -103,7 +116,7 @@ export function StagingPanel({ repo, onStash }: { repo: RepositoryInfo; onStash:
         />
       </div>
 
-      <CommitComposer repoPath={repoPath} stagedCount={groups.staged.length} unborn={!status.data?.branch.oid} />
+      <CommitComposer key={repoPath} repoPath={repoPath} stagedCount={groups.staged.length} unborn={!status.data?.branch.oid} />
     </aside>
   )
 }
@@ -208,10 +221,36 @@ function FileSection({
 }
 
 function CommitComposer({ repoPath, stagedCount, unborn }: { repoPath: string; stagedCount: number; unborn: boolean }) {
-  const [summary, setSummary] = useState('')
-  const [description, setDescription] = useState('')
+  const [draft] = useState(() => loadDraft(repoPath))
+  const [summary, setSummary] = useState(draft?.summary ?? '')
+  const [description, setDescription] = useState(draft?.description ?? '')
   const [amend, setAmend] = useState(false)
   const select = useAppStore((s) => s.select)
+  const openMenu = useUiStore((s) => s.openMenu)
+
+  // The unsent message survives tab switches and restarts (amend prefill is not saved over it).
+  useEffect(() => {
+    if (!amend) saveDraft(repoPath, { summary, description })
+  }, [repoPath, summary, description, amend])
+
+  // A configured commit.template fills an empty message once.
+  const template = useQuery({ queryKey: ['commit-template', repoPath], queryFn: () => call('commit:template', { repoPath }), staleTime: Infinity })
+  const [templateUsed, setTemplateUsed] = useState(!!draft)
+  if (!templateUsed && template.data !== undefined) {
+    setTemplateUsed(true)
+    if (template.data && !summary && !description) {
+      const [first = '', ...rest] = template.data.split('\n')
+      setSummary(first)
+      setDescription(rest.join('\n').replace(/^\n+/, ''))
+    }
+  }
+
+  const history = useHistory(repoPath)
+  const identity = useQuery({ queryKey: ['git-identity'], queryFn: () => call('app:git-identity', {}) })
+  const recent = useMemo(() => history.data?.pages[0]?.commits.slice(0, 300) ?? [], [history.data])
+  const conventional = useMemo(() => usesConventionalCommits(recent.map((c) => c.subject)), [recent])
+  const coAuthors = useMemo(() => recentCoAuthors(recent, identity.data ?? null), [recent, identity.data])
+  const hint = summaryHint(summary)
 
   const commit = useRepoMutation(repoPath, (vars: { message: string; amend: boolean }) =>
     call('commit:create', { repoPath, ...vars }),
@@ -241,6 +280,7 @@ function CommitComposer({ repoPath, stagedCount, unborn }: { repoPath: string; s
           setSummary('')
           setDescription('')
           setAmend(false)
+          saveDraft(repoPath, { summary: '', description: '' })
           // Show the new commit; the WIP row remains if there are still uncommitted changes.
           select(res.sha)
         },
@@ -283,10 +323,51 @@ function CommitComposer({ repoPath, stagedCount, unborn }: { repoPath: string; s
         />
         <span
           className={`absolute top-1.5 right-2 text-xs ${summary.length > 72 ? 'text-warn' : 'text-muted'}`}
+          title="Characters in the summary; aim for 50, keep it under 72"
         >
           {summary.length}
         </span>
       </div>
+      {hint && (
+        <p className="mt-1 text-xs text-warn" data-testid="summary-hint">
+          {hint}
+        </p>
+      )}
+      {(conventional || coAuthors.length > 0) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs">
+          {conventional && (
+            <select
+              aria-label="Commit type"
+              value={currentType(summary) ?? ''}
+              onChange={(e) => e.target.value && setSummary(applyType(summary, e.target.value))}
+              className="rounded border border-border bg-bg px-1 py-0.5"
+              title="This repository uses Conventional Commits"
+            >
+              <option value="">type…</option>
+              {CONVENTIONAL_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          )}
+          {coAuthors.length > 0 && (
+            <button
+              type="button"
+              className="ml-auto rounded border border-border px-1.5 py-0.5 text-muted hover:bg-panel-2 hover:text-fg"
+              onClick={(e) =>
+                openMenu(
+                  e.clientX,
+                  e.clientY,
+                  coAuthors.map((p) => ({ label: `${p.name} <${p.email}>`, onSelect: () => setDescription((d) => addCoAuthor(d, p)) })),
+                )
+              }
+            >
+              Add co-author…
+            </button>
+          )}
+        </div>
+      )}
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}

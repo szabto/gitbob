@@ -51,6 +51,8 @@ export interface IpcOutputs {
   'repo:health': { suggestCommitGraph: boolean }
   'repo:write-commit-graph': void
   'file:history': FileHistoryPage
+  /** commit.template contents without comment lines, or null. */
+  'commit:template': string | null
   'branch:merge': { fastForward: boolean; upToDate: boolean }
   /** done: false if the user declined the confirmation. */
   'branch:rebase': { done: boolean }

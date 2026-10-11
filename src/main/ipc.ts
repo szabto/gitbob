@@ -18,7 +18,7 @@ import { getFileContents } from '@git-core/contents'
 import { applyHunks } from '@git-core/patch'
 import { describeConflict, getConflictVersions, resolveConflictWith, saveConflictResolution } from '@git-core/conflicts'
 import { getLfsStatus, installLfs, pullLfs, trackPattern, untrackPattern } from '@git-core/lfs'
-import { createCommit, getLastCommitMessage } from '@git-core/commit'
+import { createCommit, getCommitTemplate, getLastCommitMessage } from '@git-core/commit'
 import {
   checkoutDetached,
   checkoutRef,
@@ -297,6 +297,7 @@ export function registerIpc(ctx: IpcContext): void {
         (before, after) => branchMove(before, after, 'soft'),
       ),
     'commit:last-message': ({ repoPath }) => getLastCommitMessage(requireOpened(repoPath)),
+    'commit:template': ({ repoPath }) => getCommitTemplate(requireOpened(repoPath)),
     'branch:create': ({ repoPath, name, startPoint, checkout }) =>
       journaled(
         requireOpened(repoPath),

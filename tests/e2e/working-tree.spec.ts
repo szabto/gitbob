@@ -176,3 +176,60 @@ test('amend prefills the previous message and rewrites HEAD', async () => {
     await app.close()
   }
 })
+
+test('commit helpers: Conventional Commits type, co-authors, hints, and a draft that survives tab switches', async () => {
+  const repo = createFixtureRepo()
+  const subjects = ['feat: login form', 'fix(auth): token refresh', 'docs: readme', 'chore: deps', 'test: login', 'refactor: api client', 'feat(ui): dark mode', 'ci: cache', 'perf: graph', 'build: vite 7', 'fix: typo']
+  subjects.forEach((s, i) =>
+    repo.git(['commit', '--allow-empty', '-q', '-m', s], i % 3 === 0 ? { GIT_AUTHOR_NAME: 'Ann Lee', GIT_AUTHOR_EMAIL: 'ann@example.com' } : {}),
+  )
+  repo.write('a.txt', 'changed\n')
+  repo.git(['add', 'a.txt'])
+  const { app, page } = await launch(repo.dir)
+  try {
+    await page.getByTestId('wip-row').click()
+    const summary = page.getByLabel('Commit summary')
+    await summary.fill('handle expired sessions.')
+    await expect(page.getByTestId('summary-hint')).toContainText('period')
+    await summary.fill('handle expired sessions')
+    await expect(page.getByTestId('summary-hint')).toHaveCount(0)
+
+    await page.getByLabel('Commit type').selectOption('fix')
+    await expect(summary).toHaveValue('fix: handle expired sessions')
+    await page.getByLabel('Commit type').selectOption('feat')
+    await expect(summary).toHaveValue('feat: handle expired sessions')
+
+    await page.getByLabel('Commit description').fill('Sessions now renew quietly.')
+    await page.getByRole('button', { name: 'Add co-author…' }).click()
+    await page.getByRole('menuitem', { name: 'Ann Lee <ann@example.com>' }).click()
+    await expect(page.getByLabel('Commit description')).toHaveValue('Sessions now renew quietly.\n\nCo-authored-by: Ann Lee <ann@example.com>')
+
+    // Leave the repository and come back: the draft is still there.
+    await page.getByRole('button', { name: 'New tab' }).click()
+    await page.getByTestId('repo-tab').first().click()
+    await page.getByTestId('wip-row').click()
+    await expect(page.getByLabel('Commit summary')).toHaveValue('feat: handle expired sessions')
+
+    await page.getByRole('button', { name: 'Commit 1 file' }).click()
+    await expect(page.getByTestId('details-subject')).toHaveText('feat: handle expired sessions')
+    expect(repo.git(['log', '-1', '--format=%B'])).toBe('feat: handle expired sessions\n\nSessions now renew quietly.\n\nCo-authored-by: Ann Lee <ann@example.com>')
+  } finally {
+    await app.close()
+  }
+})
+
+test('a configured commit.template prefills the message', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1\n' })
+  repo.write('.gitmessage', 'Summary here\n\n# Explain why, not what.\nWhy:\n')
+  repo.git(['config', 'commit.template', '.gitmessage'])
+  repo.write('a.txt', '2\n')
+  const { app, page } = await launch(repo.dir)
+  try {
+    await page.getByTestId('wip-row').click()
+    await expect(page.getByLabel('Commit summary')).toHaveValue('Summary here')
+    await expect(page.getByLabel('Commit description')).toHaveValue('Why:')
+  } finally {
+    await app.close()
+  }
+})

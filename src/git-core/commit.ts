@@ -1,4 +1,6 @@
 import type { CommitResult } from '@shared/types'
+import { readFile, stat } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { GitError } from './errors'
 import { runGit } from './runner'
 
@@ -44,4 +46,30 @@ export async function getLastCommitMessage(repoPath: string): Promise<string | n
   if (rev.exitCode !== 0) return null
   const r = await runGit(['log', '-1', '--format=%B', rev.stdout.trim(), '--'], { cwd: repoPath })
   return r.stdout.replace(/\s+$/, '')
+}
+
+const MAX_TEMPLATE_BYTES = 64 * 1024
+
+/**
+ * The message template configured with `commit.template` (git's `--path` expansion, relative paths
+ * resolved against the repository), with `#` comment lines removed. Null when none is set or it
+ * can't be read.
+ */
+export async function getCommitTemplate(repoPath: string): Promise<string | null> {
+  const r = await runGit(['config', '--path', '--get', 'commit.template'], { cwd: repoPath, okExitCodes: [0, 1] })
+  const configured = r.stdout.trim()
+  if (r.exitCode !== 0 || !configured) return null
+  try {
+    const file = resolve(repoPath, configured)
+    const st = await stat(file)
+    if (!st.isFile() || st.size > MAX_TEMPLATE_BYTES) return null
+    const text = (await readFile(file, 'utf8'))
+      .split(/\r?\n/)
+      .filter((l) => !l.startsWith('#'))
+      .join('\n')
+      .replace(/\s+$/, '')
+    return text || null
+  } catch {
+    return null
+  }
 }
