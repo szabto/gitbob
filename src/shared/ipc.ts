@@ -100,6 +100,7 @@ export const ipcInputSchemas = {
       .optional(),
     hidden: z.array(fullRefName).max(1000).optional(),
   }),
+  'log:count': z.object({ repoPath: absolutePath, hidden: z.array(fullRefName).max(1000).optional() }),
   'commit:details': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'log:search': z.object({ repoPath: absolutePath, query: z.string().trim().min(1).max(200) }),
   'status:get': z.object({ repoPath: absolutePath }),
@@ -233,6 +234,7 @@ export const ipcInputSchemas = {
         autoCheckUpdates: z.boolean().optional(),
         githubClientId: z.string().regex(/^[A-Za-z0-9._-]{8,64}$/).nullable().optional(),
         avatars: z.enum(['off', 'hosting', 'gravatar']).optional(),
+        zoom: z.number().min(0.5).max(2).optional(),
       })
       .strict(),
   }),

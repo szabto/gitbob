@@ -55,7 +55,8 @@ test('real repository: open, scroll the whole history, memory', async () => {
         el.scrollTop = el.scrollHeight
       })
       const text = (await count.textContent()) ?? ''
-      if (Number(text.replace(/\D/g, '')) >= total && !/\+/.test(text)) break
+      // "2,000 of 191,887 commits" while loading; "191887 commits" once everything is in.
+      if (!/ of |\+/.test(text) && Number(text.replace(/\D/g, '')) >= total) break
       if (Date.now() - t1 > 600_000) throw new Error(`still loading: ${text}`)
       await page.waitForTimeout(100)
     }

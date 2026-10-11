@@ -22,6 +22,7 @@ export const IPC_CHANNELS = [
   'repo:write-commit-graph',
   'repo:head',
   'log:page',
+  'log:count',
   'log:search',
   'commit:details',
   'status:get',

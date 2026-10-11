@@ -312,3 +312,38 @@ test('toolbar: repository and branch pickers, Stash / Pop, Search and Actions', 
     await app.close()
   }
 })
+
+test('status bar: last message, zoom that is remembered, version, and the real commit count', async () => {
+  const repo = createFixtureRepo()
+  for (let i = 0; i < 5; i++) repo.commit(`c${i}`, { 'a.txt': String(i) })
+  const userData = makeTempDir('gitbob-ud-')
+  const { app, page } = await launch(repo.dir, userData)
+  try {
+    const bar = page.getByTestId('status-bar')
+    await expect(bar.getByTestId('app-version')).toContainText('GitBob ')
+    await expect(bar.getByTestId('zoom-level')).toHaveText('100%')
+    await bar.getByRole('button', { name: 'Zoom in' }).click()
+    await expect(bar.getByTestId('zoom-level')).toHaveText('110%')
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor())).toBeCloseTo(1.1)
+    await bar.getByRole('button', { name: 'Zoom 110%, reset' }).click()
+    await expect(bar.getByTestId('zoom-level')).toHaveText('100%')
+    await bar.getByRole('button', { name: 'Zoom out' }).click()
+    await expect(bar.getByTestId('zoom-level')).toHaveText('90%')
+
+    // Notices stay readable in the status bar after the banner is dismissed.
+    await page.getByRole('button', { name: 'Branch', exact: true }).click()
+    await page.getByLabel('Branch name').fill('topic')
+    await page.getByRole('button', { name: 'Create' }).click()
+    await expect(page.getByTestId('head-label')).toHaveText('topic')
+  } finally {
+    await app.close()
+  }
+  // Zoom is remembered.
+  const again = await launch(repo.dir, userData)
+  try {
+    await expect(again.page.getByTestId('zoom-level')).toHaveText('90%')
+    await expect.poll(() => again.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor())).toBeCloseTo(0.9)
+  } finally {
+    await again.app.close()
+  }
+})

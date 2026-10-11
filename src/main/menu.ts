@@ -1,6 +1,7 @@
 import { app, Menu, type BrowserWindow, type MenuItemConstructorOptions } from 'electron'
 
 export interface MenuOptions {
+  onZoom: (action: 'in' | 'out' | 'reset') => void
   onSettings: () => void
   theme: 'system' | 'light' | 'dark'
   onThemeChange: (theme: 'system' | 'light' | 'dark') => void
@@ -51,9 +52,10 @@ export function buildMenu(getWindow: () => BrowserWindow | null, opts: MenuOptio
         { role: 'reload' },
         { role: 'toggleDevTools' },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        { label: 'Actual Size', accelerator: 'CmdOrCtrl+0', click: () => opts.onZoom('reset') },
+        { label: 'Zoom In', accelerator: 'CmdOrCtrl+Plus', click: () => opts.onZoom('in') },
+        { label: 'Zoom In', accelerator: 'CmdOrCtrl+=', visible: false, acceleratorWorksWhenHidden: true, click: () => opts.onZoom('in') },
+        { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => opts.onZoom('out') },
         { type: 'separator' },
         { role: 'togglefullscreen' },
         { type: 'separator' },

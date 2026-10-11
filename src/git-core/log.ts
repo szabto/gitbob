@@ -324,3 +324,12 @@ export async function getCommitPage(repoPath: string, opts: LogPageOptions): Pro
   )
   return trimPage(parseLog(stdout), opts.limit)
 }
+
+/** Total commits the unfiltered graph would show (same revisions as getCommitPage, hidden refs excluded). */
+export async function countCommits(repoPath: string, hidden: readonly string[] = []): Promise<number> {
+  const head = await getHead(repoPath)
+  const revs = refGroups(hidden)
+  if (!head.unborn) revs.push('HEAD')
+  const r = await runGit(['rev-list', '--count', ...revs, '--'], { cwd: repoPath, timeoutMs: 120_000, okExitCodes: [0, 128] })
+  return r.exitCode === 0 ? Number(r.stdout.trim()) || 0 : 0
+}

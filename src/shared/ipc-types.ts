@@ -67,6 +67,7 @@ export interface IpcOutputs {
   'branch:rebase': { done: boolean }
   'repo:head': HeadState
   'log:page': CommitPage
+  'log:count': number
   'log:search': { shas: string[]; truncated: boolean }
   'commit:details': CommitDetails
   'status:get': WorkingTreeStatus

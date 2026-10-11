@@ -8,6 +8,7 @@ import { RepositoryView } from './components/RepositoryView'
 import { ErrorBanner } from './components/ErrorBanner'
 import { ContextMenu, PromptDialog } from './components/Overlays'
 import { CloneDialog } from './components/CloneDialog'
+import { StatusBar } from './components/StatusBar'
 import { CredentialDialog } from './components/CredentialDialog'
 import { TabBar } from './components/TabBar'
 import { CommandHost } from './components/CommandHost'
@@ -163,6 +164,7 @@ export function App() {
       ) : (
         <Welcome onPick={pickRepository} onOpenPath={openPath} onClone={cloneRepository} onInit={initRepository} />
       )}
+      <StatusBar />
       <CommandHost repo={repo} app={commandApp} />
       <ContextMenu />
       <PromptDialog />

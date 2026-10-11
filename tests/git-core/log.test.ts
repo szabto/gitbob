@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { clearLogCache, getCommitPage, LOG_FORMAT, parseLog } from '@git-core/log'
+import { clearLogCache, countCommits, getCommitPage, LOG_FORMAT, parseLog } from '@git-core/log'
 import { runGit } from '@git-core/runner'
 import type { CommitSummary } from '@shared/types'
 import { cleanupFixtures, cloneFixtureRepo, createFixtureRepo } from '../helpers/fixture'
@@ -620,5 +620,21 @@ describe('hidden branches', () => {
     // Hiding the checked-out branch keeps it visible through HEAD; malformed entries are ignored.
     const headHidden = await getCommitPage(repo.dir, { skip: 0, limit: 100, hidden: ['refs/heads/main', 'refs/heads/*', '--all'] })
     expect(headHidden.commits.map((c) => c.sha)).toEqual(expect.arrayContaining([main, side, base]))
+  })
+})
+
+describe('countCommits', () => {
+  it('counts what the graph shows, excluding hidden refs', async () => {
+    const repo = createFixtureRepo()
+    repo.commit('base', { 'a.txt': '1' })
+    repo.branch('side')
+    repo.checkout('side')
+    repo.commit('s1', { 's.txt': '1' })
+    repo.commit('s2', { 's.txt': '2' })
+    repo.checkout('main')
+    repo.commit('m1', { 'm.txt': '1' })
+    expect(await countCommits(repo.dir)).toBe(4)
+    expect(await countCommits(repo.dir, ['refs/heads/side'])).toBe(2)
+    expect(await countCommits(createFixtureRepo().dir)).toBe(0)
   })
 })

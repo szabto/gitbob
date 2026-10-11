@@ -25,6 +25,17 @@ export function useHistory(repoPath: string, filter: HistoryFilter | null = null
   })
 }
 
+/** Total commits in the (unfiltered) graph, for "2,000 of 191,887 commits". */
+export function useCommitCount(repoPath: string, enabled: boolean) {
+  const hidden = useHiddenRefs(repoPath)
+  return useQuery({
+    queryKey: ['log', repoPath, 'count', hidden],
+    queryFn: () => call('log:count', { repoPath, ...(hidden.length ? { hidden } : {}) }),
+    enabled,
+    staleTime: 30_000,
+  })
+}
+
 export function useCommitDetails(repoPath: string, sha: string | null) {
   return useQuery({
     queryKey: ['commit', repoPath, sha],

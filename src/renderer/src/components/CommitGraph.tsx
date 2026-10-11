@@ -10,7 +10,7 @@ import { ResizeHandle } from './ResizeHandle'
 import { buildRefLabels, type RefLabel } from '../lib/ref-labels'
 import { clampWidth, useGraphColumns, type GraphColumns } from '../lib/graph-columns'
 import { initials, nameHue, useAvatarSource, useEmailAvatar, type AvatarSource } from '../lib/avatars'
-import { useRemotes } from '../lib/queries'
+import { useCommitCount, useRemotes } from '../lib/queries'
 import { useUiStore } from '../state/ui'
 import type { GraphRow } from '@git-graph/layout'
 import type { RemoteInfo } from '@shared/types'
@@ -64,6 +64,8 @@ export function CommitGraph({
   const avatarSource = useAvatarSource(repoPath)
   const labelsBySha = useMemo(() => buildRefLabels(allRefs, currentRef), [allRefs, currentRef])
   const openMenu = useUiStore((s) => s.openMenu)
+  const historyFilter = useAppStore((s) => s.historyFilter)
+  const total = useCommitCount(repoPath, hasMore && !historyFilter)
   const resizer = (key: 'refs' | 'author' | 'date' | 'sha', sign: 1 | -1) => ({
     onStart: () => {
       resizeStart.current = cols
@@ -252,8 +254,7 @@ export function CommitGraph({
       </div>
       <div className="flex h-6 shrink-0 items-center border-t border-border bg-panel px-3 text-xs text-muted">
         <span data-testid="commit-count">
-          {commits.length} commit{commits.length === 1 ? '' : 's'}
-          {hasMore ? '+' : ''}
+          {hasMore && total.data ? `${commits.length.toLocaleString('en-US')} of ${total.data.toLocaleString('en-US')} commits` : `${commits.length} commit${commits.length === 1 ? '' : 's'}${hasMore ? '+' : ''}`}
         </span>
       </div>
     </div>

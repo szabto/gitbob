@@ -17,6 +17,8 @@ export interface Settings {
   githubClientId: string | null
   /** Commit author avatars: none (initials), from the repository's hosting service, or also Gravatar. */
   avatars: 'off' | 'hosting' | 'gravatar'
+  /** Interface zoom factor (0.5–2). */
+  zoom: number
 }
 
 const DEFAULTS: Settings = {
@@ -27,6 +29,7 @@ const DEFAULTS: Settings = {
   autoCheckUpdates: false,
   githubClientId: null,
   avatars: 'hosting',
+  zoom: 1,
 }
 
 /** Small JSON settings file in userData. Unknown or invalid values fall back to defaults. */
@@ -52,6 +55,7 @@ export class SettingsStore {
         )
       }
       if (typeof raw.autoCheckUpdates === 'boolean') this.data.autoCheckUpdates = raw.autoCheckUpdates
+      if (typeof raw.zoom === 'number' && raw.zoom >= 0.5 && raw.zoom <= 2) this.data.zoom = raw.zoom
       if (raw.avatars === 'off' || raw.avatars === 'hosting' || raw.avatars === 'gravatar') this.data.avatars = raw.avatars
       if (typeof raw.githubClientId === 'string' && /^[A-Za-z0-9._-]{8,64}$/.test(raw.githubClientId)) this.data.githubClientId = raw.githubClientId
     } catch {

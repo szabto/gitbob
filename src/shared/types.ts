@@ -459,6 +459,8 @@ export interface AppSettings {
   githubClientId: string | null
   /** Commit author avatars: initials only, from the hosting service (GitHub), or also Gravatar. */
   avatars: 'off' | 'hosting' | 'gravatar'
+  /** Interface zoom factor (0.5–2). */
+  zoom: number
 }
 
 export interface AppInfo {

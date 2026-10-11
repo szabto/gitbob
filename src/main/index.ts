@@ -12,6 +12,7 @@ import { ProviderService } from './providers'
 import { validateGitPath } from './app-info'
 import { UndoJournal } from './undo'
 import { AvatarService } from './avatars'
+import { nextZoom } from './zoom'
 import { Updater } from './updater'
 import { setGitBinary } from '@git-core/runner'
 import type { AppSettings } from '@shared/types'
@@ -137,6 +138,7 @@ void app.whenReady().then(async () => {
       }
     }
     await settings.update(patch)
+    if (patch.zoom !== undefined) for (const w of BrowserWindow.getAllWindows()) w.webContents.setZoomFactor(patch.zoom)
     if (patch.theme) {
       nativeTheme.themeSource = patch.theme
       for (const w of BrowserWindow.getAllWindows()) w.webContents.send('theme:changed', { theme: patch.theme })
@@ -178,11 +180,18 @@ void app.whenReady().then(async () => {
     buildMenu(() => mainWindow, {
       theme: settings.get().theme,
       onThemeChange: (theme) => void updateSettings({ theme }),
+      onZoom: (action) => void updateSettings({ zoom: nextZoom(settings.get().zoom, action) }),
       onSettings: () => mainWindow?.webContents.send('menu:settings'),
     })
   }
   rebuildMenu()
   mainWindow = createWindow()
+  const applyZoom = (win: BrowserWindow): void => {
+    win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(settings.get().zoom))
+    // Ctrl/Cmd + scroll wheel steps through the same levels and is remembered.
+    win.webContents.on('zoom-changed', (_e, dir) => void updateSettings({ zoom: nextZoom(settings.get().zoom, dir === 'in' ? 'in' : 'out') }))
+  }
+  applyZoom(mainWindow)
 
   if (settings.get().autoCheckUpdates) {
     const win = mainWindow
@@ -205,7 +214,10 @@ void app.whenReady().then(async () => {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      mainWindow = createWindow()
+      applyZoom(mainWindow)
+    }
   })
 })
 

@@ -7,7 +7,7 @@ import type { AppSettings, RepositoryInfo } from '@shared/types'
 import { GitError, toAppError } from '@git-core/errors'
 import { openRepository } from '@git-core/repository'
 import { getHead, listRefs } from '@git-core/refs'
-import { getCommitPage } from '@git-core/log'
+import { getCommitPage, countCommits } from '@git-core/log'
 import { cloneRepository, initRepository } from '@git-core/create'
 import { getCommitDetails, listCommitFiles } from '@git-core/details'
 import { searchCommits } from '@git-core/search'
@@ -206,6 +206,7 @@ export function registerIpc(ctx: IpcContext): void {
       health.timeFirstPage(requireOpened(repoPath), filter ? -1 : skip, () =>
         getCommitPage(repoPath, { skip, limit, ...(filter ? { filter } : {}), ...(hidden?.length ? { hidden } : {}) }),
       ),
+    'log:count': ({ repoPath, hidden }) => countCommits(requireOpened(repoPath), hidden ?? []),
     'log:search': ({ repoPath, query }) => searchCommits(requireOpened(repoPath), query),
     'commit:details': ({ repoPath, sha }) => getCommitDetails(requireOpened(repoPath), sha),
     'commit:all-files': ({ repoPath, sha }) => listCommitFiles(requireOpened(repoPath), sha),

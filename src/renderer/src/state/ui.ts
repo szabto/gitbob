@@ -31,6 +31,8 @@ interface UiState {
   error: ApiError | null
   /** Informational message (e.g. where a backup was saved). */
   notice: string | null
+  /** The latest notice, kept for the status bar after the banner is dismissed. */
+  lastMessage: { text: string; at: number } | null
   showNotice: (message: string | null) => void
   menu: { x: number; y: number; items: MenuEntry[] } | null
   prompt: (PromptOptions & { resolve: (value: string | null) => void }) | null
@@ -58,7 +60,8 @@ export function toApiError(err: unknown): ApiError {
 export const useUiStore = create<UiState>((set, get) => ({
   error: null,
   notice: null,
-  showNotice: (notice) => set({ notice }),
+  lastMessage: null,
+  showNotice: (notice) => set(notice ? { notice, lastMessage: { text: notice, at: Date.now() } } : { notice }),
   menu: null,
   prompt: null,
   busy: null,
