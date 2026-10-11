@@ -38,10 +38,11 @@ describe('file history', () => {
     const empty = createFixtureRepo()
     expect(await getFileHistory(empty.dir, 'a.txt')).toEqual({ entries: [], hasMore: false })
     const repo = createFixtureRepo()
-    repo.commit('base', { '-n.txt': '1', '*.txt': '2', 'b.txt': '3' })
+    // '[ab].txt' is a glob matching a.txt; it must be taken literally. (No '*': invalid on Windows.)
+    repo.commit('base', { '-n.txt': '1', '[ab].txt': '2', 'a.txt': '3' })
     expect((await getFileHistory(repo.dir, 'missing.txt')).entries).toEqual([])
     expect((await getFileHistory(repo.dir, '-n.txt')).entries).toHaveLength(1)
-    expect((await getFileHistory(repo.dir, '*.txt')).entries.map((e) => e.path)).toEqual(['*.txt'])
+    expect((await getFileHistory(repo.dir, '[ab].txt')).entries.map((e) => e.path)).toEqual(['[ab].txt'])
     await expect(getFileHistory(repo.dir, '../outside')).rejects.toThrow()
   })
 
