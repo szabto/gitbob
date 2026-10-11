@@ -237,7 +237,8 @@ test('undo and redo a commit, a new branch and a branch delete; stale history is
     await expect(page.getByTestId('head-label')).toHaveText('feature/x')
     await undo.click()
     await expect(page.getByTestId('head-label')).toHaveText('main')
-    expect(repo.git(['branch', '--list', 'feature/x'])).toBe('')
+    // Undo switches back first and deletes the branch second.
+    await expect.poll(() => repo.git(['branch', '--list', 'feature/x'])).toBe('')
 
     // Delete a branch (confirmed), undo brings it back at the same commit.
     await mockConfirm(app, 1)
