@@ -147,6 +147,10 @@ When you change files, a **// WIP** row appears at the top of the graph. Click i
 3. **Describe it.** Type a short summary (and optionally a longer description).
 4. Click **Commit**. Done. Made a typo? Tick **Amend** to change the last commit instead.
 
+GitBob keeps an unfinished message for each repository, fills in your `commit.template` if you have one, and points out summaries that are too long. In projects that use Conventional Commits a **type** picker appears, and **Add co-author…** adds a `Co-authored-by:` line for anyone who recently committed.
+
+Spotted a typo while reviewing? Click **Edit** above the diff to fix the file right there, then **Save** or **Save and stage**. If another program changed the file in the meantime, GitBob won't overwrite it.
+
 Want only part of a file in the commit? Every block of changes (a *hunk*) has its own **Stage hunk** button, and you can click individual green or red lines to select them and press **Stage 2 lines**. The same works backwards for **Unstage** and **Discard**. Prefer reading changes next to each other? Switch the diff to **Side by side** for a syntax-highlighted, two-column view.
 
 Changed your mind about a file? **Discard** throws away its unstaged edits after asking you first. Staged changes are kept, and brand-new files are moved to the Trash so you can still get them back.
@@ -219,6 +223,7 @@ Right-click any commit for the time-travel tools:
 - **Cherry-pick** copies that commit onto your current branch.
 - **Revert** adds a new commit that undoes it (safe for shared branches).
 - **Reset** moves your branch back to that commit. *Soft* keeps the changes staged, *mixed* keeps them as unstaged edits, *hard* throws them away. Before a hard reset GitBob asks you, and saves your uncommitted work as a backup stash so it can come back.
+- **Stash** parks unfinished work: **Stash…** in Working changes, or right-click a single file to stash just that one. Click a stash to see its files, **Pop** or **Apply** it, bring back one file with **Apply file**, or turn it into a new branch with **Branch…**.
 - **Create tag** marks a release, with an optional message. Push or delete tags from the sidebar.
 - **Undo / Redo** in the toolbar (⌥⌘Z / ⇧⌥⌘Z) take back the last commit, amend, checkout, branch or tag change, reset, cherry-pick, revert, pull or rebase you did in GitBob. Undo never overwrites uncommitted work, and refuses if the repository changed in the meantime.
 - **File history** (in any file's diff, or right-click a file in a commit) lists every commit that changed the file, following renames, with each commit's change.
@@ -336,7 +341,7 @@ Every screenshot in this README is the real app working on a real Git repository
     </td>
     <td width="33%" valign="top">
       <h4>🧩 Working tree</h4>
-      Status with added, modified, deleted, renamed, untracked and conflicted files · stage/unstage files, hunks or single lines · discard with confirmation (new files go to the Trash) · unified and side-by-side diffs with syntax highlighting · three-way conflict editor · keep-ours/theirs for binary and delete conflicts · staged renames shown as renames · commit · amend · merge/rebase/cherry-pick in progress indicator · live refresh
+      Status with added, modified, deleted, renamed, untracked and conflicted files · stage/unstage files, hunks or single lines · discard with confirmation (new files go to the Trash) · unified and side-by-side diffs with syntax highlighting · three-way conflict editor · edit files in place · commit templates, drafts, Conventional Commits and co-author helpers · keep-ours/theirs for binary and delete conflicts · staged renames shown as renames · commit · amend · merge/rebase/cherry-pick in progress indicator · live refresh
     </td>
     <td width="33%" valign="top">
       <h4>🌿 Branches &amp; sync</h4>
@@ -350,7 +355,7 @@ Every screenshot in this README is the real app working on a real Git repository
     </td>
     <td width="33%" valign="top">
       <h4>📦 Stash, tags &amp; LFS</h4>
-      Stash with message (untracked files included) · pop · apply · delete · see stashed files · annotated and lightweight tags · push and delete tags · Git LFS: tracked patterns, track/untrack, download missing files, set up per repository
+      Stash with message (untracked files included) · stash a single file · pop · apply · apply one file · stash to branch · delete · see stashed files · annotated and lightweight tags · push and delete tags · Git LFS: tracked patterns, track/untrack, download missing files, set up per repository
     </td>
     <td width="33%" valign="top">
       <h4>🔗 Hosting services</h4>
