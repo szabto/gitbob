@@ -111,3 +111,37 @@ describe('getLastCommitMessage', () => {
     expect(await getLastCommitMessage(repo.dir)).toBe('subject line\n\nbody line 1\nbody line 2')
   })
 })
+
+describe('createCommit with selected paths', () => {
+  it('commits only the selected files (new files included) and leaves the rest as it was', async () => {
+    const repo = createFixtureRepo()
+    repo.commit('base', { 'a.txt': '1\n', 'b.txt': '1\n', 'c.txt': '1\n' })
+    repo.write('a.txt', '2\n')
+    repo.write('b.txt', '2\n')
+    repo.git(['add', 'b.txt'])
+    repo.write('c.txt', '2\n')
+    repo.write('new file.txt', 'n\n')
+    repo.write('other-new.txt', 'o\n')
+    await createCommit(repo.dir, 'Only a and the new file', { amend: false, paths: ['a.txt', 'new file.txt'] })
+    expect(repo.git(['show', '--name-only', '--format=', 'HEAD']).split('\n').sort()).toEqual(['a.txt', 'new file.txt'])
+    // b stays staged, c unstaged, the other new file untracked.
+    expect(repo.git(['diff', '--cached', '--name-only'])).toBe('b.txt')
+    expect(repo.git(['diff', '--name-only'])).toBe('c.txt')
+    expect(repo.git(['ls-files', '--others', '--exclude-standard'])).toBe('other-new.txt')
+  })
+
+  it('leaves new files untracked when the commit fails, and rejects paths outside the repository', async () => {
+    const repo = createFixtureRepo()
+    repo.commit('base', { 'a.txt': '1\n' })
+    repo.write('fresh.txt', 'f\n')
+    repo.write('.git/hooks/pre-commit', '#!/bin/sh\nexit 1\n')
+    if (process.platform !== 'win32') {
+      repo.git(['update-index', '--chmod=+x', 'a.txt']) // no-op on content; just keeps index valid
+      const { chmodSync } = await import('node:fs')
+      chmodSync(join(repo.dir, '.git/hooks/pre-commit'), 0o755)
+      await expect(createCommit(repo.dir, 'blocked', { amend: false, paths: ['fresh.txt'] })).rejects.toThrow()
+      expect(repo.git(['ls-files', '--others', '--exclude-standard'])).toBe('fresh.txt')
+    }
+    await expect(createCommit(repo.dir, 'x', { amend: false, paths: ['../evil'] })).rejects.toThrow()
+  })
+})

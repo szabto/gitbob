@@ -159,6 +159,8 @@ export const ipcInputSchemas = {
     repoPath: absolutePath,
     message: z.string().max(1_000_000).refine((m) => m.trim().length > 0, 'commit message must not be empty'),
     amend: z.boolean().default(false),
+    /** Commit only these files (their working-tree content); everything else stays as it is. */
+    paths: z.array(z.string().min(1).max(4096)).max(10_000).optional(),
   }),
   'commit:last-message': z.object({ repoPath: absolutePath }),
   'branch:create': z.object({

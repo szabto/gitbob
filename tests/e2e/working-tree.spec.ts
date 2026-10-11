@@ -233,3 +233,37 @@ test('a configured commit.template prefills the message', async () => {
     await app.close()
   }
 })
+
+test('multi-select changed files: stage a range, and commit only the selected files', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1\n', 'b.txt': '1\n', 'c.txt': '1\n', 'd.txt': '1\n' })
+  for (const f of ['a.txt', 'b.txt', 'c.txt', 'd.txt']) repo.write(f, '2\n')
+  repo.write('new.txt', 'n\n')
+  const { app, page } = await launch(repo.dir)
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
+  try {
+    await page.getByTestId('wip-row').click()
+    const unstaged = page.getByTestId('unstaged-files')
+    // Shift-click selects a range; the selection bar offers actions for it.
+    await fileRow(page, 'unstaged-files', 'a.txt').click()
+    await fileRow(page, 'unstaged-files', 'b.txt').click({ modifiers: ['Shift'] })
+    await expect(unstaged.getByTestId('selection-bar')).toContainText('2 selected')
+    await unstaged.getByTestId('selection-bar').getByRole('button', { name: 'Stage' }).click()
+    await expect(fileRow(page, 'staged-files', 'a.txt')).toBeVisible()
+    await expect(fileRow(page, 'staged-files', 'b.txt')).toBeVisible()
+
+    // ⌘/Ctrl-click two other files (one new) and commit only those.
+    await fileRow(page, 'unstaged-files', 'c.txt').click()
+    await fileRow(page, 'unstaged-files', 'new.txt').click({ modifiers: [mod] })
+    await expect(unstaged.getByTestId('selection-bar')).toContainText('2 selected')
+    await page.getByLabel('Commit summary').fill('Just c and the new file')
+    await page.getByRole('button', { name: 'Commit 2 selected files' }).click()
+    await expect(page.getByTestId('details-subject')).toHaveText('Just c and the new file')
+    expect(repo.git(['show', '--name-only', '--format=', 'HEAD']).split('\n').sort()).toEqual(['c.txt', 'new.txt'])
+    // The staged a and b stay staged; d stays unstaged.
+    expect(repo.git(['diff', '--cached', '--name-only']).split('\n').sort()).toEqual(['a.txt', 'b.txt'])
+    expect(repo.git(['diff', '--name-only'])).toBe('d.txt')
+  } finally {
+    await app.close()
+  }
+})

@@ -153,7 +153,7 @@ GitBob keeps an unfinished message for each repository, fills in your `commit.te
 
 Spotted a typo while reviewing? Click **Edit** above the diff to fix the file right there, then **Save** or **Save and stage**. If another program changed the file in the meantime, GitBob won't overwrite it.
 
-Want only part of a file in the commit? Every block of changes (a *hunk*) has its own **Stage hunk** button, and you can click individual green or red lines to select them and press **Stage 2 lines**. The same works backwards for **Unstage** and **Discard**. Prefer reading changes next to each other? Switch the diff to **Side by side** for a syntax-highlighted, two-column view.
+Want to commit just some files? ⌘/Ctrl-click or Shift-click files to select several: the bar above them stages, unstages, discards or stashes just those, and the commit button becomes **Commit N selected files**, which commits exactly those files and leaves everything else as it was. Want only part of a file in the commit? Every block of changes (a *hunk*) has its own **Stage hunk** button, and you can click individual green or red lines to select them and press **Stage 2 lines**. The same works backwards for **Unstage** and **Discard**. Prefer reading changes next to each other? Switch the diff to **Side by side** for a syntax-highlighted, two-column view.
 
 Changed your mind about a file? **Discard** throws away its unstaged edits after asking you first. Staged changes are kept, and brand-new files are moved to the Trash so you can still get them back.
 
@@ -216,7 +216,7 @@ On GitHub you can also **Sign in with GitHub** instead of pasting a token: GitBo
 
 ### 7. Undo, park and reuse work
 
-Right-click any commit for the time-travel tools:
+Right-click any commit, or any branch label in the graph or the sidebar, for the time-travel tools (the menus follow GitKraken's: edit a commit message, drop or move commits, fast-forward or pull a branch without checking it out, compare a commit with your working directory, save a patch, copy links, hide or solo a branch, delete a remote branch, and more):
 
 <p align="center">
   <img src="docs/images/gitbob-history-menu.png" alt="The commit context menu with Create branch, Create tag, Cherry-pick, Revert, three Reset options and Checkout" width="100%">

@@ -29,11 +29,44 @@ export function StagingPanel({
 }) {
   const repoPath = repo.root
   const status = useStatus(repoPath)
+  const [selection, setSelection] = useState<{ section: 'unstaged' | 'staged' | null; paths: string[]; anchor: string | null }>({
+    section: null,
+    paths: [],
+    anchor: null,
+  })
+  const clearSelection = (): void => setSelection({ section: null, paths: [], anchor: null })
+  const selectedIn = (section: 'unstaged' | 'staged'): Set<string> => new Set(selection.section === section ? selection.paths : [])
+  /** Returns true when the click changed the selection instead of opening the file. */
+  const onSelect = (section: 'unstaged' | 'staged', list: StatusEntry[], e: StatusEntry, ev: React.MouseEvent): boolean => {
+    const additive = ev.metaKey || ev.ctrlKey
+    const same = selection.section === section
+    if (ev.shiftKey && same && selection.anchor) {
+      const i = list.findIndex((x) => x.path === selection.anchor)
+      const j = list.findIndex((x) => x.path === e.path)
+      if (i >= 0 && j >= 0) {
+        const range = list.slice(Math.min(i, j), Math.max(i, j) + 1).map((x) => x.path)
+        setSelection({ section, paths: [...new Set([...(additive ? selection.paths : []), ...range])], anchor: selection.anchor })
+        return true
+      }
+    }
+    if (additive) {
+      const base = same ? selection.paths : []
+      const paths = base.includes(e.path) ? base.filter((p) => p !== e.path) : [...base, e.path]
+      setSelection({ section, paths, anchor: e.path })
+      return true
+    }
+    setSelection({ section, paths: [e.path], anchor: e.path })
+    return false
+  }
   const showDiff = useAppStore((s) => s.showDiff)
   const diffTarget = useAppStore((s) => s.diffTarget)
   const openConflict = useAppStore((s) => s.openConflict)
   const conflictPath = useAppStore((s) => s.conflictPath)
   const groups = groupStatus(status.data)
+  const selectionList = selection.section === 'unstaged' ? groups.unstaged : selection.section === 'staged' ? groups.staged : []
+  const selectedEntries = selectionList.filter((e) => selection.paths.includes(e.path))
+  // "Commit selected" applies to a real multi-selection; a single click just opens a file.
+  const selectedPaths = selectedEntries.length >= 2 ? selectedEntries.flatMap((e) => (e.origPath ? [e.path, e.origPath] : [e.path])) : []
 
   const stage = useRepoMutation(repoPath, (paths: string[]) => call('index:stage', { repoPath, paths }), {
     history: false,
@@ -80,7 +113,10 @@ export function StagingPanel({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div
+        className="flex min-h-0 flex-1 flex-col"
+        onKeyDown={(e) => e.key === 'Escape' && setSelection({ section: null, paths: [], anchor: null })}
+      >
         {groups.conflicted.length > 0 && (
           <FileSection
             title="Conflicts"
@@ -102,6 +138,14 @@ export function StagingPanel({
             groups.unstaged.length > 0 ? { label: 'Stage all', run: () => stageAll.mutate() } : undefined
           }
           action={{ label: 'Stage', run: (p) => stage.mutate(p) }}
+          selected={selectedIn('unstaged')}
+          onSelect={(e, ev) => onSelect('unstaged', groups.unstaged, e, ev)}
+          onClearSelection={clearSelection}
+          selectionActions={[
+            { label: 'Stage', run: (p) => (stage.mutate(p), clearSelection()) },
+            ...(onStashFiles && status.data?.branch.oid ? [{ label: 'Stash', run: (p: string[]) => (onStashFiles(p), clearSelection()) }] : []),
+            { label: 'Discard', danger: true, run: (p) => (discard.mutate(p), clearSelection()) },
+          ]}
           menu={(e) => [
             ...(onStashFiles && status.data?.branch.oid ? [{ label: `Stash ${e.path}…`, onSelect: () => onStashFiles([e.path]) }] : []),
             ...(e.kind !== 'untracked' ? [{ label: 'File history', onSelect: () => useAppStore.getState().openFileHistory(e.path) }] : []),
@@ -122,6 +166,10 @@ export function StagingPanel({
             groups.staged.length > 0 ? { label: 'Unstage all', run: () => unstageAll.mutate() } : undefined
           }
           action={{ label: 'Unstage', run: (p) => unstage.mutate(p) }}
+          selected={selectedIn('staged')}
+          onSelect={(e, ev) => onSelect('staged', groups.staged, e, ev)}
+          onClearSelection={clearSelection}
+          selectionActions={[{ label: 'Unstage', run: (p) => (unstage.mutate(p), clearSelection()) }]}
           menu={(e) => [
             ...(onStashFiles && status.data?.branch.oid ? [{ label: `Stash ${e.path}…`, onSelect: () => onStashFiles([e.path]) }] : []),
             ...(e.kind !== 'untracked' ? [{ label: 'File history', onSelect: () => useAppStore.getState().openFileHistory(e.path) }] : []),
@@ -132,7 +180,14 @@ export function StagingPanel({
         />
       </div>
 
-      <CommitComposer key={repoPath} repoPath={repoPath} stagedCount={groups.staged.length} unborn={!status.data?.branch.oid} />
+      <CommitComposer
+        key={repoPath}
+        repoPath={repoPath}
+        stagedCount={groups.staged.length}
+        unborn={!status.data?.branch.oid}
+        selectedPaths={selectedPaths}
+        onCommitted={clearSelection}
+      />
     </aside>
   )
 }
@@ -155,6 +210,10 @@ function FileSection({
   menu,
   isActive,
   disabled,
+  selected,
+  onSelect,
+  selectionActions,
+  onClearSelection,
 }: {
   title: string
   testId: string
@@ -168,13 +227,38 @@ function FileSection({
   menu?: (e: StatusEntry) => MenuEntry[]
   isActive: (e: StatusEntry) => boolean
   disabled: boolean
+  /** Multi-selection in this section (paths). */
+  selected?: Set<string>
+  onSelect?: (e: StatusEntry, ev: React.MouseEvent) => boolean
+  /** Actions for the selection, shown when two or more files are selected. */
+  selectionActions?: { label: string; run: (paths: string[]) => void; danger?: boolean }[]
+  onClearSelection?: () => void
 }) {
+  const sel = selected ?? new Set<string>()
+  const many = sel.size >= 2
   return (
     <section className="flex min-h-[80px] flex-1 flex-col border-b border-border" data-testid={testId}>
       <div className="flex h-7 shrink-0 items-center gap-2 bg-panel-2 px-3 text-xs">
         <span className="font-semibold">{title}</span>
         <span className="text-muted">{entries.length}</span>
-        {headerAction && (
+        {many ? (
+          <div className="ml-auto flex items-center gap-1" data-testid="selection-bar">
+            <span className="text-accent">{sel.size} selected</span>
+            {selectionActions?.map((a) => (
+              <button
+                key={a.label}
+                disabled={disabled}
+                onClick={() => a.run([...sel])}
+                className={`rounded border border-border px-1.5 py-0.5 hover:bg-fg/5 disabled:opacity-50 ${a.danger ? 'text-err' : ''}`}
+              >
+                {a.label}
+              </button>
+            ))}
+            <button aria-label="Clear selection" title="Clear selection (Esc)" onClick={onClearSelection} className="px-1 text-muted hover:text-fg">
+              ✕
+            </button>
+          </div>
+        ) : headerAction && (
           <button
             disabled={disabled}
             onClick={headerAction.run}
@@ -194,10 +278,15 @@ function FileSection({
               key={e.path}
               data-testid="status-file"
               data-path={e.path}
-              className={`group flex h-7 cursor-default items-center gap-2 px-3 font-mono text-xs ${
-                isActive(e) ? 'bg-accent/20' : 'hover:bg-fg/[0.04]'
+              data-selected={sel.has(e.path) || undefined}
+              className={`group flex h-7 cursor-default items-center gap-2 px-3 font-mono text-xs select-none ${
+                sel.has(e.path) && many ? 'bg-accent/30' : isActive(e) ? 'bg-accent/20' : 'hover:bg-fg/[0.04]'
               }`}
-              onClick={() => onOpen(e)}
+              onClick={(ev) => {
+                // ⌘/Ctrl-click and Shift-click change the selection without opening a diff.
+                if (onSelect?.(e, ev)) return
+                onOpen(e)
+              }}
               onContextMenu={(ev) => {
                 const items = menu?.(e) ?? []
                 if (!items.length) return
@@ -245,7 +334,20 @@ function FileSection({
   )
 }
 
-function CommitComposer({ repoPath, stagedCount, unborn }: { repoPath: string; stagedCount: number; unborn: boolean }) {
+function CommitComposer({
+  repoPath,
+  stagedCount,
+  unborn,
+  selectedPaths = [],
+  onCommitted,
+}: {
+  repoPath: string
+  stagedCount: number
+  unborn: boolean
+  /** Files to commit instead of the staged changes (multi-selection). */
+  selectedPaths?: string[]
+  onCommitted?: () => void
+}) {
   const [draft] = useState(() => loadDraft(repoPath))
   const [summary, setSummary] = useState(draft?.summary ?? '')
   const [description, setDescription] = useState(draft?.description ?? '')
@@ -277,7 +379,7 @@ function CommitComposer({ repoPath, stagedCount, unborn }: { repoPath: string; s
   const coAuthors = useMemo(() => recentCoAuthors(recent, identity.data ?? null), [recent, identity.data])
   const hint = summaryHint(summary)
 
-  const commit = useRepoMutation(repoPath, (vars: { message: string; amend: boolean }) =>
+  const commit = useRepoMutation(repoPath, (vars: { message: string; amend: boolean; paths?: string[] }) =>
     call('commit:create', { repoPath, ...vars }),
   )
 
@@ -294,14 +396,16 @@ function CommitComposer({ repoPath, stagedCount, unborn }: { repoPath: string; s
   }
 
   const message = description.trim() ? `${summary.trim()}\n\n${description.trim()}` : summary.trim()
-  const canCommit = !!summary.trim() && (stagedCount > 0 || amend) && !commit.isPending
+  const selectedCount = new Set(selectedPaths).size
+  const canCommit = !!summary.trim() && (stagedCount > 0 || amend || selectedCount > 0) && !commit.isPending
 
   const submit = (): void => {
     if (!canCommit) return
     commit.mutate(
-      { message, amend },
+      { message, amend, ...(selectedCount > 0 ? { paths: selectedPaths } : {}) },
       {
         onSuccess: (res) => {
+          onCommitted?.()
           setSummary('')
           setDescription('')
           setAmend(false)
@@ -416,7 +520,9 @@ function CommitComposer({ repoPath, stagedCount, unborn }: { repoPath: string; s
       >
         {commit.isPending
           ? 'Committing…'
-          : amend
+          : selectedCount > 0
+            ? `${amend ? 'Amend with' : 'Commit'} ${selectedCount} selected file${selectedCount === 1 ? '' : 's'}`
+            : amend
             ? 'Amend commit'
             : stagedCount > 0
               ? `Commit ${stagedCount} file${stagedCount === 1 ? '' : 's'}`

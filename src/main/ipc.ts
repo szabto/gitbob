@@ -368,11 +368,11 @@ export function registerIpc(ctx: IpcContext): void {
       ctx.network.run(event.sender, (net) => pullLfs(requireOpened(repoPath), { ...(net.env ? { env: net.env } : {}), ...(net.signal ? { signal: net.signal } : {}) }), repoPath),
     'conflict:save': ({ repoPath, path, content, markResolved }) =>
       saveConflictResolution(requireOpened(repoPath), path, content, { markResolved }),
-    'commit:create': ({ repoPath, message, amend }) =>
+    'commit:create': ({ repoPath, message, amend, paths }) =>
       journaled(
         requireOpened(repoPath),
         `${amend ? 'Amend' : 'Commit'} "${subject(message)}"`,
-        () => createCommit(repoPath, message, { amend }),
+        () => createCommit(repoPath, message, { amend, ...(paths?.length ? { paths } : {}) }),
         (before, after) => branchMove(before, after, 'soft'),
       ),
     'commit:last-message': ({ repoPath }) => getLastCommitMessage(requireOpened(repoPath)),
