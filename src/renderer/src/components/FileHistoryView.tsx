@@ -106,13 +106,15 @@ export function FileHistoryView({ repoPath, path }: { repoPath: string; path: st
             )}
           </ul>
           {current && current.status !== 'D' ? (
-            <DiffView
-              key={current.commit.sha}
-              repoPath={repoPath}
-              target={{ kind: 'commit', sha: current.commit.sha, path: current.path, ...(current.oldPath ? { oldPath: current.oldPath } : {}) }}
-              onClose={() => openFileHistory(null)}
-              showHistoryButton={false}
-            />
+            <div className="flex min-w-0 flex-1">
+              <DiffView
+                key={current.commit.sha}
+                repoPath={repoPath}
+                target={{ kind: 'commit', sha: current.commit.sha, path: current.path, ...(current.oldPath ? { oldPath: current.oldPath } : {}) }}
+                onClose={() => openFileHistory(null)}
+                showHistoryButton={false}
+              />
+            </div>
           ) : current ? (
             <div className="flex-1 p-4 text-sm text-muted" data-testid="file-history-deleted">
               This commit deleted the file.

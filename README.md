@@ -166,6 +166,12 @@ Changed your mind about a file? **Discard** throws away its unstaged edits after
 
 GitBob never overwrites your uncommitted changes when switching. If Git would have to, it tells you instead.
 
+<p align="center">
+  <img src="docs/images/gitbob-drag-merge.png" alt="A branch dragged onto main in the sidebar opens a menu with Merge fix/chart-overflow into main and Rebase main onto fix/chart-overflow" width="100%">
+  <br>
+  <sub>Drop a branch on your current branch to merge or rebase it.</sub>
+</p>
+
 ### 5. Sync with the server
 
 | Button | What it does |
@@ -184,6 +190,24 @@ Click a pull request to open it inside GitBob: read the description and comments
 
 On GitHub you can also **Sign in with GitHub** instead of pasting a token: GitBob shows a short code, opens github.com in your browser, and you approve it there.
 
+<p align="center">
+  <img src="docs/images/gitbob-pr.png" alt="A pull request open in GitBob: description, reviewers with one approval, comments, CI passing, Approve and Request changes buttons and the merge panel" width="100%">
+  <br>
+  <sub>Review a pull request without leaving GitBob.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/gitbob-pr-files.png" alt="The changed file of a pull request with a reviewer's comment shown under the line it refers to" width="100%">
+  <br>
+  <sub>Line comments sit right under the lines they talk about.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/gitbob-clone.png" alt="The clone dialog listing the signed-in user's GitHub repositories filtered by the word aurora, private ones marked" width="80%">
+  <br>
+  <sub>Clone straight from a list of your repositories.</sub>
+</p>
+
 ### 7. Undo, park and reuse work
 
 Right-click any commit for the time-travel tools:
@@ -198,6 +222,11 @@ Right-click any commit for the time-travel tools:
 - **Create tag** marks a release, with an optional message. Push or delete tags from the sidebar.
 - **Undo / Redo** in the toolbar (⌥⌘Z / ⇧⌥⌘Z) take back the last commit, amend, checkout, branch or tag change, reset, cherry-pick, revert, pull or rebase you did in GitBob. Undo never overwrites uncommitted work, and refuses if the repository changed in the meantime.
 - **File history** (in any file's diff, or right-click a file in a commit) lists every commit that changed the file, following renames, with each commit's change.
+
+<p align="center">
+  <img src="docs/images/gitbob-file-history.png" alt="File history of src/api/forecast.ts: four commits on the left, the selected commit's change to the file on the right" width="100%">
+</p>
+
 - **Blame** (in any file's diff) shows who last changed each line and links to that commit.
 
 Want to tidy up before sharing? Right-click the commit *before* the ones you want to change and choose **Interactive rebase onto here**. Reorder commits with the arrows, and for each one pick **Reword** (new message), **Squash** or **Fixup** (fold into the commit above) or **Drop**.

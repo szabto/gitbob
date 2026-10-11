@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { call } from '../lib/api'
 import { useFileContents, useFileDiff, useRepoMutation } from '../lib/queries'
 import { useUiStore } from '../state/ui'
+import { formatDate } from '../lib/format'
 import { useAppStore } from '../state/store'
 
 const targetLabel: Record<DiffTarget['kind'], string> = {
@@ -318,7 +319,7 @@ function HunkTable({ repoPath, target, data }: { repoPath: string; target: DiffT
                         {thread.map((c) => (
                           <div key={c.id} className="mb-2 max-w-3xl" data-testid="line-comment">
                             <div className="text-xs text-muted">
-                              <strong className="text-fg">{c.author}</strong> · {new Date(c.createdAt).toLocaleString()}
+                              <strong className="text-fg">{c.author}</strong> · {formatDate(Date.parse(c.createdAt) / 1000)}
                             </div>
                             <div className="whitespace-pre-wrap">{c.body}</div>
                           </div>
