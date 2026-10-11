@@ -11,11 +11,12 @@ import type { Command } from '../lib/commands'
 import { eventToAccelerator, formatAccelerator, normalizeAccelerator, RESERVED } from '../lib/shortcuts'
 import { useUiStore } from '../state/ui'
 
-type Tab = 'general' | 'git' | 'shortcuts' | 'about'
+export type SettingsTab = 'general' | 'profile' | 'git' | 'shortcuts' | 'about'
+type Tab = SettingsTab
 
-export function SettingsDialog({ commands, onClose }: { commands: Command[]; onClose: () => void }) {
+export function SettingsDialog({ commands, onClose, initialTab = 'general' }: { commands: Command[]; onClose: () => void; initialTab?: SettingsTab }) {
   const dialogRef = useDialog<HTMLDivElement>(onClose)
-  const [tab, setTab] = useState<Tab>('general')
+  const [tab, setTab] = useState<Tab>(initialTab)
   const qc = useQueryClient()
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => call('settings:get', {}) })
   const info = useQuery({ queryKey: ['app-info'], queryFn: () => call('app:info', {}) })
@@ -46,6 +47,7 @@ export function SettingsDialog({ commands, onClose }: { commands: Command[]; onC
           {(
             [
               ['general', 'General'],
+              ['profile', 'Profile'],
               ['git', 'Git'],
               ['shortcuts', 'Keyboard shortcuts'],
               ['about', 'About & updates'],
@@ -72,6 +74,8 @@ export function SettingsDialog({ commands, onClose }: { commands: Command[]; onC
             <p className="text-sm text-muted">Loading…</p>
           ) : tab === 'general' ? (
             <General s={settings.data} update={update} />
+          ) : tab === 'profile' ? (
+            <ProfileTab s={settings.data} update={update} />
           ) : tab === 'git' ? (
             <GitTab s={settings.data} update={update} gitPath={info.data?.gitPath} gitVersion={info.data?.gitVersion ?? null} />
           ) : tab === 'shortcuts' ? (
@@ -82,6 +86,88 @@ export function SettingsDialog({ commands, onClose }: { commands: Command[]; onC
         </div>
       </div>
     </div>
+  )
+}
+
+function ProfileTab({ s, update }: { s: AppSettings; update: (patch: SettingsPatch) => Promise<void> }) {
+  const qc = useQueryClient()
+  const profiles = useQuery({ queryKey: ['profiles'], queryFn: () => call('profile:list', {}) })
+  const [name, setName] = useState(s.gitName ?? '')
+  const [email, setEmail] = useState(s.gitEmail ?? '')
+  const { ask, showError, showNotice } = useUiStore.getState()
+  const refresh = (): void => void qc.invalidateQueries({ queryKey: ['profiles'] })
+  const active = profiles.data?.profiles.find((p) => p.id === profiles.data?.active)
+  const changed = name.trim() !== (s.gitName ?? '') || email.trim() !== (s.gitEmail ?? '')
+  return (
+    <>
+      <p className="mb-4 text-sm text-muted">
+        Each profile has its own settings, open repositories, recent list and connected accounts. Switching restarts GitBob in the other profile.
+      </p>
+      <Row label="Profiles">
+        <ul className="space-y-1 text-sm" data-testid="profile-list">
+          {profiles.data?.profiles.map((p) => (
+            <li key={p.id} className="flex items-center gap-2">
+              <span className={p.id === profiles.data!.active ? 'font-semibold' : ''}>{p.name}</span>
+              {p.id === profiles.data!.active && <span className="text-xs text-muted">(this one)</span>}
+              <span className="ml-auto flex gap-1">
+                <button
+                  className="rounded border border-border px-1.5 text-xs hover:bg-panel-2"
+                  onClick={async () => {
+                    const n = await ask({ title: 'Rename profile', label: 'Profile name', initialValue: p.name, confirmLabel: 'Rename' })
+                    if (n) await call('profile:rename', { id: p.id, name: n }).then(refresh, showError)
+                  }}
+                >
+                  Rename
+                </button>
+                {p.id !== profiles.data!.active && (
+                  <>
+                    <button className="rounded border border-border px-1.5 text-xs hover:bg-panel-2" onClick={() => void call('profile:switch', { id: p.id }).catch(showError)}>
+                      Switch
+                    </button>
+                    {p.id !== 'default' && (
+                      <button className="rounded border border-border px-1.5 text-xs text-err hover:bg-err/10" onClick={() => void call('profile:remove', { id: p.id }).then(refresh, showError)}>
+                        Remove
+                      </button>
+                    )}
+                  </>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <button
+          className="mt-2 rounded border border-border px-2 py-0.5 text-sm hover:bg-panel-2"
+          onClick={async () => {
+            const n = await ask({ title: 'New profile', label: 'Profile name', placeholder: 'Work, Personal, …', confirmLabel: 'Create' })
+            if (n) await call('profile:create', { name: n }).then(refresh, showError)
+          }}
+        >
+          New profile…
+        </button>
+      </Row>
+      <Row
+        label={`Git identity${active ? ` for “${active.name}”` : ''}`}
+        hint="Name and email for commits made in this profile, e.g. your company email at work. Leave empty to use your normal Git settings. A repository's own user.email still wins."
+      >
+        <div className="flex flex-col gap-2">
+          <input aria-label="Profile Git name" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} className="rounded border border-border bg-bg px-2 py-1 text-sm" />
+          <input aria-label="Profile Git email" placeholder="you@company.com" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="rounded border border-border bg-bg px-2 py-1 text-sm" />
+          <div>
+            <button
+              disabled={!changed}
+              className="rounded bg-accent px-2 py-0.5 text-sm font-medium text-on-accent disabled:opacity-40"
+              onClick={async () => {
+                await update({ gitName: name.trim() || null, gitEmail: email.trim() || null })
+                void qc.invalidateQueries({ queryKey: ['git-identity'] })
+                showNotice('Git identity saved for this profile.')
+              }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </Row>
+    </>
   )
 }
 

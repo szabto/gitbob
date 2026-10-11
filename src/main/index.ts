@@ -13,12 +13,26 @@ import { validateGitPath } from './app-info'
 import { UndoJournal } from './undo'
 import { AvatarService } from './avatars'
 import { nextZoom } from './zoom'
+import { ProfileStore, writeProfileGitConfig } from './profiles'
 import { Updater } from './updater'
 import { setGitBinary } from '@git-core/runner'
 import type { AppSettings } from '@shared/types'
 
 // Allow tests to isolate persisted state.
 if (process.env.GITBOB_USER_DATA) app.setPath('userData', resolve(process.env.GITBOB_USER_DATA))
+// Each profile has its own data folder; it must be chosen before the app is ready.
+const profiles = new ProfileStore(app.getPath('userData'))
+app.setPath('userData', profiles.activeDir())
+/** The user's own GIT_CONFIG_GLOBAL (if any), included by profile git configs. */
+const originalGitConfigGlobal = process.env.GIT_CONFIG_GLOBAL
+
+/** Point Git at this profile's identity (if it has one) on top of the normal global config. */
+function applyProfileGitIdentity(identity: { gitName: string | null; gitEmail: string | null }): void {
+  const file = writeProfileGitConfig(app.getPath('userData'), { name: identity.gitName, email: identity.gitEmail }, originalGitConfigGlobal)
+  if (file) process.env.GIT_CONFIG_GLOBAL = file
+  else if (originalGitConfigGlobal === undefined) delete process.env.GIT_CONFIG_GLOBAL
+  else process.env.GIT_CONFIG_GLOBAL = originalGitConfigGlobal
+}
 
 const rendererDevUrl = process.env.ELECTRON_RENDERER_URL
 const rendererFile = join(import.meta.dirname, '../renderer/index.html')
@@ -119,6 +133,11 @@ void app.whenReady().then(async () => {
   })
 
   const loaded = settings.get()
+  try {
+    applyProfileGitIdentity(loaded)
+  } catch (e) {
+    console.error('Could not apply the profile Git identity:', e)
+  }
   if (loaded.gitPath) {
     // A custom git that no longer works falls back to PATH instead of breaking every command.
     await validateGitPath(loaded.gitPath)
@@ -138,6 +157,7 @@ void app.whenReady().then(async () => {
       }
     }
     await settings.update(patch)
+    if (patch.gitName !== undefined || patch.gitEmail !== undefined) applyProfileGitIdentity(settings.get())
     if (patch.zoom !== undefined) for (const w of BrowserWindow.getAllWindows()) w.webContents.setZoomFactor(patch.zoom)
     if (patch.theme) {
       nativeTheme.themeSource = patch.theme
@@ -153,6 +173,7 @@ void app.whenReady().then(async () => {
     updater,
     undo: new UndoJournal(),
     avatars: new AvatarService(app.getPath('userData')),
+    profiles,
     getSettings: () => settings.get(),
     updateSettings,
     providers: new ProviderService(

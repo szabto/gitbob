@@ -1,3 +1,4 @@
+import { ProfileMenu } from './ProfileMenu'
 import { useAppStore } from '../state/store'
 
 /** One tab per open repository, plus "+" for the start screen. */
@@ -7,7 +8,14 @@ export function TabBar() {
   const setRepo = useAppStore((s) => s.setRepo)
   const closeTab = useAppStore((s) => s.closeTab)
   const newTab = useAppStore((s) => s.newTab)
-  if (tabs.length === 0) return null
+  const manage = (): boolean => window.dispatchEvent(new CustomEvent('gitbob:open-settings', { detail: 'profile' }))
+  // Without open tabs (welcome screen) only the profile switcher is shown.
+  if (tabs.length === 0)
+    return (
+      <div className="flex shrink-0 justify-end px-2 pt-1">
+        <ProfileMenu onManage={manage} />
+      </div>
+    )
 
   return (
     <div className="flex h-8 shrink-0 items-end gap-0.5 border-b border-border bg-panel-2 px-2" data-testid="tab-bar">
@@ -49,6 +57,7 @@ export function TabBar() {
       >
         +
       </button>
+      <ProfileMenu onManage={manage} />
     </div>
   )
 }

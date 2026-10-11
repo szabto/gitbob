@@ -9,7 +9,7 @@ import { eventToAccelerator, normalizeAccelerator } from '../lib/shortcuts'
 import { useAppStore } from '../state/store'
 import { useUiStore } from '../state/ui'
 import { CommandPalette, commandToItem, type PaletteItem } from './CommandPalette'
-import { SettingsDialog } from './SettingsDialog'
+import { SettingsDialog, type SettingsTab } from './SettingsDialog'
 
 /** Owns the command palette, settings dialog and global keyboard shortcuts. */
 export function CommandHost({
@@ -21,6 +21,7 @@ export function CommandHost({
 }) {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('general')
   const repoPath = repo?.root ?? ''
   const actions = useRepoActions(repoPath)
   const head = useHead(repoPath, !!repo)
@@ -35,8 +36,16 @@ export function CommandHost({
   useEffect(() => subscribe('menu:command-palette', () => setPaletteOpen(true)), [])
   useEffect(() => {
     const open = (): void => setPaletteOpen(true)
+    const settings = (e: Event): void => {
+      setSettingsTab((e as CustomEvent<SettingsTab | undefined>).detail ?? 'general')
+      setSettingsOpen(true)
+    }
     window.addEventListener('gitbob:command-palette', open)
-    return () => window.removeEventListener('gitbob:command-palette', open)
+    window.addEventListener('gitbob:open-settings', settings)
+    return () => {
+      window.removeEventListener('gitbob:command-palette', open)
+      window.removeEventListener('gitbob:open-settings', settings)
+    }
   }, [])
   useEffect(() => subscribe('menu:settings', () => setSettingsOpen(true)), [])
   useEffect(() => subscribe('settings:changed', (s) => qc.setQueryData(['settings'], s)), [qc])
@@ -127,7 +136,7 @@ export function CommandHost({
   return (
     <>
       {paletteOpen && <CommandPalette items={items} onClose={() => setPaletteOpen(false)} />}
-      {settingsOpen && <SettingsDialog commands={commands} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsDialog commands={commands} initialTab={settingsTab} onClose={() => setSettingsOpen(false)} />}
     </>
   )
 }

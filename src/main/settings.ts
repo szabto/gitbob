@@ -19,6 +19,9 @@ export interface Settings {
   avatars: 'off' | 'hosting' | 'gravatar'
   /** Interface zoom factor (0.5–2). */
   zoom: number
+  /** This profile's Git identity; null uses the normal global Git config. */
+  gitName: string | null
+  gitEmail: string | null
 }
 
 const DEFAULTS: Settings = {
@@ -30,6 +33,8 @@ const DEFAULTS: Settings = {
   githubClientId: null,
   avatars: 'hosting',
   zoom: 1,
+  gitName: null,
+  gitEmail: null,
 }
 
 /** Small JSON settings file in userData. Unknown or invalid values fall back to defaults. */
@@ -55,6 +60,8 @@ export class SettingsStore {
         )
       }
       if (typeof raw.autoCheckUpdates === 'boolean') this.data.autoCheckUpdates = raw.autoCheckUpdates
+      if (typeof raw.gitName === 'string' && raw.gitName.trim() && !/[\r\n\0]/.test(raw.gitName)) this.data.gitName = raw.gitName.trim().slice(0, 200)
+      if (typeof raw.gitEmail === 'string' && raw.gitEmail.trim() && !/[\r\n\0]/.test(raw.gitEmail)) this.data.gitEmail = raw.gitEmail.trim().slice(0, 200)
       if (typeof raw.zoom === 'number' && raw.zoom >= 0.5 && raw.zoom <= 2) this.data.zoom = raw.zoom
       if (raw.avatars === 'off' || raw.avatars === 'hosting' || raw.avatars === 'gravatar') this.data.avatars = raw.avatars
       if (typeof raw.githubClientId === 'string' && /^[A-Za-z0-9._-]{8,64}$/.test(raw.githubClientId)) this.data.githubClientId = raw.githubClientId

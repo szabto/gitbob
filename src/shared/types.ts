@@ -461,6 +461,15 @@ export interface AppSettings {
   avatars: 'off' | 'hosting' | 'gravatar'
   /** Interface zoom factor (0.5–2). */
   zoom: number
+  /** This profile's Git identity (commits made from GitBob); null uses the normal global config. */
+  gitName: string | null
+  gitEmail: string | null
+}
+
+/** A profile with its own settings, open tabs, recent repositories and accounts. */
+export interface ProfileInfo {
+  id: string
+  name: string
 }
 
 export interface AppInfo {

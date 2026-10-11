@@ -1,6 +1,6 @@
 import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { existsSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
 import { cleanupFixtures, createFixtureRepo, makeTempDir } from '../helpers/fixture'
@@ -345,5 +345,79 @@ test('status bar: last message, zoom that is remembered, version, and the real c
     await expect.poll(() => again.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor())).toBeCloseTo(0.9)
   } finally {
     await again.app.close()
+  }
+})
+
+test('profiles: own settings, open repositories and Git identity; switching restarts into the profile', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1\n' })
+  const base = makeTempDir('gitbob-base-')
+  const home = makeTempDir('gitbob-home-')
+  writeFileSync(join(home, '.gitconfig'), '[user]\n\tname = Personal Me\n\temail = me@home.io\n')
+  // No GIT_AUTHOR_* here: the identity must come from Git config (the profile's).
+  const start = async (args: string[]) => {
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), GITBOB_USER_DATA: base, ELECTRON_RENDERER_URL: '', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(home, '.gitconfig') }
+    for (const k of ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL']) delete env[k]
+    const app = await electron.launch({ args: [appDir, ...args], env })
+    const page = await app.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    // Keep the test in control of "restart into the profile".
+    await app.evaluate(({ app: a }) => {
+      ;(globalThis as Record<string, unknown>).__relaunched = false
+      a.relaunch = (() => {
+        ;(globalThis as Record<string, unknown>).__relaunched = true
+      }) as typeof a.relaunch
+      a.exit = (() => {}) as typeof a.exit
+    })
+    return { app, page }
+  }
+
+  // Default profile: open the repository and pick the dark theme.
+  let { app, page } = await start([repo.dir])
+  await expect(page.getByTestId('profile-name')).toHaveText('Default')
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.send('menu:settings'))
+  await page.getByLabel('Theme').selectOption('dark')
+  await page.getByRole('button', { name: 'Close settings' }).click()
+
+  // New profile → the app asks to restart into it.
+  await page.getByTestId('profile-menu').click()
+  await page.getByRole('menuitem', { name: 'New profile…' }).click()
+  await page.getByLabel('Profile name').fill('Acme')
+  await page.getByRole('button', { name: 'Create and switch' }).click()
+  await expect.poll(() => app.evaluate(() => (globalThis as Record<string, unknown>).__relaunched)).toBe(true)
+  const file = JSON.parse(readFileSync(join(base, 'profiles.json'), 'utf8')) as { active: string; profiles: { id: string; name: string }[] }
+  expect(file.profiles.map((p) => p.name)).toEqual(['Default', 'Acme'])
+  expect(file.active).not.toBe('default')
+  await app.close()
+
+  // The Acme profile starts fresh: no recent repositories, default theme.
+  ;({ app, page } = await start([]))
+  try {
+    await expect(page.getByTestId('profile-name')).toHaveText('Acme')
+    await expect(page.getByTestId('recent-repo')).toHaveCount(0)
+    expect((await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource))).toBe('system')
+
+    // Its own Git identity applies to commits made in GitBob.
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.send('menu:settings'))
+    await page.getByRole('button', { name: 'Profile', exact: true }).click()
+    await page.getByLabel('Profile Git name').fill('Work Me')
+    await page.getByLabel('Profile Git email').fill('me@acme.io')
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByTestId('notice')).toContainText('Git identity saved')
+    await page.getByRole('button', { name: 'Close settings' }).click()
+  } finally {
+    await app.close()
+  }
+  ;({ app, page } = await start([repo.dir]))
+  try {
+    repo.write('a.txt', '2\n')
+    await page.getByTestId('wip-row').click()
+    await page.getByRole('button', { name: 'Stage all' }).click()
+    await page.getByLabel('Commit summary').fill('Work commit')
+    await page.getByRole('button', { name: /^Commit/ }).click()
+    await expect(page.getByTestId('details-subject')).toHaveText('Work commit')
+    expect(repo.git(['log', '-1', '--format=%an <%ae>'])).toBe('Work Me <me@acme.io>')
+  } finally {
+    await app.close()
   }
 })

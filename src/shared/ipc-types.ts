@@ -1,5 +1,6 @@
 import type {
   AppInfo,
+  ProfileInfo,
   FileHistoryPage,
   HostedRepository,
   ProviderAccount,
@@ -51,6 +52,13 @@ export interface IpcOutputs {
   'repo:health': { suggestCommitGraph: boolean }
   'repo:write-commit-graph': void
   'file:history': FileHistoryPage
+  'profile:list': { active: string; profiles: ProfileInfo[] }
+  'profile:create': ProfileInfo
+  'profile:rename': void
+  /** removed: false if the user declined. */
+  'profile:remove': { removed: boolean }
+  /** The app restarts into the profile. */
+  'profile:switch': void
   'repo:open-terminal': void
   'repo:reveal': void
   'commit:all-files': { paths: string[]; truncated: boolean }

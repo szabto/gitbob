@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { IPC_CHANNELS, type IpcChannel } from '@shared/channels'
 import { ipcInputSchemas } from '@shared/ipc'
 import type { IpcOutputs } from '@shared/ipc-types'
@@ -44,6 +44,7 @@ import { getSignature } from '@git-core/signatures'
 import type { RecentRepositoryStore } from './recent'
 import type { UndoJournal } from './undo'
 import type { AvatarService } from './avatars'
+import type { ProfileStore } from './profiles'
 import { parseRemoteUrl } from '../providers'
 import { RepoHealth } from './repo-health'
 import { openTerminal } from './terminal'
@@ -73,6 +74,7 @@ export interface IpcContext {
   updater: Updater
   undo: UndoJournal
   avatars: AvatarService
+  profiles: ProfileStore
 }
 
 /**
@@ -240,6 +242,29 @@ export function registerIpc(ctx: IpcContext): void {
     'repo:reveal': async ({ repoPath }) => {
       const err = await shell.openPath(requireOpened(repoPath))
       if (err) throw new GitError('GIT_FAILED', err)
+    },
+    'profile:list': async () => ctx.profiles.read(),
+    'profile:create': async ({ name }) => ctx.profiles.create(name),
+    'profile:rename': async ({ id, name }) => ctx.profiles.rename(id, name),
+    'profile:remove': async ({ id }, event) => {
+      const p = ctx.profiles.read().profiles.find((x) => x.id === id)
+      if (!p) throw new GitError('NOT_FOUND', 'Unknown profile')
+      const confirmed = await confirmDestructive(event, {
+        message: `Remove the profile “${p.name}”?`,
+        detail: 'It disappears from the list. Its settings, accounts and recent repositories stay on disk in its folder, so nothing is deleted.',
+        confirmLabel: 'Remove profile',
+      })
+      if (!confirmed) return { removed: false }
+      ctx.profiles.remove(id)
+      return { removed: true }
+    },
+    'profile:switch': async ({ id }) => {
+      ctx.profiles.setActive(id)
+      // Restart into the profile: its data folder is chosen before the app starts.
+      setTimeout(() => {
+        app.relaunch()
+        app.exit(0)
+      }, 50)
     },
     'repo:health': async ({ repoPath }) => ({ suggestCommitGraph: await health.suggestCommitGraph(requireOpened(repoPath)) }),
     'repo:write-commit-graph': async ({ repoPath }) => {
