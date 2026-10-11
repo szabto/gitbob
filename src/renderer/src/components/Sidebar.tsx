@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useHiddenRefs, useHiddenStore } from '../state/hidden'
+import { IssuesSection } from './IssuesSection'
+import { useSectionOpen } from '../lib/sidebar-sections'
 import { isMac } from '../lib/shortcuts'
 import { endDrag, startDrag, useDropTarget } from '../lib/dnd'
 import { useReflog, useSubmodules, useWorktrees } from '../lib/queries'
@@ -157,6 +159,7 @@ export function Sidebar({
       {provider?.repo && (
         <PullRequestsSection repoPath={repoPath} status={provider} remoteRefs={remote} actions={actions} />
       )}
+      {provider?.repo && <IssuesSection repoPath={repoPath} status={provider} />}
       <Section
         title="Remote"
         count={remote.length}
@@ -400,32 +403,6 @@ function ReflogSection({
       ))}
     </Section>
   )
-}
-
-const SECTIONS_KEY = 'gitbob.sidebarSections'
-/** Sections start collapsed unless `defaultOpen` (Local, Pull requests, LFS); each remembers its state. */
-export function useSectionOpen(id: string, defaultOpen = id === 'local-branches'): [boolean, (v: boolean) => void] {
-  const read = (): boolean => {
-    try {
-      const v = (JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '{}') as Record<string, unknown>)[id]
-      return typeof v === 'boolean' ? v : defaultOpen
-    } catch {
-      return defaultOpen
-    }
-  }
-  const [open, setOpen] = useState(read)
-  return [
-    open,
-    (v: boolean) => {
-      setOpen(v)
-      try {
-        const all = JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '{}') as Record<string, boolean>
-        localStorage.setItem(SECTIONS_KEY, JSON.stringify({ ...all, [id]: v }))
-      } catch {
-        /* per-viewer convenience */
-      }
-    },
-  ]
 }
 
 function EyeIcon({ off }: { off: boolean }) {

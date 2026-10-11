@@ -94,6 +94,7 @@ export const IPC_CHANNELS = [
   'provider:connect',
   'provider:disconnect',
   'provider:pulls',
+  'provider:issues',
   'provider:checks',
   'provider:create-pr',
   'provider:accounts',

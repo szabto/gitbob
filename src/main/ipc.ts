@@ -589,6 +589,7 @@ export function registerIpc(ctx: IpcContext): void {
       await ctx.providers.disconnect(repoPath)
       return { disconnected: true }
     },
+    'provider:issues': ({ repoPath }) => ctx.providers.issues(requireOpened(repoPath)),
     'provider:pulls': ({ repoPath, state }) => ctx.providers.pullRequests(requireOpened(repoPath), state),
     'provider:checks': ({ repoPath, sha }) => ctx.providers.checks(requireOpened(repoPath), sha),
     'provider:accounts': () => ctx.providers.accounts(),

@@ -370,6 +370,17 @@ export interface FileHistoryPage {
   hasMore: boolean
 }
 
+/** An issue of a hosted repository. */
+export interface Issue {
+  number: number
+  title: string
+  author: string
+  url: string
+  labels: string[]
+  comments: number
+  updatedAt: string
+}
+
 /** A repository the signed-in user can access on a hosting service (for cloning). */
 export interface HostedRepository {
   kind: ProviderKind

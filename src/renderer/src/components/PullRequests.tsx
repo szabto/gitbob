@@ -1,4 +1,4 @@
-import { useSectionOpen } from './Sidebar'
+import { useSectionOpen } from '../lib/sidebar-sections'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { GitRef, ProviderKind, ProviderStatus, RepoRef } from '@shared/types'

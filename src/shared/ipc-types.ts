@@ -150,6 +150,8 @@ export interface IpcOutputs {
   'provider:connect': { user: string }
   'provider:disconnect': { disconnected: boolean }
   'provider:pulls': PullRequest[]
+  /** null: no issue tracker (Azure DevOps work items aren't supported; Bitbucket's may be off). */
+  'provider:issues': import('./types').Issue[] | null
   /** null when the repository has no connected provider. */
   'provider:checks': CheckStatus | null
   'provider:create-pr': PullRequest

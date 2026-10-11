@@ -2,6 +2,7 @@ import type {
   CheckStatus,
   FileChange,
   HostedRepository,
+  Issue,
   LineCommentInput,
   ProviderAccount,
   MergeMethod,
@@ -171,6 +172,19 @@ export class ProviderService {
           `GitHub doesn't let this sign-in see ${ref.owner}/${ref.repo}. If it belongs to an organization, ask its owners to approve GitBob, or connect with an access token that includes this repository.`,
         )
       }
+      throw e
+    }
+  }
+
+  /** Open issues; null when the service (or this repository) has no issue tracker. */
+  async issues(repoPath: string): Promise<Issue[] | null> {
+    const { ref, adapter } = await this.connected(repoPath)
+    if (!adapter.listIssues) return null
+    try {
+      return await mapErrors(() => adapter.listIssues!(ref))
+    } catch (e) {
+      // Bitbucket answers 404 when the repository's issue tracker is turned off.
+      if (e instanceof GitError && e.code === 'NOT_FOUND' && ref.kind === 'bitbucket') return null
       throw e
     }
   }

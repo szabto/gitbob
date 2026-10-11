@@ -19,6 +19,7 @@ import {
   type ReviewerState,
   type HostedRepository,
   type LineCommentInput,
+  type Issue,
 } from './types'
 import {
   MERGE_METHODS,
@@ -116,6 +117,28 @@ export class BitbucketAdapter implements ProviderAdapter {
         cloneUrl, sshUrl: safeSshUrl(href('ssh')), updatedAt: optStr(o.updated_on),
       }]
     })
+  }
+
+  /** Bitbucket's issue tracker is optional; a repository without one answers 404. */
+  async listIssues(repo: RepoRef, opts: { limit?: number } = {}): Promise<Issue[]> {
+    const base = this.repoPath(repo)
+    const limit = clampLimit(opts.limit)
+    const perPage = Math.min(this.opts.pageSize ?? 50, 50, limit)
+    const q = encodeURIComponent('state="new" OR state="open"')
+    const items = await paginate(limit, async (cursor) => {
+      const res = await this.req(cursor ?? `${base}/issues?q=${q}&sort=-updated_on&pagelen=${perPage}`)
+      const body = expectObject(res.data, LABEL)
+      return { items: expectArray(body.values ?? [], LABEL), next: optStr(body.next) }
+    })
+    return items.map(obj).map((i) => ({
+      number: num(i.id, LABEL),
+      title: str(i.title),
+      author: login(i.reporter),
+      url: safeWebUrl(optStr(obj(obj(i.links).html).href)) ?? '',
+      labels: [str(i.kind), str(i.priority)].filter(Boolean),
+      comments: 0,
+      updatedAt: str(i.updated_on),
+    }))
   }
 
   async listPullRequests(repo: RepoRef, opts: ListPullRequestsOptions): Promise<PullRequest[]> {

@@ -1,6 +1,7 @@
 import type {
   CheckStatus,
   HostedRepository,
+  Issue,
   LineCommentInput,
   MergeMethod,
   MergeableState,
@@ -17,6 +18,7 @@ import type {
 export type {
   CheckStatus,
   HostedRepository,
+  Issue,
   LineCommentInput,
   MergeMethod,
   MergeableState,
@@ -114,6 +116,8 @@ export interface ProviderAdapter {
    * default 300). `host` is the account host stored with the results.
    */
   listRepositories(host: string, opts?: { limit?: number }): Promise<HostedRepository[]>
+  /** Open issues, most recently updated first; absent when the provider has no issue tracker here. */
+  listIssues?(repo: RepoRef, opts?: { limit?: number }): Promise<Issue[]>
 }
 
 export interface AdapterOptions {

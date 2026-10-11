@@ -31,6 +31,8 @@ async function fakeGitHub(headSha: string) {
     if (req.headers.authorization !== `Bearer ${TOKEN}`) return json(401, { message: 'Bad credentials' })
     const url = new URL(req.url ?? '/', 'http://x')
     if (url.pathname === '/user') return json(200, { login: 'octo-tester', name: 'Octo' })
+    if (url.pathname === '/repos/acme/widgets/issues')
+      return json(200, [{ number: 31, title: 'Dark mode flickers', user: { login: 'ann' }, html_url: 'https://github.com/acme/widgets/issues/31', labels: [{ name: 'bug' }], comments: 0, updated_at: '2026-10-02T00:00:00Z' }])
     if (url.pathname === '/user/repos')
       return json(200, [
         { full_name: 'acme/widgets', description: 'Widget factory', private: true, clone_url: 'https://github.com/acme/widgets.git', ssh_url: 'git@github.com:acme/widgets.git', pushed_at: '2026-10-02T00:00:00Z' },
@@ -118,6 +120,12 @@ test('connects GitHub with a token, lists pull requests, shows CI and creates a 
     await expect(section.getByTestId('pull-request')).toHaveCount(1)
     await expect(section.getByTestId('pull-request')).toContainText('#12')
     await expect(section.getByTestId('pull-request')).toContainText('Add dark mode')
+
+    // Issues (collapsed by default) list the repository's open issues.
+    const issues = page.getByTestId('issues')
+    await issues.locator('> div > button').click()
+    await expect(issues.getByTestId('issue')).toHaveCount(1)
+    await expect(issues.getByTestId('issue')).toContainText('#31 Dark mode flickers')
 
     // CI status of the selected commit.
     await page.locator(`[data-sha="${head}"]`).click()

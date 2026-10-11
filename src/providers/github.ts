@@ -19,6 +19,7 @@ import {
   type ReviewerState,
   type HostedRepository,
   type LineCommentInput,
+  type Issue,
 } from './types'
 import {
   MERGE_METHODS,
@@ -107,6 +108,26 @@ export class GitHubAdapter implements ProviderAdapter {
         cloneUrl, sshUrl: safeSshUrl(o.ssh_url), updatedAt: optStr(o.pushed_at) ?? optStr(o.updated_at),
       }]
     })
+  }
+
+  async listIssues(repo: RepoRef, opts: { limit?: number } = {}): Promise<Issue[]> {
+    const base = this.repoPath(repo)
+    const limit = clampLimit(opts.limit)
+    const perPage = Math.min(this.opts.pageSize ?? 100, limit)
+    const items = await paginate(limit, async (cursor) => {
+      const res = await this.req(cursor ?? `${base}/issues?state=open&sort=updated&direction=desc&per_page=${perPage}`)
+      return { items: expectArray(res.data, LABEL), next: parseLinkNext(res.headers.get('link')) }
+    })
+    // GitHub lists pull requests among issues; they are shown in their own section.
+    return items.map(obj).filter((i) => !i.pull_request).map((i) => ({
+      number: num(i.number, LABEL),
+      title: str(i.title),
+      author: str(obj(i.user).login),
+      url: safeWebUrl(optStr(i.html_url)) ?? '',
+      labels: (Array.isArray(i.labels) ? i.labels : []).map((l) => (typeof l === 'string' ? l : str(obj(l).name))).filter(Boolean),
+      comments: typeof i.comments === 'number' ? i.comments : 0,
+      updatedAt: str(i.updated_at),
+    }))
   }
 
   async listPullRequests(repo: RepoRef, opts: ListPullRequestsOptions): Promise<PullRequest[]> {

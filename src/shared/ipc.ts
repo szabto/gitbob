@@ -252,6 +252,7 @@ export const ipcInputSchemas = {
       .refine((t) => !/[\s\0]/.test(t), 'token must not contain whitespace'),
   }),
   'provider:disconnect': z.object({ repoPath: absolutePath }),
+  'provider:issues': z.object({ repoPath: absolutePath }),
   'provider:pulls': z.object({ repoPath: absolutePath, state: z.enum(['open', 'all']).default('open') }),
   'provider:checks': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'provider:accounts': z.object({}).strict(),

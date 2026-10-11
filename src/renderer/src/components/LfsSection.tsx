@@ -1,4 +1,4 @@
-import { useSectionOpen } from './Sidebar'
+import { useSectionOpen } from '../lib/sidebar-sections'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { call } from '../lib/api'

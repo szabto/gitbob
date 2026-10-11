@@ -19,6 +19,7 @@ import {
   type ReviewerState,
   type HostedRepository,
   type LineCommentInput,
+  type Issue,
 } from './types'
 import {
   MERGE_METHODS,
@@ -110,6 +111,25 @@ export class GitLabAdapter implements ProviderAdapter {
         cloneUrl, sshUrl: safeSshUrl(o.ssh_url_to_repo), updatedAt: optStr(o.last_activity_at),
       }]
     })
+  }
+
+  async listIssues(repo: RepoRef, opts: { limit?: number } = {}): Promise<Issue[]> {
+    const base = this.projectPath(repo)
+    const limit = clampLimit(opts.limit)
+    const perPage = Math.min(this.opts.pageSize ?? 100, limit)
+    const items = await paginate(limit, async (cursor) => {
+      const res = await this.req(cursor ?? `${base}/issues?state=opened&order_by=updated_at&sort=desc&per_page=${perPage}`)
+      return { items: expectArray(res.data, LABEL), next: parseLinkNext(res.headers.get('link')) }
+    })
+    return items.map(obj).map((i) => ({
+      number: num(i.iid, LABEL),
+      title: str(i.title),
+      author: str(obj(i.author).username),
+      url: safeWebUrl(optStr(i.web_url)) ?? '',
+      labels: (Array.isArray(i.labels) ? i.labels : []).filter((l): l is string => typeof l === 'string'),
+      comments: typeof i.user_notes_count === 'number' ? i.user_notes_count : 0,
+      updatedAt: str(i.updated_at),
+    }))
   }
 
   async listPullRequests(repo: RepoRef, opts: ListPullRequestsOptions): Promise<PullRequest[]> {
