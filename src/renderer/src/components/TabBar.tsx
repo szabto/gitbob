@@ -1,3 +1,4 @@
+import { FolderGit2 } from 'lucide-react'
 import { ProfileMenu } from './ProfileMenu'
 import { useAppStore } from '../state/store'
 
@@ -35,9 +36,10 @@ export function TabBar() {
                 title={t.root}
                 onClick={() => setRepo(t)}
                 onAuxClick={(e) => e.button === 1 && closeTab(t.root)}
-                className="min-w-0 truncate py-1 pr-1 pl-3 text-left text-xs"
+                className="flex min-w-0 items-center gap-1.5 py-1 pr-1 pl-2.5 text-left text-xs"
               >
-                {t.name}
+                <FolderGit2 size={13} aria-hidden className="shrink-0 opacity-70" />
+                <span className="truncate">{t.name}</span>
               </button>
               <button
                 aria-label={`Close ${t.name}`}

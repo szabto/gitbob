@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight, CircleDot } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import type { ProviderStatus } from '@shared/types'
 import { call } from '../lib/api'
@@ -21,7 +22,8 @@ export function IssuesSection({ repoPath, status }: { repoPath: string; status: 
           aria-expanded={open}
           className="flex flex-1 items-center gap-1 px-3 py-1 text-xs font-semibold tracking-wider text-muted uppercase hover:text-fg"
         >
-          <span className="inline-block w-3">{open ? '▾' : '▸'}</span>
+          {open ? <ChevronDown size={12} aria-hidden className="shrink-0" /> : <ChevronRight size={12} aria-hidden className="shrink-0" />}
+          <CircleDot size={13} aria-hidden className="shrink-0" />
           Issues
           <span className="ml-auto font-normal">{issues.data ? issues.data.length : ''}</span>
         </button>

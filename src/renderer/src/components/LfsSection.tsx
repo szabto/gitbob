@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight, HardDrive } from 'lucide-react'
 import { useSectionOpen } from '../lib/sidebar-sections'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -40,7 +41,8 @@ export function LfsSection({ repoPath }: { repoPath: string }) {
         aria-expanded={open}
         className="flex w-full items-center gap-1 px-3 py-1 text-xs font-semibold tracking-wider text-muted uppercase hover:text-fg"
       >
-        <span className="inline-block w-3">{open ? '▾' : '▸'}</span>
+        {open ? <ChevronDown size={12} aria-hidden className="shrink-0" /> : <ChevronRight size={12} aria-hidden className="shrink-0" />}
+          <HardDrive size={13} aria-hidden className="shrink-0" />
         Git LFS
         <span className="ml-auto font-normal">{s.files.length}</span>
       </button>

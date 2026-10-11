@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight, GitPullRequest } from 'lucide-react'
 import { useSectionOpen } from '../lib/sidebar-sections'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -112,7 +113,8 @@ export function PullRequestsSection({
           className="flex flex-1 items-center gap-1 px-3 py-1 text-xs font-semibold tracking-wider text-muted uppercase hover:text-fg"
           aria-expanded={open}
         >
-          <span className="inline-block w-3">{open ? '▾' : '▸'}</span>
+          {open ? <ChevronDown size={12} aria-hidden className="shrink-0" /> : <ChevronRight size={12} aria-hidden className="shrink-0" />}
+          <GitPullRequest size={13} aria-hidden className="shrink-0" />
           Pull requests
           {pulls.data && <span className="ml-auto font-normal">{pulls.data.length}</span>}
         </button>

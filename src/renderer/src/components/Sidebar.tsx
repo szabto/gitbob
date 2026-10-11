@@ -1,3 +1,4 @@
+import { Archive, Boxes, Check, ChevronDown, ChevronRight, Cloud, FolderTree, GitBranch, History, Laptop, Tag, type LucideIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useHiddenRefs, useHiddenStore } from '../state/hidden'
 import { IssuesSection } from './IssuesSection'
@@ -93,7 +94,7 @@ export function Sidebar({
       </div>
       {/* Spacer: open sections above, collapsed ones docked below. */}
       <div className="flex-1" style={{ order: 1 }} />
-      <Section title="Local" count={local.length} testId="local-branches" {...(filtering ? { open: true, onToggle: () => {} } : {})}>
+      <Section title="Local" icon={Laptop} count={local.length} testId="local-branches" {...(filtering ? { open: true, onToggle: () => {} } : {})}>
         <RefTree
           refs={local}
           scope="local"
@@ -118,7 +119,7 @@ export function Sidebar({
       )}
       {provider?.repo && <IssuesSection repoPath={repoPath} status={provider} />}
       <Section
-        title="Remote"
+        title="Remote" icon={Cloud}
         count={remote.length}
         testId="remote-branches"
         action={{ label: '+', title: 'Add remote', onClick: () => void actions.addRemote() }}
@@ -151,7 +152,7 @@ export function Sidebar({
           />
         ))}
       </Section>
-      <Section title="Tags" count={tags.length} testId="tags" {...(filtering ? { open: true, onToggle: () => {} } : {})}>
+      <Section title="Tags" icon={Tag} count={tags.length} testId="tags" {...(filtering ? { open: true, onToggle: () => {} } : {})}>
         <RefTree
           refs={tags}
           scope="tags"
@@ -175,7 +176,7 @@ export function Sidebar({
           )}
         />
       </Section>
-      <Section title="Stashes" count={stashes.length} testId="stashes">
+      <Section title="Stashes" icon={Archive} count={stashes.length} testId="stashes">
         {stashes.map((s) => (
           <li key={s.sha}>
             <button
@@ -214,7 +215,7 @@ function WorktreeSection({ repoPath, actions }: { repoPath: string; actions: Act
   const list = (worktrees.data ?? []).filter((w) => !w.bare)
   return (
     <Section
-      title="Worktrees"
+      title="Worktrees" icon={FolderTree}
       count={list.length}
       testId="worktrees"
       action={{ label: '+', title: 'Add worktree', onClick: () => void actions.addWorktree() }}
@@ -271,7 +272,7 @@ function SubmoduleSection({ repoPath, actions }: { repoPath: string; actions: Ac
   }
   return (
     <Section
-      title="Submodules"
+      title="Submodules" icon={Boxes}
       count={subs.data.length}
       testId="submodules"
       action={{ label: '⟳', title: 'Update all submodules', onClick: () => void actions.updateSubmodules() }}
@@ -322,7 +323,7 @@ function ReflogSection({
 
   return (
     <Section
-      title="Reflog"
+      title="Reflog" icon={History}
       count={reflog.data?.length ?? null}
       testId="reflog"
       open={open}
@@ -380,7 +381,9 @@ function Section({
   children,
   open: controlledOpen,
   onToggle,
+  icon: Icon,
 }: {
+  icon?: LucideIcon
   title: string
   /** null hides the count (e.g. not loaded yet). */
   count: number | null
@@ -402,7 +405,8 @@ function Section({
           className="flex flex-1 items-center gap-1 px-3 py-1 text-xs font-semibold tracking-wider text-muted uppercase hover:text-fg"
           aria-expanded={open}
         >
-          <span className="inline-block w-3">{open ? '▾' : '▸'}</span>
+          {open ? <ChevronDown size={12} aria-hidden className="shrink-0" /> : <ChevronRight size={12} aria-hidden className="shrink-0" />}
+          {Icon && <Icon size={13} aria-hidden className="shrink-0" />}
           {title}
           {count !== null && <span className="ml-auto font-normal">{count}</span>}
         </button>
@@ -480,7 +484,13 @@ function RefItem({
           active ? 'font-semibold text-accent' : ''
         } ${hidden ? 'opacity-45' : ''} ${drop.isOver ? 'bg-accent/20 outline outline-1 -outline-offset-1 outline-accent' : ''}`}
       >
-        {active && <span aria-label="current branch">●</span>}
+        {active ? (
+          <Check size={13} aria-label="current branch" className="shrink-0" />
+        ) : gitRef.kind === 'tag' ? (
+          <Tag size={13} aria-hidden className="shrink-0 text-muted" />
+        ) : (
+          <GitBranch size={13} aria-hidden className="shrink-0 text-muted" />
+        )}
         <span className="truncate">{label ?? gitRef.shortName}</span>
         {gitRef.upstream && (gitRef.ahead || gitRef.behind || gitRef.upstreamGone) ? (
           <span className="ml-auto shrink-0 text-[11px] font-normal text-muted" data-testid="ahead-behind">
@@ -517,8 +527,8 @@ function RemoteGroup({
           }}
           className="flex w-full items-center gap-1.5 py-0.5 pr-3 pl-3 text-left text-muted hover:bg-panel-2 hover:text-fg"
         >
-          <span className="inline-block w-3 text-[10px]">{open ? '▾' : '▸'}</span>
-          <span aria-hidden>☁</span>
+          {open ? <ChevronDown size={12} aria-hidden className="shrink-0" /> : <ChevronRight size={12} aria-hidden className="shrink-0" />}
+          <Cloud size={13} aria-hidden className="shrink-0" />
           <span className="truncate">{name}</span>
           <span className="ml-auto text-[10px]">{refs.length}</span>
         </button>

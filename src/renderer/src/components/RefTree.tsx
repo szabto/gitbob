@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight, Folder, FolderOpen } from 'lucide-react'
 import { useState } from 'react'
 import type { GitRef } from '@shared/types'
 
@@ -98,8 +99,8 @@ export function RefTree({
             className="flex w-full items-center gap-1.5 py-0.5 pr-3 text-left text-muted hover:bg-panel-2 hover:text-fg"
             style={{ paddingLeft: 12 + d * 12 }}
           >
-            <span className="inline-block w-3 text-[10px]">{open ? '▾' : '▸'}</span>
-            <span aria-hidden>📁</span>
+            {open ? <ChevronDown size={12} aria-hidden className="shrink-0" /> : <ChevronRight size={12} aria-hidden className="shrink-0" />}
+            {open ? <FolderOpen size={13} aria-hidden className="shrink-0" /> : <Folder size={13} aria-hidden className="shrink-0" />}
             <span className="truncate">{sub.name}</span>
             <span className="ml-auto text-[10px]">{countRefs(sub)}</span>
           </button>

@@ -1,3 +1,4 @@
+import { Archive, ArchiveRestore, ArrowDownToLine, ArrowUpFromLine, ChevronDown, Command, FolderOpen, GitBranchPlus, RefreshCw, Redo2, Search, SquareTerminal, Undo2, X, type LucideIcon } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { CommitSummary, GitRef, RepositoryInfo } from '@shared/types'
@@ -205,7 +206,7 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
   return (
     <DropHandler.Provider value={dropHandler}>
       <div className="flex min-h-0 flex-1 flex-col">
-        <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border bg-panel px-3">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-panel px-3">
           <Logo size={22} />
           <Picker
             label="Switch repository"
@@ -297,20 +298,24 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
               <>
                 <ToolbarButton
                   label="Undo"
+                  icon={Undo2}
                   title={undoState.data?.undo ? `Undo: ${undoState.data.undo}` : 'Nothing to undo'}
                   disabled={!!busy || !undoState.data?.undo}
                   onClick={() => void actions.undo()}
                 />
                 <ToolbarButton
                   label="Redo"
+                  icon={Redo2}
                   title={undoState.data?.redo ? `Redo: ${undoState.data.redo}` : 'Nothing to redo'}
                   disabled={!!busy || !undoState.data?.redo}
                   onClick={() => void actions.redo()}
                 />
                 <span className="mx-1 h-5 border-l border-border" />
-                <ToolbarButton label="Fetch" disabled={!!busy || remoteNames.length === 0} onClick={() => void actions.fetch()} />
+                <ToolbarButton label="Fetch"
+                  icon={RefreshCw} disabled={!!busy || remoteNames.length === 0} onClick={() => void actions.fetch()} />
                 <ToolbarButton
                   label="Pull"
+                  icon={ArrowDownToLine}
                   disabled={!!busy || !currentRefObj?.upstream}
                   onClick={() => void actions.pull('ff-only')}
                   onMenu={(e) =>
@@ -323,30 +328,36 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
                 />
                 <ToolbarButton
                   label="Push"
+                  icon={ArrowUpFromLine}
                   disabled={!!busy || !currentRefObj}
                   onClick={() => void actions.push(currentRefObj, remoteNames)}
                 />
                 <ToolbarButton
                   label="Branch"
+                  icon={GitBranchPlus}
                   disabled={!head.data?.sha}
                   onClick={() => head.data?.sha && void actions.createBranch(head.data.sha)}
                 />
                 <ToolbarButton
                   label="Stash"
+                  icon={Archive}
                   title="Stash all changes"
                   disabled={!!busy || !head.data?.sha || changeCount.unstaged + changeCount.staged === 0}
                   onClick={() => void actions.stash()}
                 />
                 <ToolbarButton
                   label="Pop"
+                  icon={ArchiveRestore}
                   title={stashes.data?.[0] ? `Pop the latest stash: ${stashes.data[0].message}` : 'No stashes'}
                   disabled={!!busy || !stashes.data?.length}
                   onClick={() => stashes.data?.[0] && void actions.applyStash(stashes.data[0], true)}
                 />
                 <span className="mx-1 h-5 border-l border-border" />
-                <ToolbarButton label="Terminal" title="Open a terminal in this repository" onClick={() => void openTerminal()} />
+                <ToolbarButton label="Terminal"
+                  icon={SquareTerminal} title="Open a terminal in this repository" onClick={() => void openTerminal()} />
                 <ToolbarButton
                   label="Search"
+                  icon={Search}
                   title="Search the history"
                   onClick={() => {
                     const el = document.getElementById('graph-search-input') as HTMLInputElement | null
@@ -354,16 +365,13 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
                     el?.select()
                   }}
                 />
-                <ToolbarButton label="Actions" title="All commands" onClick={() => window.dispatchEvent(new Event('gitbob:command-palette'))} />
+                <ToolbarButton label="Actions"
+                  icon={Command} title="All commands" onClick={() => window.dispatchEvent(new Event('gitbob:command-palette'))} />
                 <span className="mx-1 h-5 border-l border-border" />
               </>
             )}
-            <button className="rounded border border-border px-2.5 py-1 hover:bg-panel-2" onClick={onOpen}>
-              Open…
-            </button>
-            <button className="rounded border border-border px-2.5 py-1 hover:bg-panel-2" onClick={onClose}>
-              Close
-            </button>
+            <ToolbarButton label="Open…" icon={FolderOpen} onClick={onOpen} />
+            <ToolbarButton label="Close" icon={X} onClick={onClose} />
           </div>
         </header>
 
@@ -451,28 +459,29 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
 
 function ToolbarButton({
   label,
+  icon: Icon,
   onClick,
   onMenu,
   disabled,
   title,
 }: {
   label: string
+  icon: LucideIcon
   title?: string
   onClick: () => void
   onMenu?: (e: React.MouseEvent) => void
   disabled?: boolean
 }) {
   return (
-    <span className="inline-flex">
+    <span className="inline-flex items-stretch">
       <button
         disabled={disabled}
         onClick={onClick}
         title={title}
-        className={`border border-border px-2.5 py-1 hover:bg-panel-2 disabled:opacity-40 ${
-          onMenu ? 'rounded-l border-r-0' : 'rounded'
-        }`}
+        className="flex min-w-11 flex-col items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] text-muted hover:bg-panel-2 hover:text-fg disabled:opacity-35 disabled:hover:bg-transparent"
       >
-        {label}
+        <Icon size={17} strokeWidth={1.75} aria-hidden />
+        <span>{label}</span>
       </button>
       {onMenu && (
         <button
@@ -483,9 +492,9 @@ function ToolbarButton({
             onMenu(e)
           }}
           onMouseDown={(e) => e.stopPropagation()}
-          className="rounded-r border border-border px-1.5 py-1 text-muted hover:bg-panel-2 disabled:opacity-40"
+          className="-ml-1 rounded px-0.5 text-muted hover:bg-panel-2 hover:text-fg disabled:opacity-35"
         >
-          ▾
+          <ChevronDown size={12} aria-hidden />
         </button>
       )}
     </span>
