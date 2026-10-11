@@ -354,6 +354,7 @@ test('GitKraken-style menus: edit, move and drop commits, fast-forward, compare,
     await mockConfirm(app, 1)
     await menu(row(page, 'third change'), 'Drop commit…')
     await expect.poll(subjects).toEqual(['second change', 'first change, better worded', 'base'])
+    await expect(page.getByTestId('commit-row')).toHaveCount(3)
 
     // Branch label menu in the graph: fast-forward a branch that isn't checked out.
     await menu(page.locator('[data-testid="ref-label"][data-ref="refs/heads/behind"]'), 'Fast-forward behind to main')

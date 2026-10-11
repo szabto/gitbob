@@ -159,12 +159,12 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
   const openCompare = useAppStore((s) => s.openCompare)
   const commitBySha = useMemo(() => new Map(commits.map((c) => [c.sha, c])), [commits])
   // Ancestors of HEAD among the loaded commits, computed on first use per HEAD / page set.
-  const ancestors = useRef<{ key: string; set: Set<string> } | null>(null)
+  // Keyed on HEAD and the commit list itself: a rewrite can change commits without changing their count.
+  const ancestors = useRef<{ head: string; commits: CommitSummary[]; set: Set<string> } | null>(null)
   const onCurrentBranch = (sha: string): boolean => {
     const headSha = head.data?.sha
     if (!headSha) return false
-    const key = `${headSha}:${commits.length}`
-    if (ancestors.current?.key !== key) {
+    if (ancestors.current?.head !== headSha || ancestors.current.commits !== commits) {
       const set = new Set<string>()
       const stack = [headSha]
       while (stack.length) {
@@ -173,7 +173,7 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
         set.add(s)
         for (const p of commitBySha.get(s)?.parents ?? []) stack.push(p)
       }
-      ancestors.current = { key, set }
+      ancestors.current = { head: headSha, commits, set }
     }
     return ancestors.current.set.has(sha)
   }
