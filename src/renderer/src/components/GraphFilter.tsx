@@ -43,7 +43,7 @@ export function GraphFilter({ refs }: { refs: GitRef[] }) {
       {summary && (
         <span className="flex min-w-0 items-center gap-1 text-[11px] text-accent" data-testid="filter-summary">
           <span className="truncate">{summary}</span>
-          <button aria-label="Clear filter" className="text-muted hover:text-fg" onClick={() => setFilter(null)}>
+          <button aria-label="Clear filter" className="shrink-0 text-muted hover:text-fg" onClick={() => setFilter(null)}>
             ✕
           </button>
         </span>

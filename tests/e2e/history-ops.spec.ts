@@ -370,7 +370,8 @@ test('GitKraken-style menus: edit, move and drop commits, fast-forward, compare,
     // Solo shows only that branch.
     await menu(page.locator('[data-testid="ref-item"][data-ref="refs/remotes/origin/old-remote"]'), 'Solo')
     await expect(page.getByTestId('filter-summary')).toBeVisible()
-    await page.getByRole('button', { name: 'Clear filter' }).first().click()
+    await page.getByTestId('graph-header').getByRole('button', { name: 'Clear filter' }).click()
+    await expect(page.getByTestId('filter-summary')).toHaveCount(0)
 
     // Delete a branch on the server (confirmed natively).
     await menu(page.locator('[data-testid="ref-item"][data-ref="refs/remotes/origin/old-remote"]'), 'Delete origin/old-remote…')
