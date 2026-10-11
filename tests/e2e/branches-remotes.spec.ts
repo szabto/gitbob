@@ -198,7 +198,8 @@ test('remembers HTTPS credentials through the configured credential helper', asy
   work.git(['remote', 'add', 'origin', `${server.url}/${basename(bare.dir)}`])
   // Test-only helper so the real system keychain is never touched.
   const store = join(makeTempDir('gitbob-creds-'), 'creds')
-  work.git(['config', 'credential.helper', `store --file=${store}`])
+  // Git splits helper commands like a shell, so a Windows path needs forward slashes here.
+  work.git(['config', 'credential.helper', `store --file=${store.replace(/\\/g, '/')}`])
 
   const { app, page } = await launch(work.dir)
   try {
