@@ -2,7 +2,7 @@ import { test, expect, _electron as electron, type ElectronApplication } from '@
 import { execFileSync } from 'node:child_process'
 import { existsSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve, sep } from 'node:path'
 import { cleanupFixtures, createFixtureRepo, makeTempDir } from '../helpers/fixture'
 
 const appDir = resolve(import.meta.dirname, '../..')
@@ -143,9 +143,10 @@ test('shows repository paths under the home folder as ~/…', async () => {
   const repo = createFixtureRepo()
   repo.commit('base', { 'a.txt': '1' })
   const parent = resolve(repo.dir, '..')
-  const { app, page } = await launch(repo.dir, makeTempDir('gitbob-ud-'), { HOME: parent })
+  // Windows reads the home folder from USERPROFILE.
+  const { app, page } = await launch(repo.dir, makeTempDir('gitbob-ud-'), { HOME: parent, USERPROFILE: parent })
   try {
-    await expect(page.getByTestId('repo-path')).toHaveText(`~/${repo.dir.split('/').pop()}`)
+    await expect(page.getByTestId('repo-path')).toHaveText(`~${sep}${basename(repo.dir)}`)
     expect(homedir()).not.toBe(parent)
   } finally {
     await app.close()

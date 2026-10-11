@@ -1,6 +1,6 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { existsSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { cleanupFixtures, createFixtureRepo, makeTempDir } from '../helpers/fixture'
 
 const appDir = resolve(import.meta.dirname, '../..')
@@ -48,7 +48,7 @@ test('clones a repository into a chosen folder and opens it', async () => {
     await page.getByRole('button', { name: 'Choose folder…' }).click()
     await expect(page.getByTestId('commit-row')).toHaveCount(2)
     await expect(page.getByTestId('repo-tab')).toHaveCount(1)
-    const name = server.dir.split('/').pop()!.replace(/\.git$/, '')
+    const name = basename(server.dir).replace(/\.git$/, '')
     expect(existsSync(join(parent, name, 'a.txt'))).toBe(true)
     await expect(page.locator('[data-testid="ref-item"][data-ref="refs/remotes/origin/main"]')).toBeVisible()
   } finally {

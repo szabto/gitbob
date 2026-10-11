@@ -1,5 +1,5 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 import { cleanupFixtures, createFixtureRepo, makeTempDir, type FixtureRepo } from '../helpers/fixture'
 
 const appDir = resolve(import.meta.dirname, '../..')
@@ -42,7 +42,7 @@ test('opens a repository from the command line and renders its real history grap
   const { repo, shas } = buildRepo()
   const { app, page } = await launch({ repo: repo.dir, userData: makeTempDir('gitbob-ud-') })
   try {
-    await expect(page.getByTestId('repo-name')).toHaveText(repo.dir.split('/').pop()!)
+    await expect(page.getByTestId('repo-name')).toHaveText(basename(repo.dir))
     await expect(page.getByTestId('head-label')).toHaveText('main')
 
     const rows = page.getByTestId('commit-row')
@@ -127,7 +127,7 @@ test('opens a repository via the dialog, remembers it, and reports invalid folde
     await expect(page.getByTestId('repo-tab')).toHaveCount(1)
     await expect(page.getByTestId('commit-row')).toHaveCount(8)
     await page.getByRole('button', { name: 'New tab' }).click()
-    const recent = page.getByTestId('recent-repo').filter({ hasText: repo.dir.split('/').pop()! })
+    const recent = page.getByTestId('recent-repo').filter({ hasText: basename(repo.dir) })
     await expect(recent).toBeVisible()
     await recent.click()
     await expect(page.getByTestId('repo-tab')).toHaveCount(1)
@@ -161,7 +161,7 @@ test('opens several repositories in tabs, switches and closes them', async () =>
     await expect(page.getByTestId('wip-row')).toBeVisible({ timeout: 10_000 })
 
     // Close the active tab: the other one becomes active.
-    await page.getByRole('button', { name: `Close ${a.dir.split('/').pop()}` }).click()
+    await page.getByRole('button', { name: `Close ${basename(a.dir)}` }).click()
     await expect(page.getByTestId('repo-tab')).toHaveCount(1)
     await expect(page.getByTestId('commit-row')).toHaveCount(1)
   } finally {
