@@ -284,3 +284,46 @@ test('asks for an SSH key passphrase and to trust a new host', async () => {
     await app.close()
   }
 })
+
+test('drag and drop: merge a branch, rebase onto one, and cherry-pick a commit', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1\n' })
+  repo.branch('feature')
+  repo.branch('topic')
+  repo.commit('main work', { 'm.txt': 'm\n' })
+  repo.checkout('feature')
+  repo.commit('feature work', { 'f.txt': 'f\n' })
+  repo.checkout('topic')
+  const picked = repo.commit('topic fix', { 't.txt': 't\n' })
+  repo.checkout('main')
+  const { app, page } = await launch(repo.dir)
+  const item = (ref: string) => page.locator(`[data-testid="ref-item"][data-ref="${ref}"]`)
+  try {
+    // Drop feature on main (current) → merge.
+    await item('refs/heads/feature').dragTo(item('refs/heads/main'))
+    await page.getByRole('menuitem', { name: 'Merge feature into main' }).click()
+    await expect(page.getByTestId('notice')).toContainText('Merged feature')
+    expect(repo.git(['log', '-1', '--format=%s'])).toBe("Merge branch 'feature'")
+
+    // Drag a commit row onto the current branch's label in the graph → cherry-pick.
+    await page.locator(`[data-testid="commit-row"][data-sha="${picked}"]`).dragTo(page.locator('[data-testid="ref-badge"][data-ref="refs/heads/main"]'))
+    await page.getByRole('menuitem', { name: `Cherry-pick ${picked.slice(0, 7)} onto main` }).click()
+    await expect.poll(() => repo.git(['log', '-1', '--format=%s'])).toBe('topic fix')
+
+    // Check out topic, drop it onto main → rebase (confirmed natively), then undo it.
+    repo.checkout('topic')
+    await expect(page.getByTestId('head-label')).toHaveText('topic')
+    await app.evaluate(({ dialog }) => {
+      dialog.showMessageBox = (() => Promise.resolve({ response: 1, checkboxChecked: false })) as typeof dialog.showMessageBox
+    })
+    await item('refs/heads/topic').dragTo(item('refs/heads/main'))
+    await page.getByRole('menuitem', { name: 'Rebase topic onto main' }).click()
+    await expect(page.getByTestId('notice')).toContainText('Rebased onto main')
+    expect(repo.git(['merge-base', '--is-ancestor', 'main', 'topic']).length).toBe(0)
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    await expect(page.getByTestId('notice')).toContainText('Undid: Rebase onto main')
+    expect(repo.rev('topic')).toBe(picked)
+  } finally {
+    await app.close()
+  }
+})

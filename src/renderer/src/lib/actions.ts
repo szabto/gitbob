@@ -190,6 +190,16 @@ export function useRepoActions(repoPath: string) {
     },
     revert: (sha: string) => run(null, () => call('history:revert', { repoPath, sha })),
     cherryPick: (sha: string) => run(null, () => call('history:cherry-pick', { repoPath, shas: [sha] })),
+    merge: (ref: GitRef, mode: 'ff' | 'no-ff' | 'ff-only' = 'ff') =>
+      run('Merging…', async () => {
+        const r = await call('branch:merge', { repoPath, ref: ref.name, mode })
+        showNotice(r.upToDate ? `Already up to date with ${ref.shortName}.` : r.fastForward ? `Fast-forwarded to ${ref.shortName}.` : `Merged ${ref.shortName}.`)
+      }),
+    rebase: (onto: GitRef) =>
+      run('Rebasing…', async () => {
+        const r = await call('branch:rebase', { repoPath, onto: onto.name })
+        if (r.done) showNotice(`Rebased onto ${onto.shortName}.`)
+      }),
     continueOperation: () => run(null, () => call('op:continue', { repoPath })),
     abortOperation: () => run(null, () => call('op:abort', { repoPath })),
     skipOperation: () => run(null, () => call('op:skip', { repoPath })),

@@ -6,6 +6,7 @@ import { useAppStore } from '../state/store'
 import { formatShortDate, shortSha } from '../lib/format'
 import { GraphCell, LANE_WIDTH, ROW_HEIGHT } from './GraphCell'
 import { RefBadge } from './RefBadge'
+import { endDrag, startDrag } from '../lib/dnd'
 import { GraphSearch } from './GraphSearch'
 import { GraphFilter } from './GraphFilter'
 
@@ -163,6 +164,9 @@ export function CommitGraph({
                 aria-selected={selected}
                 data-testid="commit-row"
                 data-sha={commit.sha}
+                draggable
+                onDragStart={(e) => startDrag(e, { kind: 'commit', sha: commit.sha, subject: commit.subject })}
+                onDragEnd={endDrag}
                 onClick={() => select(commit.sha)}
                 onContextMenu={(e) => {
                   e.preventDefault()

@@ -275,6 +275,66 @@ export async function cherryPick(repoPath: string, shas: string[], opts: { mainl
 }
 
 // ---------------------------------------------------------------------------
+// Merge / rebase onto a branch
+
+const MERGE_REF_RE = /^refs\/(heads|remotes|tags)\/[^\s~^:?*[\\]+$/
+
+/** A full branch/tag ref that exists and points to a commit (never parsed as an option). */
+async function assertMergeableRef(repoPath: string, ref: string): Promise<string> {
+  if (typeof ref !== 'string' || !MERGE_REF_RE.test(ref) || ref.includes('..') || ref.endsWith('.lock')) {
+    throw new GitError('INVALID_ARGUMENT', `Not a branch or tag: ${ref}`)
+  }
+  const r = await runGit(['rev-parse', '-q', '--verify', `${ref}^{commit}`], { cwd: repoPath, okExitCodes: [0, 1, 128] })
+  if (r.exitCode !== 0) throw new GitError('NOT_FOUND', `${ref.replace(/^refs\/(heads|remotes|tags)\//, '')} does not exist`)
+  return r.stdout.trim()
+}
+
+export type MergeMode = 'ff' | 'no-ff' | 'ff-only'
+
+/**
+ * Merge a branch or tag into the current branch (`git merge --no-edit`). A conflict stops the
+ * merge (the operation banner offers continue/abort). Returns whether it was a fast-forward.
+ */
+export async function mergeRef(repoPath: string, ref: string, opts: { mode: MergeMode }): Promise<{ fastForward: boolean; upToDate: boolean }> {
+  if (opts.mode !== 'ff' && opts.mode !== 'no-ff' && opts.mode !== 'ff-only') throw new GitError('INVALID_ARGUMENT', 'Invalid merge mode')
+  const target = await assertMergeableRef(repoPath, ref)
+  await assertNoOperation(repoPath)
+  const before = await runGit(['rev-parse', '-q', '--verify', 'HEAD^{commit}'], { cwd: repoPath, okExitCodes: [0, 1, 128] })
+  // Same wording as git's default message, without the refs/ prefix the full ref would leave in it.
+  const kind = ref.startsWith('refs/heads/') ? 'branch' : ref.startsWith('refs/remotes/') ? 'remote-tracking branch' : 'tag'
+  const name = ref.replace(/^refs\/(heads|remotes|tags)\//, '')
+  const current = (await runGit(['symbolic-ref', '-q', '--short', 'HEAD'], { cwd: repoPath, okExitCodes: [0, 1] })).stdout.trim()
+  const into = current && current !== 'main' && current !== 'master' ? ` into ${current}` : ''
+  const r = await runGit(['merge', '--no-edit', `--${opts.mode}`, '-m', `Merge ${kind} '${name}'${into}`, ref], {
+    cwd: repoPath,
+    env: NO_EDITOR_ENV,
+    timeoutMs: COMMIT_TIMEOUT,
+    okExitCodes: ALL_EXIT_CODES,
+  })
+  if (r.exitCode !== 0) throw await stoppedError(repoPath, 'Merge', r)
+  const after = (await runGit(['rev-parse', 'HEAD'], { cwd: repoPath })).stdout.trim()
+  const upToDate = before.exitCode === 0 && before.stdout.trim() === after
+  return { fastForward: !upToDate && after === target, upToDate }
+}
+
+/** Commits on the current branch that a rebase onto `ref` would rewrite. */
+export async function commitsToRebase(repoPath: string, ref: string): Promise<number> {
+  await assertMergeableRef(repoPath, ref)
+  const r = await runGit(['rev-list', '--count', `${ref}..HEAD`], { cwd: repoPath })
+  return Number(r.stdout.trim()) || 0
+}
+
+/** Rebase the current branch onto a branch or tag (`git rebase <ref>`). A conflict stops it. */
+export async function rebaseOnto(repoPath: string, ref: string): Promise<void> {
+  await assertMergeableRef(repoPath, ref)
+  await assertNoOperation(repoPath)
+  const branch = await runGit(['symbolic-ref', '-q', 'HEAD'], { cwd: repoPath, okExitCodes: [0, 1] })
+  if (branch.exitCode !== 0) throw new GitError('INVALID_ARGUMENT', 'Check out a branch before rebasing')
+  const r = await runGit(['rebase', ref], { cwd: repoPath, env: NO_EDITOR_ENV, timeoutMs: COMMIT_TIMEOUT, okExitCodes: ALL_EXIT_CODES })
+  if (r.exitCode !== 0) throw await stoppedError(repoPath, 'Rebase', r)
+}
+
+// ---------------------------------------------------------------------------
 // Continue / abort / skip
 
 async function currentOperation(repoPath: string, allowed: readonly GitOperation[], verb: string): Promise<GitOperation> {

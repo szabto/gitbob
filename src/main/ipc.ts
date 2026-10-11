@@ -34,7 +34,7 @@ import { appInfo, gitIdentity, setGitIdentity, validateGitPath } from './app-inf
 import type { Updater } from './updater'
 import { applyStash, createStash, dropStash, getStashFiles, listStashes } from '@git-core/stash'
 import { createTag, deleteTag, listTags, pushTag } from '@git-core/tags'
-import { abortOperation, cherryPick, continueOperation, reset, revert, skipOperation } from '@git-core/history'
+import { abortOperation, cherryPick, commitsToRebase, continueOperation, mergeRef, rebaseOnto, reset, revert, skipOperation } from '@git-core/history'
 import { getReflog } from '@git-core/reflog'
 import { cleanupRebaseFiles, getRebaseTodo, interactiveRebase } from '@git-core/rebase'
 import { getBlame } from '@git-core/blame'
@@ -202,6 +202,30 @@ export function registerIpc(ctx: IpcContext): void {
     'log:search': ({ repoPath, query }) => searchCommits(requireOpened(repoPath), query),
     'commit:details': ({ repoPath, sha }) => getCommitDetails(requireOpened(repoPath), sha),
     'status:get': ({ repoPath }) => health.timeStatus(requireOpened(repoPath), () => getStatus(repoPath)),
+    'branch:merge': ({ repoPath, ref, mode }) =>
+      journaled(
+        requireOpened(repoPath),
+        `Merge ${ref.replace(/^refs\/(heads|remotes|tags)\//, '')}`,
+        () => mergeRef(repoPath, ref, { mode }),
+        (b, a) => branchMove(b, a, 'keep'),
+      ),
+    'branch:rebase': async ({ repoPath, onto }, event) => {
+      requireOpened(repoPath)
+      const name = onto.replace(/^refs\/(heads|remotes|tags)\//, '')
+      const count = await commitsToRebase(repoPath, onto)
+      const head = await headSnapshot(repoPath)
+      const current = (head.ref ?? '').replace(/^refs\/heads\//, '') || 'the current branch'
+      if (count > 0) {
+        const confirmed = await confirmDestructive(event, {
+          message: `Rebase ${current} onto ${name}?`,
+          detail: `${count} commit${count === 1 ? '' : 's'} of ${current} will be rewritten on top of ${name}. If ${current} was already pushed, you will need to force push it afterwards. Undo can take the rebase back.`,
+          confirmLabel: 'Rebase',
+        })
+        if (!confirmed) return { done: false }
+      }
+      await journaled(repoPath, `Rebase onto ${name}`, () => rebaseOnto(repoPath, onto), (b, a) => branchMove(b, a, 'keep'))
+      return { done: true }
+    },
     'file:history': ({ repoPath, path, skip }) => getFileHistory(requireOpened(repoPath), path, { skip, limit: 500 }),
     'repo:health': async ({ repoPath }) => ({ suggestCommitGraph: await health.suggestCommitGraph(requireOpened(repoPath)) }),
     'repo:write-commit-graph': async ({ repoPath }) => {

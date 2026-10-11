@@ -160,6 +160,7 @@ Changed your mind about a file? **Discard** throws away its unstaged edits after
 - **New branch:** click **Branch** in the toolbar (it starts from where you are), or right-click any commit → **Create branch here…**
 - **Folders:** branches named like `feature/login` are grouped into collapsible folders (`feature › login`), and remote branches sit under their remote (`origin › feature › login`).
 - **Switch branch:** double-click it in the sidebar. Double-clicking a remote branch such as `origin/feature` creates a local copy that tracks it.
+- **Merge or rebase:** right-click a branch → **Merge … into main** or **Rebase main onto …**, or just drag it: drop a branch on your current branch (in the sidebar or on its label in the graph) and pick merge or rebase. Drag a commit onto your current branch to cherry-pick it.
 - **Rename, delete, set upstream:** right-click the branch. GitBob refuses to delete a branch whose work isn't merged anywhere unless you confirm twice.
 - **Look at an old version:** right-click a commit → **Checkout this commit**.
 
@@ -196,6 +197,7 @@ Right-click any commit for the time-travel tools:
 - **Reset** moves your branch back to that commit. *Soft* keeps the changes staged, *mixed* keeps them as unstaged edits, *hard* throws them away. Before a hard reset GitBob asks you, and saves your uncommitted work as a backup stash so it can come back.
 - **Create tag** marks a release, with an optional message. Push or delete tags from the sidebar.
 - **Undo / Redo** in the toolbar (⌥⌘Z / ⇧⌥⌘Z) take back the last commit, amend, checkout, branch or tag change, reset, cherry-pick, revert, pull or rebase you did in GitBob. Undo never overwrites uncommitted work, and refuses if the repository changed in the meantime.
+- **File history** (in any file's diff, or right-click a file in a commit) lists every commit that changed the file, following renames, with each commit's change.
 - **Blame** (in any file's diff) shows who last changed each line and links to that commit.
 
 Want to tidy up before sharing? Right-click the commit *before* the ones you want to change and choose **Interactive rebase onto here**. Reorder commits with the arrows, and for each one pick **Reword** (new message), **Squash** or **Fixup** (fold into the commit above) or **Drop**.
@@ -309,7 +311,7 @@ Every screenshot in this README is the real app working on a real Git repository
     </td>
     <td width="33%" valign="top">
       <h4>🌿 Branches &amp; sync</h4>
-      Branch folders · create · checkout (local, remote-tracking, detached) · rename · delete (with unmerged protection) · upstream and ahead/behind · remotes add/remove · fetch with prune · pull ff-only/merge/rebase · push with upstream · force-with-lease · HTTPS credential prompt (optionally remembered in the OS keychain) · SSH passphrase and host-key prompts · progress and cancel
+      Branch folders · drag and drop to merge, rebase or cherry-pick · merge (ff / no-ff / ff-only) · rebase onto · create · checkout (local, remote-tracking, detached) · rename · delete (with unmerged protection) · upstream and ahead/behind · remotes add/remove · fetch with prune · pull ff-only/merge/rebase · push with upstream · force-with-lease · HTTPS credential prompt (optionally remembered in the OS keychain) · SSH passphrase and host-key prompts · progress and cancel
     </td>
   </tr>
   <tr>
@@ -329,7 +331,7 @@ Every screenshot in this README is the real app working on a real Git repository
   <tr>
     <td width="33%" valign="top">
       <h4>🎨 Comfortable</h4>
-      Command palette · rebindable shortcuts · settings · accessible dialogs and contrast (checked with axe-core) · repository tabs (restored on restart) · clone with progress · new repository · light, dark or match-system theme · blame · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories · first-run setup (Git check, name and email) · in-app updates on Windows and Linux AppImage
+      Command palette · rebindable shortcuts · settings · accessible dialogs and contrast (checked with axe-core) · repository tabs (restored on restart) · clone with progress · new repository · light, dark or match-system theme · blame · file history · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories · first-run setup (Git check, name and email) · in-app updates on Windows and Linux AppImage
     </td>
   </tr>
 </table>

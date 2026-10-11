@@ -51,6 +51,9 @@ export interface IpcOutputs {
   'repo:health': { suggestCommitGraph: boolean }
   'repo:write-commit-graph': void
   'file:history': FileHistoryPage
+  'branch:merge': { fastForward: boolean; upToDate: boolean }
+  /** done: false if the user declined the confirmation. */
+  'branch:rebase': { done: boolean }
   'repo:head': HeadState
   'log:page': CommitPage
   'log:search': { shas: string[]; truncated: boolean }

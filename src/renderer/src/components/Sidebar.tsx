@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { endDrag, startDrag, useDropTarget } from '../lib/dnd'
 import { useReflog, useSubmodules, useWorktrees } from '../lib/queries'
 import { formatShortDate, shortSha } from '../lib/format'
 import type { GitRef, ProviderStatus, StashEntry } from '@shared/types'
@@ -41,9 +42,18 @@ export function Sidebar({
   const tags = refs.filter((r) => r.kind === 'tag')
   const remoteBranchNames = remote.map((r) => r.shortName)
 
+  const mergeEntries = (r: GitRef): MenuEntry[] =>
+    currentBranch && r.name !== currentRef
+      ? [
+          { label: `Merge ${r.shortName} into ${currentBranch}`, onSelect: () => void actions.merge(r) },
+          { label: `Rebase ${currentBranch} onto ${r.shortName}…`, onSelect: () => void actions.rebase(r) },
+        ]
+      : []
+
   const localMenu = (r: GitRef): MenuEntry[] => [
     { label: `Checkout ${r.shortName}`, disabled: r.name === currentRef, onSelect: () => void actions.checkout(r.name) },
     { label: 'Create branch here…', onSelect: () => void actions.createBranch(r.target) },
+    ...mergeEntries(r),
     'separator',
     { label: 'Rename…', onSelect: () => void actions.rename(r.shortName) },
     r.upstream
@@ -72,6 +82,7 @@ export function Sidebar({
   const remoteMenu = (r: GitRef): MenuEntry[] => [
     { label: `Checkout ${r.shortName}`, onSelect: () => void actions.checkout(r.name) },
     { label: 'Create branch here…', onSelect: () => void actions.createBranch(r.target) },
+    ...mergeEntries(r),
   ]
 
   return (
@@ -406,9 +417,15 @@ function RefItem({
   onDoubleClick?: () => void
   onMenu?: (e: React.MouseEvent) => void
 }) {
+  const drop = useDropTarget(gitRef)
   return (
     <li>
       <button
+        draggable
+        onDragStart={(e) => startDrag(e, { kind: 'ref', ref: gitRef })}
+        onDragEnd={endDrag}
+        {...drop.props}
+        data-drop-over={drop.isOver || undefined}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
         onContextMenu={(e) => {
@@ -422,7 +439,7 @@ function RefItem({
         style={{ paddingLeft: 28 + depth * 12 }}
         className={`flex w-full items-center gap-2 truncate py-0.5 pr-3 text-left hover:bg-panel-2 ${
           active ? 'font-semibold text-accent' : ''
-        }`}
+        } ${drop.isOver ? 'bg-accent/20 outline outline-1 -outline-offset-1 outline-accent' : ''}`}
       >
         {active && <span aria-label="current branch">●</span>}
         <span className="truncate">{label ?? gitRef.shortName}</span>
