@@ -90,3 +90,11 @@ export async function getCommitDetails(repoPath: string, sha: string): Promise<C
     files,
   }
 }
+
+/** Every file path in a commit's tree (for "View all files"), at most `limit`. */
+export async function listCommitFiles(repoPath: string, sha: string, limit = 50_000): Promise<{ paths: string[]; truncated: boolean }> {
+  if (!/^[0-9a-f]{4,64}$/i.test(sha)) throw new GitError('INVALID_ARGUMENT', 'Invalid commit id')
+  const { stdout } = await runGit(['ls-tree', '-r', '-z', '--name-only', '--full-tree', `${sha}^{tree}`], { cwd: repoPath, maxOutputBytes: 64 * 1024 * 1024 })
+  const all = stdout.split('\0').filter(Boolean)
+  return { paths: all.slice(0, limit), truncated: all.length > limit }
+}

@@ -1,22 +1,15 @@
-import type { FileChange, GitRef } from '@shared/types'
-import { useChecks, useCommitDetails, useProviderStatus } from '../lib/queries'
+import type { GitRef } from '@shared/types'
+import { useChecks, useCommitDetails, useHead, useProviderStatus, useRemotes, useStatus } from '../lib/queries'
 import { useQuery } from '@tanstack/react-query'
 import { call } from '../lib/api'
 import { useAppStore } from '../state/store'
-import { useUiStore } from '../state/ui'
 import { formatDate, shortSha } from '../lib/format'
-import { RefBadge } from './RefBadge'
-
-const statusLabel: Record<FileChange['status'], { label: string; cls: string }> = {
-  A: { label: 'A', cls: 'text-ok' },
-  M: { label: 'M', cls: 'text-warn' },
-  D: { label: 'D', cls: 'text-err' },
-  R: { label: 'R', cls: 'text-info' },
-  C: { label: 'C', cls: 'text-info' },
-  T: { label: 'T', cls: 'text-purple' },
-  U: { label: 'U', cls: 'text-err' },
-  X: { label: '?', cls: 'text-muted' },
-}
+import { RefLabelPill } from './RefLabelPill'
+import { Avatar } from './Avatar'
+import { CommitFiles } from './CommitFiles'
+import { buildRefLabels } from '../lib/ref-labels'
+import { useAvatarSource } from '../lib/avatars'
+import { useMemo } from 'react'
 
 export function CommitDetailsPanel({
   repoPath,
@@ -37,10 +30,13 @@ export function CommitDetailsPanel({
   })
   const reveal = useAppStore((s) => s.reveal)
   const select = useAppStore((s) => s.select)
-  const showDiff = useAppStore((s) => s.showDiff)
-  const diffTarget = useAppStore((s) => s.diffTarget)
-  const openFileHistory = useAppStore((s) => s.openFileHistory)
-  const openBlame = useAppStore((s) => s.openBlame)
+  const selectWip = useAppStore((s) => s.selectWip)
+  const status = useStatus(repoPath)
+  const remotes = useRemotes(repoPath)
+  const avatarSource = useAvatarSource(repoPath)
+  const head = useHead(repoPath)
+  const labels = useMemo(() => buildRefLabels([...refsBySha.values()].flat(), head.data?.ref ?? null), [refsBySha, head.data?.ref])
+  const changes = (status.data?.entries ?? []).filter((e) => e.kind !== 'ignored').length
 
   return (
     <aside className="flex w-[380px] shrink-0 flex-col border-l border-border bg-panel" data-testid="commit-details">
@@ -50,6 +46,16 @@ export function CommitDetailsPanel({
           ✕
         </button>
       </div>
+      {changes > 0 && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-info/10 px-3 py-1.5 text-xs" data-testid="wip-banner">
+          <span>
+            {changes} file change{changes === 1 ? '' : 's'} in the working directory
+          </span>
+          <button className="ml-auto rounded border border-border px-2 py-0.5 hover:bg-panel-2" onClick={selectWip}>
+            View changes
+          </button>
+        </div>
+      )}
       {details.isPending ? (
         <div className="p-4 text-muted">Loading…</div>
       ) : details.isError ? (
@@ -57,7 +63,7 @@ export function CommitDetailsPanel({
       ) : (
         <div className="selectable min-h-0 flex-1 overflow-y-auto p-3">
           <div className="mb-2 flex flex-wrap gap-1">
-            {refsBySha.get(details.data.sha)?.map((r) => <RefBadge key={r.name} gitRef={r} current={false} />)}
+            {labels.get(details.data.sha)?.map((l) => <RefLabelPill key={l.key} label={l} remotes={remotes.data ?? []} />)}
           </div>
           <h2 className="text-[15px] font-semibold break-words" data-testid="details-subject">
             {details.data.subject}
@@ -74,9 +80,12 @@ export function CommitDetailsPanel({
               {details.data.sha}
             </dd>
             <dt className="text-muted">Author</dt>
-            <dd>
-              {details.data.authorName} &lt;{details.data.authorEmail}&gt;
-              <div className="text-muted">{formatDate(details.data.authorTime)}</div>
+            <dd className="flex items-start gap-2">
+              <Avatar name={details.data.authorName} email={details.data.authorEmail} source={avatarSource} size={28} />
+              <div className="min-w-0">
+                {details.data.authorName} &lt;{details.data.authorEmail}&gt;
+                <div className="text-muted">authored {formatDate(details.data.authorTime)}</div>
+              </div>
             </dd>
             {(details.data.committerEmail !== details.data.authorEmail ||
               details.data.commitTime !== details.data.authorTime) && (
@@ -127,48 +136,7 @@ export function CommitDetailsPanel({
             </dd>
           </dl>
 
-          <h3 className="mt-5 mb-1 text-xs font-semibold tracking-wider text-muted uppercase">
-            {details.data.files.length} file{details.data.files.length === 1 ? '' : 's'} changed
-            {details.data.parents.length > 1 && ' (vs first parent)'}
-          </h3>
-          <ul data-testid="details-files" className="font-mono text-xs">
-            {details.data.files.map((f) => (
-              <li
-                key={`${f.status}:${f.oldPath ?? ''}:${f.path}`}
-                data-testid="details-file"
-                data-path={f.path}
-                onClick={() =>
-                  showDiff({ kind: 'commit', sha: details.data.sha, path: f.path, ...(f.oldPath ? { oldPath: f.oldPath } : {}) })
-                }
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  useUiStore.getState().openMenu(e.clientX, e.clientY, [
-                    { label: 'File history', onSelect: () => openFileHistory(f.path) },
-                    ...(f.status === 'D' ? [] : [{ label: 'Blame', onSelect: () => openBlame({ path: f.path, rev: details.data.sha }) }]),
-                  ])
-                }}
-                className={`-mx-1 flex cursor-default items-center gap-2 rounded px-1 py-0.5 ${
-                  diffTarget?.kind === 'commit' && diffTarget.sha === details.data.sha && diffTarget.path === f.path
-                    ? 'bg-accent/20'
-                    : 'hover:bg-fg/[0.05]'
-                }`}
-              >
-                <span className={`w-3 shrink-0 font-bold ${statusLabel[f.status].cls}`}>{statusLabel[f.status].label}</span>
-                <span className="min-w-0 flex-1 truncate" title={f.oldPath ? `${f.oldPath} → ${f.path}` : f.path}>
-                  {f.oldPath ? `${f.oldPath} → ` : ''}
-                  {f.path}
-                </span>
-                {f.additions === null ? (
-                  <span className="text-muted">bin</span>
-                ) : (
-                  <span className="shrink-0">
-                    <span className="text-ok">+{f.additions}</span>{' '}
-                    <span className="text-err">-{f.deletions}</span>
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+          <CommitFiles repoPath={repoPath} sha={details.data.sha} files={details.data.files} isMerge={details.data.parents.length > 1} />
         </div>
       )}
     </aside>

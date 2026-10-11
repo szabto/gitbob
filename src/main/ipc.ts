@@ -9,7 +9,7 @@ import { openRepository } from '@git-core/repository'
 import { getHead, listRefs } from '@git-core/refs'
 import { getCommitPage } from '@git-core/log'
 import { cloneRepository, initRepository } from '@git-core/create'
-import { getCommitDetails } from '@git-core/details'
+import { getCommitDetails, listCommitFiles } from '@git-core/details'
 import { searchCommits } from '@git-core/search'
 import { getStatus } from '@git-core/status'
 import { discardPaths, stageAll, stagePaths, unstageAll, unstagePaths } from '@git-core/staging'
@@ -205,6 +205,7 @@ export function registerIpc(ctx: IpcContext): void {
       health.timeFirstPage(requireOpened(repoPath), filter ? -1 : skip, () => getCommitPage(repoPath, { skip, limit, ...(filter ? { filter } : {}) })),
     'log:search': ({ repoPath, query }) => searchCommits(requireOpened(repoPath), query),
     'commit:details': ({ repoPath, sha }) => getCommitDetails(requireOpened(repoPath), sha),
+    'commit:all-files': ({ repoPath, sha }) => listCommitFiles(requireOpened(repoPath), sha),
     'status:get': ({ repoPath }) => health.timeStatus(requireOpened(repoPath), () => getStatus(repoPath)),
     'branch:merge': ({ repoPath, ref, mode }) =>
       journaled(

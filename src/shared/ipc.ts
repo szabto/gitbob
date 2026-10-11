@@ -72,6 +72,7 @@ export const ipcInputSchemas = {
   'repo:init': z.object({}).strict(),
   'repo:refs': z.object({ repoPath: absolutePath }),
   'repo:health': z.object({ repoPath: absolutePath }),
+  'commit:all-files': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'avatar:get': z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('email'), email: z.string().min(3).max(320), source: z.enum(['github', 'gravatar']) }),
     z.object({ kind: z.literal('github-owner'), owner: z.string().min(1).max(39) }),

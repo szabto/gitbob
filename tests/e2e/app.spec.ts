@@ -354,3 +354,34 @@ test('branch labels: one label when local and remote match, two when they differ
     await app.close()
   }
 })
+
+test('commit details: uncommitted-changes banner, tree view and all files', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'src/app/main.ts': '1\n', 'src/app/util.ts': '1\n', 'README.md': 'r\n' })
+  repo.commit('touch two', { 'src/app/main.ts': '2\n', 'README.md': 'r2\n' })
+  repo.write('wip.txt', 'w\n')
+  const { app, page } = await launch({ repo: repo.dir, userData: makeTempDir('gitbob-ud-') })
+  try {
+    await page.locator('[data-testid="commit-row"]', { hasText: 'touch two' }).click()
+    const panel = page.getByTestId('commit-details')
+    await expect(panel.getByTestId('wip-banner')).toContainText('1 file change in the working directory')
+
+    // Path view: folder dimmed, file name highlighted; Tree view: folders.
+    await expect(panel.getByTestId('details-file')).toHaveCount(2)
+    await panel.getByRole('button', { name: 'Tree' }).click()
+    await expect(panel.locator('[data-testid="details-folder"][data-folder="src/app"]')).toBeVisible()
+    await panel.locator('[data-testid="details-folder"][data-folder="src/app"]').click()
+    await expect(panel.locator('[data-testid="details-file"][data-path="src/app/main.ts"]')).toHaveCount(0)
+    await panel.getByRole('button', { name: 'Path' }).click()
+
+    // All files adds the unchanged one, marked as unchanged.
+    await panel.getByLabel('All files').check()
+    await expect(panel.getByTestId('details-file')).toHaveCount(3)
+    await expect(panel.locator('[data-testid="details-file"][data-path="src/app/util.ts"]')).not.toHaveAttribute('data-changed', 'true')
+
+    await panel.getByRole('button', { name: 'View changes' }).click()
+    await expect(page.getByTestId('staging-panel')).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
