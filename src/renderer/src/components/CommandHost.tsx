@@ -33,6 +33,11 @@ export function CommandHost({
   const showNotice = useUiStore((s) => s.showNotice)
 
   useEffect(() => subscribe('menu:command-palette', () => setPaletteOpen(true)), [])
+  useEffect(() => {
+    const open = (): void => setPaletteOpen(true)
+    window.addEventListener('gitbob:command-palette', open)
+    return () => window.removeEventListener('gitbob:command-palette', open)
+  }, [])
   useEffect(() => subscribe('menu:settings', () => setSettingsOpen(true)), [])
   useEffect(() => subscribe('settings:changed', (s) => qc.setQueryData(['settings'], s)), [qc])
   useEffect(

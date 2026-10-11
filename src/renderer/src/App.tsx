@@ -159,7 +159,7 @@ export function App() {
       <TabBar />
       {!repo && <GlobalBusy />}
       {repo ? (
-        <RepositoryView key={repo.root} repo={repo} onOpen={pickRepository} onClose={() => setRepo(null)} />
+        <RepositoryView key={repo.root} repo={repo} onOpen={pickRepository} onClose={() => setRepo(null)} onClone={cloneRepository} onInit={initRepository} />
       ) : (
         <Welcome onPick={pickRepository} onOpenPath={openPath} onClone={cloneRepository} onInit={initRepository} />
       )}

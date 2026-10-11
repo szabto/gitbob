@@ -18,11 +18,12 @@ import { OperationBanner } from './OperationBanner'
 import { SpeedUpBanner } from './SpeedUpBanner'
 import { FileHistoryView } from './FileHistoryView'
 import { DropHandler, makeDropHandler } from '../lib/dnd'
+import { Picker } from './Picker'
 import { BlameView } from './BlameView'
 import { PullRequestView } from './PullRequestView'
 import { RebaseDialog } from './RebaseDialog'
 import { CreatePullRequestDialog, PROVIDER_NAMES } from './PullRequests'
-import { useAppInfo, useProviderStatus } from '../lib/queries'
+import { useAppInfo, useProviderStatus, useRecent } from '../lib/queries'
 import { displayPath } from '../lib/format'
 import type { GitRef as GitRefType } from '@shared/types'
 import { useUiStore } from '../state/ui'
@@ -34,9 +35,13 @@ interface Props {
   repo: RepositoryInfo
   onOpen: () => void
   onClose: () => void
+  onClone?: () => void
+  onInit?: () => void
 }
 
-export function RepositoryView({ repo, onOpen, onClose }: Props) {
+const fileManagerName = navigator.platform.startsWith('Mac') ? 'Finder' : navigator.platform.startsWith('Win') ? 'Explorer' : 'file manager'
+
+export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props) {
   const refs = useRefs(repo.root)
   const head = useHead(repo.root)
   const historyFilter = useAppStore((s) => s.historyFilter)
@@ -125,25 +130,87 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
 
   const currentBranch = head.data?.ref?.startsWith('refs/heads/') ? head.data.ref.slice('refs/heads/'.length) : null
 
+  const tabs = useAppStore((s) => s.tabs)
+  const setRepoInStore = useAppStore((s) => s.setRepo)
+  const recent = useRecent()
+  const showError = useUiStore((s) => s.showError)
+  const openRecent = async (path: string): Promise<void> => {
+    try {
+      setRepoInStore(await call('repo:open', { path }))
+    } catch (e) {
+      showError(e)
+    }
+  }
+  const openTerminal = async (): Promise<void> => {
+    try {
+      await call('repo:open-terminal', { repoPath: repo.root })
+    } catch (e) {
+      showError(e)
+    }
+  }
+
   const dropHandler = makeDropHandler({ currentRef: head.data?.ref ?? null, actions }, openMenu)
   return (
     <DropHandler.Provider value={dropHandler}>
       <div className="flex min-h-0 flex-1 flex-col">
         <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border bg-panel px-3">
           <Logo size={22} />
-          <span className="font-semibold" data-testid="repo-name">
-            {repo.name}
-          </span>
+          <Picker
+            label="Switch repository"
+            testId="repo-picker"
+            placeholder="Find a repository"
+            buttonContent={
+              <span className="font-semibold" data-testid="repo-name">
+                {repo.name}
+              </span>
+            }
+            items={[
+              ...tabs.map((t) => ({ key: `tab:${t.root}`, label: t.name, hint: 'open', group: 'Open tabs', current: t.root === repo.root, onSelect: () => setRepoInStore(t) })),
+              ...(recent.data ?? [])
+                .filter((r) => !tabs.some((t) => t.root === r.path))
+                .map((r) => ({ key: `recent:${r.path}`, label: r.name, hint: displayPath(r.path, appInfo.data?.home), group: 'Recent', onSelect: () => void openRecent(r.path) })),
+            ]}
+            footer={[
+              { key: 'open', label: 'Open repository…', onSelect: onOpen },
+              ...(onClone ? [{ key: 'clone', label: 'Clone…', onSelect: onClone }] : []),
+              ...(onInit ? [{ key: 'init', label: 'New repository…', onSelect: onInit }] : []),
+              { key: 'terminal', label: 'Open in terminal', onSelect: () => void openTerminal() },
+              { key: 'reveal', label: `Show in ${fileManagerName}`, onSelect: () => void call('repo:reveal', { repoPath: repo.root }).catch(showError) },
+            ]}
+          />
           <span className="truncate text-xs text-muted" title={repo.root} data-testid="repo-path">
             {displayPath(repo.root, appInfo.data?.home)}
           </span>
-          <span className="ml-2 rounded bg-panel-2 px-2 py-0.5 text-xs" data-testid="head-label">
-            {head.data
-              ? head.data.detached
-                ? `HEAD detached at ${head.data.sha?.slice(0, 7) ?? '?'}`
-                : `${currentBranch ?? head.data.ref}${head.data.unborn ? ' (no commits)' : ''}`
-              : '…'}
-          </span>
+          <Picker
+            label="Switch branch"
+            testId="branch-picker"
+            placeholder="Find a branch"
+            buttonContent={
+              <span className="rounded bg-panel-2 px-2 py-0.5 text-xs" data-testid="head-label">
+                {head.data
+                  ? head.data.detached
+                    ? `HEAD detached at ${head.data.sha?.slice(0, 7) ?? '?'}`
+                    : `${currentBranch ?? head.data.ref}${head.data.unborn ? ' (no commits)' : ''}`
+                  : '…'}
+              </span>
+            }
+            items={[
+              ...(refs.data ?? [])
+                .filter((r) => r.kind === 'head')
+                .map((r) => ({
+                  key: r.name,
+                  label: r.shortName,
+                  group: 'Local',
+                  current: r.name === head.data?.ref,
+                  ...(r.upstream && (r.ahead || r.behind) ? { hint: `↑${r.ahead ?? 0} ↓${r.behind ?? 0}` } : {}),
+                  onSelect: () => r.name !== head.data?.ref && void actions.checkout(r.name),
+                })),
+              ...(refs.data ?? [])
+                .filter((r) => r.kind === 'remote' && !r.name.endsWith('/HEAD'))
+                .map((r) => ({ key: r.name, label: r.shortName, group: 'Remote', onSelect: () => void actions.checkout(r.name) })),
+            ]}
+            footer={head.data?.sha ? [{ key: 'create', label: 'Create branch…', onSelect: () => void actions.createBranch(head.data!.sha!) }] : []}
+          />
           {currentRefObj?.upstream && (
             <span className="text-xs text-muted" data-testid="tracking-status" title={currentRefObj.upstream}>
               {currentRefObj.upstreamGone
@@ -212,6 +279,30 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
                   disabled={!head.data?.sha}
                   onClick={() => head.data?.sha && void actions.createBranch(head.data.sha)}
                 />
+                <ToolbarButton
+                  label="Stash"
+                  title="Stash all changes"
+                  disabled={!!busy || !head.data?.sha || changeCount.unstaged + changeCount.staged === 0}
+                  onClick={() => void actions.stash()}
+                />
+                <ToolbarButton
+                  label="Pop"
+                  title={stashes.data?.[0] ? `Pop the latest stash: ${stashes.data[0].message}` : 'No stashes'}
+                  disabled={!!busy || !stashes.data?.length}
+                  onClick={() => stashes.data?.[0] && void actions.applyStash(stashes.data[0], true)}
+                />
+                <span className="mx-1 h-5 border-l border-border" />
+                <ToolbarButton label="Terminal" title="Open a terminal in this repository" onClick={() => void openTerminal()} />
+                <ToolbarButton
+                  label="Search"
+                  title="Search the history"
+                  onClick={() => {
+                    const el = document.getElementById('graph-search-input') as HTMLInputElement | null
+                    el?.focus()
+                    el?.select()
+                  }}
+                />
+                <ToolbarButton label="Actions" title="All commands" onClick={() => window.dispatchEvent(new Event('gitbob:command-palette'))} />
                 <span className="mx-1 h-5 border-l border-border" />
               </>
             )}

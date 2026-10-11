@@ -48,7 +48,7 @@ test('stashes changes, shows the stash, and pops it back', async () => {
     await page.getByTestId('wip-row').click()
     await page.getByRole('button', { name: 'Stash…' }).click()
     await page.getByLabel('Message (optional)').fill('half-done edit')
-    await page.getByRole('button', { name: 'Stash', exact: true }).click()
+    await page.getByTestId('prompt-dialog').getByRole('button', { name: 'Stash', exact: true }).click()
 
     await expect(page.getByTestId('stash-item')).toHaveText('half-done edit')
     await expect(page.getByTestId('wip-row')).toHaveCount(0)
@@ -280,7 +280,7 @@ test('stash one file, view an untracked stashed file, apply a single file, and t
     await status('a.txt').click({ button: 'right' })
     await page.getByRole('menuitem', { name: 'Stash a.txt…' }).click()
     await page.getByLabel('Message (optional)').fill('just a')
-    await page.getByRole('button', { name: 'Stash', exact: true }).click()
+    await page.getByTestId('prompt-dialog').getByRole('button', { name: 'Stash', exact: true }).click()
     await expect(page.getByTestId('stash-item')).toHaveText('just a')
     // git writes the stash entry before it resets the file, so the list can update first.
     await expect.poll(() => read(repo, 'a.txt')).toBe('one\n')
@@ -289,7 +289,7 @@ test('stash one file, view an untracked stashed file, apply a single file, and t
     // Stash the rest (with the untracked file); its diff shows in the panel.
     await page.getByRole('button', { name: 'Stash…' }).click()
     await page.getByLabel('Message (optional)').fill('the rest')
-    await page.getByRole('button', { name: 'Stash', exact: true }).click()
+    await page.getByTestId('prompt-dialog').getByRole('button', { name: 'Stash', exact: true }).click()
     await expect(page.getByTestId('stash-item')).toHaveCount(2)
     await page.getByTestId('stash-item').filter({ hasText: 'the rest' }).click()
     await page.locator('[data-testid="stash-file"][data-path="new.txt"]').click()

@@ -51,6 +51,8 @@ export interface IpcOutputs {
   'repo:health': { suggestCommitGraph: boolean }
   'repo:write-commit-graph': void
   'file:history': FileHistoryPage
+  'repo:open-terminal': void
+  'repo:reveal': void
   'commit:all-files': { paths: string[]; truncated: boolean }
   /** Avatar image as a data URL, or null (none, or avatars are off). */
   'avatar:get': string | null

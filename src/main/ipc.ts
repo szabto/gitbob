@@ -46,6 +46,7 @@ import type { UndoJournal } from './undo'
 import type { AvatarService } from './avatars'
 import { parseRemoteUrl } from '../providers'
 import { RepoHealth } from './repo-health'
+import { openTerminal } from './terminal'
 import { writeCommitGraph } from '@git-core/maintenance'
 import { getFileHistory } from '@git-core/file-history'
 import { readFileForEdit, saveEditedFile } from '@git-core/worktree-file'
@@ -234,6 +235,11 @@ export function registerIpc(ctx: IpcContext): void {
       return { done: true }
     },
     'file:history': ({ repoPath, path, skip }) => getFileHistory(requireOpened(repoPath), path, { skip, limit: 500 }),
+    'repo:open-terminal': ({ repoPath }) => openTerminal(requireOpened(repoPath)),
+    'repo:reveal': async ({ repoPath }) => {
+      const err = await shell.openPath(requireOpened(repoPath))
+      if (err) throw new GitError('GIT_FAILED', err)
+    },
     'repo:health': async ({ repoPath }) => ({ suggestCommitGraph: await health.suggestCommitGraph(requireOpened(repoPath)) }),
     'repo:write-commit-graph': async ({ repoPath }) => {
       await writeCommitGraph(requireOpened(repoPath))

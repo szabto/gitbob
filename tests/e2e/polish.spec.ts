@@ -263,3 +263,52 @@ test('the speed-up hint can be dismissed and stays dismissed', async () => {
     await second.app.close()
   }
 })
+
+test('toolbar: repository and branch pickers, Stash / Pop, Search and Actions', async () => {
+  const other = createFixtureRepo()
+  other.commit('other base', { 'o.txt': '1\n' })
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1\n' })
+  repo.branch('feature/x')
+  repo.write('a.txt', 'changed\n')
+  const userData = makeTempDir('gitbob-ud-')
+  // Open `other` once so it is in the recent list.
+  const first = await launch(other.dir, userData)
+  await expect(first.page.getByTestId('commit-row')).toHaveCount(1)
+  await first.app.close()
+
+  const { app, page } = await launch(repo.dir, userData)
+  try {
+    // Branch picker: search and check out.
+    await page.getByTestId('branch-picker').click()
+    await page.getByLabel('Find a branch').fill('feat')
+    await expect(page.getByTestId('picker-item')).toHaveCount(1)
+    await page.getByLabel('Find a branch').press('Enter')
+    await expect(page.getByTestId('head-label')).toHaveText('feature/x')
+
+    // Stash and Pop from the toolbar.
+    const toolbar = page.getByTestId('toolbar')
+    await toolbar.getByRole('button', { name: 'Stash', exact: true }).click()
+    await page.getByTestId('prompt-dialog').getByRole('button', { name: 'Stash', exact: true }).click()
+    await expect(page.getByTestId('wip-row')).toHaveCount(0)
+    await toolbar.getByRole('button', { name: 'Pop', exact: true }).click()
+    await expect(page.getByTestId('wip-row')).toBeVisible()
+    await expect(toolbar.getByRole('button', { name: 'Pop', exact: true })).toBeDisabled()
+
+    // Search focuses history search; Actions opens the command palette.
+    await toolbar.getByRole('button', { name: 'Search', exact: true }).click()
+    await expect(page.locator('#graph-search-input')).toBeFocused()
+    await toolbar.getByRole('button', { name: 'Actions', exact: true }).click()
+    await expect(page.getByTestId('command-palette')).toBeVisible()
+    await page.keyboard.press('Escape')
+
+    // Repository picker: open the recent repository in a new tab.
+    await page.getByTestId('repo-picker').click()
+    await expect(page.getByTestId('repo-picker-menu')).toContainText('Open tabs')
+    await page.getByTestId('picker-item').filter({ hasText: basename(other.dir) }).click()
+    await expect(page.getByTestId('repo-tab')).toHaveCount(2)
+    await expect(page.getByTestId('repo-name')).toHaveText(basename(other.dir))
+  } finally {
+    await app.close()
+  }
+})
