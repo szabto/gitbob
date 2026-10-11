@@ -42,6 +42,9 @@ import { addWorktree, listWorktrees, removeWorktree } from '@git-core/worktrees'
 import { listSubmodules, updateSubmodules } from '@git-core/submodules'
 import { getSignature } from '@git-core/signatures'
 import type { RecentRepositoryStore } from './recent'
+import type { UndoJournal } from './undo'
+import { getOperation } from '@git-core/status'
+import { headSnapshot, readRef, type HeadSnapshot, type UndoStep } from '@git-core/undo'
 import { z } from 'zod'
 
 type Handler<C extends IpcChannel> = (
@@ -60,6 +63,7 @@ export interface IpcContext {
   updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
   providers: ProviderService
   updater: Updater
+  undo: UndoJournal
 }
 
 /**
@@ -112,7 +116,51 @@ async function confirmDestructive(
   return res.response === 1
 }
 
+const short = (sha: string | null): string => (sha ?? '').slice(0, 7)
+const subject = (message: string): string => {
+  const line = message.trim().split('\n')[0] ?? ''
+  return line.length > 50 ? `${line.slice(0, 49)}…` : line
+}
+const at = (head: HeadSnapshot, sha: string | null): HeadSnapshot => ({ sha, ref: head.ref })
+
+/** Undo/redo steps for an operation that moved the current branch from `before` to `after`. */
+function branchMove(before: HeadSnapshot, after: HeadSnapshot, mode: 'soft' | 'mixed' | 'keep'): { undo: UndoStep[]; redo: UndoStep[] } | null {
+  if (!before.sha || !after.sha || before.sha === after.sha || before.ref !== after.ref) return null
+  return {
+    undo: [{ type: 'reset', mode, expect: after, to: before.sha }],
+    redo: [{ type: 'reset', mode, expect: at(after, before.sha), to: after.sha }],
+  }
+}
+
+function checkoutSteps(before: HeadSnapshot, after: HeadSnapshot): { undo: UndoStep[]; redo: UndoStep[] } | null {
+  if (!before.sha || !after.sha || (before.sha === after.sha && before.ref === after.ref)) return null
+  return { undo: [{ type: 'checkout', expect: after, to: before }], redo: [{ type: 'checkout', expect: before, to: after }] }
+}
+
 export function registerIpc(ctx: IpcContext): void {
+  /**
+   * Run a mutation of an opened repository and, if it completed (no conflict stop), record how
+   * to undo and redo it. Recording problems never fail the operation itself.
+   */
+  async function journaled<T>(
+    repoPath: string,
+    label: string | ((result: T) => string),
+    fn: () => Promise<T>,
+    build: (before: HeadSnapshot, after: HeadSnapshot, result: T) => Promise<{ undo: UndoStep[]; redo: UndoStep[] } | null> | { undo: UndoStep[]; redo: UndoStep[] } | null,
+  ): Promise<T> {
+    const before = await headSnapshot(repoPath)
+    const result = await fn()
+    try {
+      if (!(await getOperation(repoPath))) {
+        const steps = await build(before, await headSnapshot(repoPath), result)
+        if (steps) ctx.undo.record(repoPath, { label: typeof label === 'string' ? label : label(result), ...steps })
+      }
+    } catch {
+      /* not undoable; the operation itself succeeded */
+    }
+    return result
+  }
+
   const handlers: { [C in IpcChannel]: Handler<C> } = {
     'repo:open': ({ path }) => openAndRegister(path, ctx),
     'repo:pick': async (_input, event) => {
@@ -206,13 +254,42 @@ export function registerIpc(ctx: IpcContext): void {
       ctx.network.run(event.sender, (net) => pullLfs(requireOpened(repoPath), { ...(net.env ? { env: net.env } : {}), ...(net.signal ? { signal: net.signal } : {}) }), repoPath),
     'conflict:save': ({ repoPath, path, content, markResolved }) =>
       saveConflictResolution(requireOpened(repoPath), path, content, { markResolved }),
-    'commit:create': ({ repoPath, message, amend }) => createCommit(requireOpened(repoPath), message, { amend }),
+    'commit:create': ({ repoPath, message, amend }) =>
+      journaled(
+        requireOpened(repoPath),
+        `${amend ? 'Amend' : 'Commit'} "${subject(message)}"`,
+        () => createCommit(repoPath, message, { amend }),
+        (before, after) => branchMove(before, after, 'soft'),
+      ),
     'commit:last-message': ({ repoPath }) => getLastCommitMessage(requireOpened(repoPath)),
     'branch:create': ({ repoPath, name, startPoint, checkout }) =>
-      createBranch(requireOpened(repoPath), name, { startPoint, checkout }),
-    'branch:checkout': ({ repoPath, ref }) => checkoutRef(requireOpened(repoPath), ref),
-    'commit:checkout': ({ repoPath, sha }) => checkoutDetached(requireOpened(repoPath), sha),
-    'branch:rename': ({ repoPath, oldName, newName }) => renameBranch(requireOpened(repoPath), oldName, newName),
+      journaled(
+        requireOpened(repoPath),
+        `Create branch "${name}"`,
+        () => createBranch(repoPath, name, { startPoint, checkout }),
+        async (before, after) => {
+          const ref = `refs/heads/${name}`
+          const sha = await readRef(repoPath, ref)
+          if (!sha) return null
+          if (!checkout) return { undo: [{ type: 'ref', ref, from: sha, to: null }], redo: [{ type: 'ref', ref, from: null, to: sha }] }
+          if (!before.sha) return null
+          return {
+            undo: [{ type: 'checkout', expect: after, to: before }, { type: 'ref', ref, from: sha, to: null }],
+            redo: [{ type: 'ref', ref, from: null, to: sha }, { type: 'checkout', expect: before, to: after }],
+          }
+        },
+      ),
+    'branch:checkout': ({ repoPath, ref }) =>
+      journaled(requireOpened(repoPath), (r) => `Check out ${r.branch}`, () => checkoutRef(repoPath, ref), checkoutSteps),
+    'commit:checkout': ({ repoPath, sha }) =>
+      journaled(requireOpened(repoPath), `Check out ${short(sha)}`, () => checkoutDetached(repoPath, sha), checkoutSteps),
+    'branch:rename': ({ repoPath, oldName, newName }) =>
+      journaled(
+        requireOpened(repoPath),
+        `Rename branch "${oldName}" to "${newName}"`,
+        () => renameBranch(repoPath, oldName, newName),
+        () => ({ undo: [{ type: 'rename-branch', from: newName, to: oldName }], redo: [{ type: 'rename-branch', from: oldName, to: newName }] }),
+      ),
     'branch:delete': async ({ repoPath, name, force }, event) => {
       requireOpened(repoPath)
       const confirmed = await confirmDestructive(event, {
@@ -223,7 +300,11 @@ export function registerIpc(ctx: IpcContext): void {
         confirmLabel: force ? 'Force delete' : 'Delete branch',
       })
       if (!confirmed) return { deleted: false }
-      await deleteBranch(repoPath, name, { force })
+      const ref = `refs/heads/${name}`
+      const sha = await readRef(repoPath, ref)
+      await journaled(repoPath, `Delete branch "${name}"`, () => deleteBranch(repoPath, name, { force }), () =>
+        sha ? { undo: [{ type: 'ref', ref, from: null, to: sha }], redo: [{ type: 'ref', ref, from: sha, to: null }] } : null,
+      )
       return { deleted: true }
     },
     'branch:set-upstream': ({ repoPath, name, upstream }) => setUpstream(requireOpened(repoPath), name, upstream),
@@ -247,7 +328,12 @@ export function registerIpc(ctx: IpcContext): void {
         repoPath,
       ),
     'remote:pull': ({ repoPath, mode }, event) =>
-      ctx.network.run(event.sender, (net) => pull(requireOpened(repoPath), { ...net, mode }), repoPath),
+      journaled(
+        requireOpened(repoPath),
+        'Pull',
+        () => ctx.network.run(event.sender, (net) => pull(repoPath, { ...net, mode }), repoPath),
+        (before, after) => branchMove(before, after, 'keep'),
+      ),
     'remote:push': async ({ repoPath, branch, remote, setUpstream: track, force }, event) => {
       requireOpened(repoPath)
       if (force !== 'none') {
@@ -281,7 +367,16 @@ export function registerIpc(ctx: IpcContext): void {
     'stash:files': ({ repoPath, index, sha }) => getStashFiles(requireOpened(repoPath), index, { expectedSha: sha }),
     'tag:list': ({ repoPath }) => listTags(requireOpened(repoPath)),
     'tag:create': ({ repoPath, name, target, message }) =>
-      createTag(requireOpened(repoPath), name, target, message ? { message } : {}),
+      journaled(
+        requireOpened(repoPath),
+        `Create tag "${name}"`,
+        () => createTag(repoPath, name, target, message ? { message } : {}),
+        async () => {
+          const ref = `refs/tags/${name}`
+          const oid = await readRef(repoPath, ref)
+          return oid ? { undo: [{ type: 'ref', ref, from: oid, to: null }], redo: [{ type: 'ref', ref, from: null, to: oid }] } : null
+        },
+      ),
     'tag:delete': async ({ repoPath, name }, event) => {
       requireOpened(repoPath)
       const confirmed = await confirmDestructive(event, {
@@ -290,7 +385,11 @@ export function registerIpc(ctx: IpcContext): void {
         confirmLabel: 'Delete tag',
       })
       if (!confirmed) return { deleted: false }
-      await deleteTag(repoPath, name)
+      const ref = `refs/tags/${name}`
+      const oid = await readRef(repoPath, ref)
+      await journaled(repoPath, `Delete tag "${name}"`, () => deleteTag(repoPath, name), () =>
+        oid ? { undo: [{ type: 'ref', ref, from: null, to: oid }], redo: [{ type: 'ref', ref, from: oid, to: null }] } : null,
+      )
       return { deleted: true }
     },
     'tag:push': ({ repoPath, name, remote }, event) =>
@@ -306,10 +405,30 @@ export function registerIpc(ctx: IpcContext): void {
         })
         if (!confirmed) return { done: false, backupStash: null }
       }
-      return { done: true, ...(await reset(repoPath, target, mode)) }
+      const result = await journaled(
+        repoPath,
+        `Reset (${mode}) to ${short(target)}`,
+        () => reset(repoPath, target, mode),
+        (before, after, r) => {
+          if (mode !== 'hard') return branchMove(before, after, mode)
+          if (!before.sha || !after.sha || before.ref !== after.ref) return null
+          return {
+            undo: [{ type: 'restore-hard-reset', expect: after, to: before.sha, backupStash: r.backupStash }],
+            redo: [{ type: 'hard-reset', expect: at(after, before.sha), to: after.sha }],
+          }
+        },
+      )
+      return { done: true, ...result }
     },
-    'history:revert': ({ repoPath, sha }) => revert(requireOpened(repoPath), sha),
-    'history:cherry-pick': ({ repoPath, shas }) => cherryPick(requireOpened(repoPath), shas),
+    'history:revert': ({ repoPath, sha }) =>
+      journaled(requireOpened(repoPath), `Revert ${short(sha)}`, () => revert(repoPath, sha), (b, a) => branchMove(b, a, 'keep')),
+    'history:cherry-pick': ({ repoPath, shas }) =>
+      journaled(
+        requireOpened(repoPath),
+        shas.length === 1 ? `Cherry-pick ${short(shas[0]!)}` : `Cherry-pick ${shas.length} commits`,
+        () => cherryPick(repoPath, shas),
+        (b, a) => branchMove(b, a, 'keep'),
+      ),
     'op:continue': async ({ repoPath }) => {
       const res = await continueOperation(requireOpened(repoPath))
       // Remove reword/squash message files left by an interactive rebase once it has finished.
@@ -331,7 +450,11 @@ export function registerIpc(ctx: IpcContext): void {
     'op:skip': ({ repoPath }) => skipOperation(requireOpened(repoPath)),
     'reflog:get': ({ repoPath, limit }) => getReflog(requireOpened(repoPath), 'HEAD', limit),
     'rebase:todo': ({ repoPath, base }) => getRebaseTodo(requireOpened(repoPath), base),
-    'rebase:start': ({ repoPath, base, todo }) => interactiveRebase(requireOpened(repoPath), base, todo),
+    'rebase:start': ({ repoPath, base, todo }) =>
+      journaled(requireOpened(repoPath), 'Interactive rebase', () => interactiveRebase(repoPath, base, todo), (b, a) => branchMove(b, a, 'keep')),
+    'undo:state': async ({ repoPath }) => ctx.undo.state(requireOpened(repoPath)),
+    'undo:undo': ({ repoPath }) => ctx.undo.undo(requireOpened(repoPath)),
+    'undo:redo': ({ repoPath }) => ctx.undo.redo(requireOpened(repoPath)),
     'blame:get': ({ repoPath, path, rev }) => getBlame(requireOpened(repoPath), path, rev),
     'worktree:list': ({ repoPath }) => listWorktrees(requireOpened(repoPath)),
     'worktree:add': async ({ repoPath, newBranch, branch }, event) => {

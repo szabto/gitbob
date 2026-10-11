@@ -32,6 +32,11 @@ export function useCommitDetails(repoPath: string, sha: string | null) {
   })
 }
 
+/** Labels of what Undo / Redo would do in this repository (actions GitBob performed this session). */
+export function useUndoState(repoPath: string, enabled = true) {
+  return useQuery({ queryKey: ['undo', repoPath], queryFn: () => call('undo:state', { repoPath }), enabled: enabled && !!repoPath, staleTime: 0 })
+}
+
 export function useRecent() {
   return useQuery({ queryKey: ['recent'], queryFn: () => call('repo:recent', {}) })
 }
@@ -66,6 +71,7 @@ export function useInvalidateRepo(repoPath: string) {
       void qc.invalidateQueries({ queryKey: ['worktrees', repoPath] })
       void qc.invalidateQueries({ queryKey: ['submodules', repoPath] })
       void qc.invalidateQueries({ queryKey: ['lfs', repoPath] })
+      void qc.invalidateQueries({ queryKey: ['undo', repoPath] })
       if (opts.history !== false) {
         void qc.invalidateQueries({ queryKey: ['log', repoPath] })
         void qc.invalidateQueries({ queryKey: ['search', repoPath] })

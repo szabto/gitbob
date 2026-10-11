@@ -95,6 +95,9 @@ export const IPC_CHANNELS = [
   'provider:signin-start',
   'provider:signin-finish',
   'provider:signin-cancel',
+  'undo:state',
+  'undo:undo',
+  'undo:redo',
   'credentials:respond',
   'op:cancel',
 ] as const

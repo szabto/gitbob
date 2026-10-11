@@ -10,6 +10,7 @@ import { SettingsStore } from './settings'
 import { TokenStore } from './tokens'
 import { ProviderService } from './providers'
 import { validateGitPath } from './app-info'
+import { UndoJournal } from './undo'
 import { Updater } from './updater'
 import { setGitBinary } from '@git-core/runner'
 import type { AppSettings } from '@shared/types'
@@ -147,6 +148,7 @@ void app.whenReady().then(async () => {
   const updater = new Updater()
   const ctx: IpcContext = {
     updater,
+    undo: new UndoJournal(),
     getSettings: () => settings.get(),
     updateSettings,
     providers: new ProviderService(

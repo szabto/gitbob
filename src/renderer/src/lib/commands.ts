@@ -19,6 +19,7 @@ export interface CommandContext {
   headSha: string | null
   currentRef: GitRef | undefined
   remotes: string[]
+  undo: { undo: string | null; redo: string | null }
   app: {
     openRepository: () => void
     cloneRepository: () => void
@@ -71,6 +72,8 @@ export function useCommands(ctx: CommandContext): Command[] {
     ]
     if (a && repo && !repo.bare) {
       list.push(
+        { id: 'repo.undo', title: ctx.undo.undo ? `Undo: ${ctx.undo.undo}` : 'Undo', section: 'Repository', defaultShortcut: 'Mod+Alt+Z', disabled: !ctx.undo.undo, run: () => void a.undo() },
+        { id: 'repo.redo', title: ctx.undo.redo ? `Redo: ${ctx.undo.redo}` : 'Redo', section: 'Repository', defaultShortcut: 'Mod+Alt+Shift+Z', disabled: !ctx.undo.redo, run: () => void a.redo() },
         { id: 'repo.fetch', title: 'Fetch', section: 'Repository', defaultShortcut: 'Mod+Shift+F', disabled: ctx.remotes.length === 0, run: () => void a.fetch() },
         { id: 'repo.pull', title: 'Pull (fast-forward only)', section: 'Repository', defaultShortcut: 'Mod+Shift+L', disabled: !ctx.currentRef?.upstream, run: () => void a.pull('ff-only') },
         { id: 'repo.pull-merge', title: 'Pull (merge)', section: 'Repository', disabled: !ctx.currentRef?.upstream, run: () => void a.pull('merge') },

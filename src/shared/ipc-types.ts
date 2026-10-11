@@ -147,6 +147,10 @@ export interface IpcOutputs {
   'provider:signin-start': { userCode: string; verificationUri: string }
   'provider:signin-finish': { user: string }
   'provider:signin-cancel': void
+  /** Labels of the actions undo/redo would revert or repeat (null: nothing). */
+  'undo:state': { undo: string | null; redo: string | null }
+  'undo:undo': { label: string }
+  'undo:redo': { label: string }
   'credentials:respond': void
   /** True if a running network operation was cancelled. */
   'op:cancel': boolean

@@ -32,6 +32,16 @@ export function useRepoActions(repoPath: string) {
   )
 
   return {
+    undo: () =>
+      run('Undoing…', async () => {
+        const r = await call('undo:undo', { repoPath })
+        showNotice(`Undid: ${r.label}`)
+      }),
+    redo: () =>
+      run('Redoing…', async () => {
+        const r = await call('undo:redo', { repoPath })
+        showNotice(`Redid: ${r.label}`)
+      }),
     fetch: () => run('Fetching…', () => call('remote:fetch', { repoPath, prune: true })),
     pull: (mode: 'ff-only' | 'merge' | 'rebase') => run('Pulling…', () => call('remote:pull', { repoPath, mode })),
     push: async (branch: GitRef | undefined, remotes: string[]) => {

@@ -4,7 +4,7 @@ import type { RepositoryInfo } from '@shared/types'
 import { call, subscribe } from '../lib/api'
 import { useRepoActions } from '../lib/actions'
 import { useCommands, type CommandContext } from '../lib/commands'
-import { useHead, useRecent, useRefs, useRemotes } from '../lib/queries'
+import { useHead, useRecent, useRefs, useRemotes, useUndoState } from '../lib/queries'
 import { eventToAccelerator, normalizeAccelerator } from '../lib/shortcuts'
 import { useAppStore } from '../state/store'
 import { useUiStore } from '../state/ui'
@@ -26,6 +26,7 @@ export function CommandHost({
   const head = useHead(repoPath, !!repo)
   const refs = useRefs(repoPath, !!repo)
   const remotes = useRemotes(repoPath, !!repo)
+  const undoState = useUndoState(repoPath, !!repo)
   const recent = useRecent()
   const qc = useQueryClient()
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => call('settings:get', {}) })
@@ -60,11 +61,12 @@ export function CommandHost({
       headSha: head.data?.sha ?? null,
       currentRef,
       remotes: (remotes.data ?? []).map((r) => r.name),
+      undo: undoState.data ?? { undo: null, redo: null },
       app: { ...app, openSettings: () => setSettingsOpen(true), setTheme, focusSearch },
     }),
     // actions is a fresh object each render; its identity doesn't matter for the command list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [repo, head.data?.sha, currentRef, remotes.data, app, setTheme, focusSearch],
+    [repo, head.data?.sha, currentRef, remotes.data, undoState.data, app, setTheme, focusSearch],
   )
   const commands = useCommands(ctx)
   const overrides = settings.data?.shortcuts

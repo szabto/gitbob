@@ -201,3 +201,64 @@ test('reflog finds a commit lost by a hard reset and rescues it as a branch', as
     await app.close()
   }
 })
+
+test('undo and redo a commit, a new branch and a branch delete; stale history is refused', async () => {
+  const repo = createFixtureRepo()
+  const base = repo.commit('base', { 'a.txt': '1\n' })
+  repo.branch('old-feature')
+  repo.write('a.txt', '2\n')
+  const { app, page } = await launch(repo.dir)
+  const undo = page.getByRole('button', { name: 'Undo', exact: true })
+  const redo = page.getByRole('button', { name: 'Redo', exact: true })
+  try {
+    await expect(undo).toBeDisabled()
+
+    // Commit, then undo: the commit is gone and its changes are staged again.
+    await page.getByTestId('wip-row').click()
+    await page.getByRole('button', { name: 'Stage all' }).click()
+    await page.getByLabel('Commit summary').fill('Change a')
+    await page.getByRole('button', { name: /^Commit/ }).click()
+    await expect(row(page, 'Change a')).toBeVisible()
+    await expect(undo).toHaveAttribute('title', 'Undo: Commit "Change a"')
+    await undo.click()
+    await expect(page.getByTestId('notice')).toContainText('Undid: Commit "Change a"')
+    await expect(row(page, 'Change a')).toHaveCount(0)
+    expect(repo.head()).toBe(base)
+    expect(repo.git(['diff', '--cached', '--name-only'])).toBe('a.txt')
+    await redo.click()
+    await expect(row(page, 'Change a')).toBeVisible()
+    expect(repo.git(['log', '-1', '--format=%s'])).toBe('Change a')
+    expect(repo.git(['status', '--porcelain'])).toBe('')
+
+    // New branch (checked out), undo: back on main and the branch is gone.
+    await page.getByRole('button', { name: 'Branch', exact: true }).click()
+    await page.getByLabel('Branch name').fill('feature/x')
+    await page.getByRole('button', { name: 'Create' }).click()
+    await expect(page.getByTestId('head-label')).toHaveText('feature/x')
+    await undo.click()
+    await expect(page.getByTestId('head-label')).toHaveText('main')
+    expect(repo.git(['branch', '--list', 'feature/x'])).toBe('')
+
+    // Delete a branch (confirmed), undo brings it back at the same commit.
+    await mockConfirm(app, 1)
+    await page.locator('[data-testid="ref-item"][data-ref="refs/heads/old-feature"]').click({ button: 'right' })
+    await page.getByRole('menuitem', { name: /Delete old-feature/ }).click()
+    await expect(page.locator('[data-testid="ref-item"][data-ref="refs/heads/old-feature"]')).toHaveCount(0)
+    await undo.click()
+    await expect(page.locator('[data-testid="ref-item"][data-ref="refs/heads/old-feature"]')).toBeVisible()
+    expect(repo.rev('old-feature')).toBe(base)
+
+    // Something changed outside GitBob: redo refuses instead of guessing.
+    await expect(redo).toBeEnabled()
+    const moved = repo.commit('made in a terminal', { 'b.txt': 'x\n' })
+    repo.git(['update-ref', 'refs/heads/old-feature', moved])
+    await redo.click()
+    await expect(page.getByTestId('error-message')).toContainText('repository has changed')
+    expect(repo.rev('old-feature')).toBe(moved)
+    await page.getByRole('button', { name: 'Dismiss error' }).click()
+    await expect(undo).toBeDisabled()
+    await expect(redo).toBeDisabled()
+  } finally {
+    await app.close()
+  }
+})

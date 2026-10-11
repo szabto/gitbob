@@ -237,6 +237,9 @@ export const ipcInputSchemas = {
   'provider:pulls': z.object({ repoPath: absolutePath, state: z.enum(['open', 'all']).default('open') }),
   'provider:checks': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'provider:accounts': z.object({}).strict(),
+  'undo:state': z.object({ repoPath: absolutePath }),
+  'undo:undo': z.object({ repoPath: absolutePath }),
+  'undo:redo': z.object({ repoPath: absolutePath }),
   'provider:hosted-repos': z.object({
     kind: z.enum(['github', 'gitlab', 'bitbucket', 'azure']),
     host: z.string().regex(/^[a-z0-9.-]+(?::\d{1,5})?$/i).max(255),

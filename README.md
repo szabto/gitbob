@@ -195,6 +195,7 @@ Right-click any commit for the time-travel tools:
 - **Revert** adds a new commit that undoes it (safe for shared branches).
 - **Reset** moves your branch back to that commit. *Soft* keeps the changes staged, *mixed* keeps them as unstaged edits, *hard* throws them away. Before a hard reset GitBob asks you, and saves your uncommitted work as a backup stash so it can come back.
 - **Create tag** marks a release, with an optional message. Push or delete tags from the sidebar.
+- **Undo / Redo** in the toolbar (⌥⌘Z / ⇧⌥⌘Z) take back the last commit, amend, checkout, branch or tag change, reset, cherry-pick, revert, pull or rebase you did in GitBob. Undo never overwrites uncommitted work, and refuses if the repository changed in the meantime.
 - **Blame** (in any file's diff) shows who last changed each line and links to that commit.
 
 Want to tidy up before sharing? Right-click the commit *before* the ones you want to change and choose **Interactive rebase onto here**. Reorder commits with the arrows, and for each one pick **Reword** (new message), **Squash** or **Fixup** (fold into the commit above) or **Drop**.
@@ -314,7 +315,7 @@ Every screenshot in this README is the real app working on a real Git repository
   <tr>
     <td width="33%" valign="top">
       <h4>⏪ Undo &amp; rewrite</h4>
-      Interactive rebase (reorder, reword, squash, fixup, drop) · cherry-pick · revert (merge commits too) · reset soft/mixed/hard with automatic backup · reflog · continue/skip/abort for stopped merges, rebases, cherry-picks and reverts
+      Undo / redo for commits, checkouts, branches, tags, resets, cherry-picks, reverts, pulls and rebases · interactive rebase (reorder, reword, squash, fixup, drop) · cherry-pick · revert (merge commits too) · reset soft/mixed/hard with automatic backup · reflog · continue/skip/abort for stopped merges, rebases, cherry-picks and reverts
     </td>
     <td width="33%" valign="top">
       <h4>📦 Stash, tags &amp; LFS</h4>

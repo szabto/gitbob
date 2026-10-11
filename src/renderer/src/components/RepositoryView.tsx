@@ -12,7 +12,7 @@ import { Logo } from './Welcome'
 import { StagingPanel } from './StagingPanel'
 import { DiffView } from './DiffView'
 import { useRepoActions } from '../lib/actions'
-import { useRemotes, useStashes } from '../lib/queries'
+import { useRemotes, useStashes, useUndoState } from '../lib/queries'
 import { StashPanel } from './StashPanel'
 import { OperationBanner } from './OperationBanner'
 import { BlameView } from './BlameView'
@@ -94,6 +94,7 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
   }, [refs.data])
 
   const actions = useRepoActions(repo.root)
+  const undoState = useUndoState(repo.root)
   const remotes = useRemotes(repo.root)
   const busy = useUiStore((s) => s.busy)
   const progress = useUiStore((s) => s.progress)
@@ -159,6 +160,19 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
           )}
           {!repo.bare && (
             <>
+              <ToolbarButton
+                label="Undo"
+                title={undoState.data?.undo ? `Undo: ${undoState.data.undo}` : 'Nothing to undo'}
+                disabled={!!busy || !undoState.data?.undo}
+                onClick={() => void actions.undo()}
+              />
+              <ToolbarButton
+                label="Redo"
+                title={undoState.data?.redo ? `Redo: ${undoState.data.redo}` : 'Nothing to redo'}
+                disabled={!!busy || !undoState.data?.redo}
+                onClick={() => void actions.redo()}
+              />
+              <span className="mx-1 h-5 border-l border-border" />
               <ToolbarButton label="Fetch" disabled={!!busy || remoteNames.length === 0} onClick={() => void actions.fetch()} />
               <ToolbarButton
                 label="Pull"
@@ -317,8 +331,10 @@ function ToolbarButton({
   onClick,
   onMenu,
   disabled,
+  title,
 }: {
   label: string
+  title?: string
   onClick: () => void
   onMenu?: (e: React.MouseEvent) => void
   disabled?: boolean
@@ -328,6 +344,7 @@ function ToolbarButton({
       <button
         disabled={disabled}
         onClick={onClick}
+        title={title}
         className={`border border-border px-2.5 py-1 hover:bg-panel-2 disabled:opacity-40 ${
           onMenu ? 'rounded-l border-r-0' : 'rounded'
         }`}
