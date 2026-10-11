@@ -11,6 +11,7 @@ import { TokenStore } from './tokens'
 import { ProviderService } from './providers'
 import { validateGitPath } from './app-info'
 import { UndoJournal } from './undo'
+import { AvatarService } from './avatars'
 import { Updater } from './updater'
 import { setGitBinary } from '@git-core/runner'
 import type { AppSettings } from '@shared/types'
@@ -149,6 +150,7 @@ void app.whenReady().then(async () => {
   const ctx: IpcContext = {
     updater,
     undo: new UndoJournal(),
+    avatars: new AvatarService(app.getPath('userData')),
     getSettings: () => settings.get(),
     updateSettings,
     providers: new ProviderService(

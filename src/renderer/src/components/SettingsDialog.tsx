@@ -126,6 +126,21 @@ function General({ s, update }: { s: AppSettings; update: (p: SettingsPatch) => 
         </select>
       </Row>
       <Row
+        label="Avatars"
+        hint="Pictures for commit authors and remotes. “From the hosting service” loads them from GitHub for GitHub repositories only; Gravatar also sends a hash of each author's email to gravatar.com."
+      >
+        <select
+          aria-label="Avatars"
+          value={s.avatars}
+          onChange={(e) => void update({ avatars: e.target.value as 'off' | 'hosting' | 'gravatar' })}
+          className="rounded border border-border bg-bg px-2 py-1 text-sm"
+        >
+          <option value="off">Initials only</option>
+          <option value="hosting">From the hosting service</option>
+          <option value="gravatar">Also from Gravatar</option>
+        </select>
+      </Row>
+      <Row
         label="GitHub sign-in"
         hint="GitBob's own GitHub app is used on github.com. For GitHub Enterprise or your own OAuth app, enter its client ID (device flow must be enabled)."
       >

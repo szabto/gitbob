@@ -305,7 +305,7 @@ test('drag and drop: merge a branch, rebase onto one, and cherry-pick a commit',
     expect(repo.git(['log', '-1', '--format=%s'])).toBe("Merge branch 'feature'")
 
     // Drag a commit row onto the current branch's label in the graph → cherry-pick.
-    await page.locator(`[data-testid="commit-row"][data-sha="${picked}"]`).dragTo(page.locator('[data-testid="ref-badge"][data-ref="refs/heads/main"]'))
+    await page.locator(`[data-testid="commit-row"][data-sha="${picked}"]`).dragTo(page.locator('[data-testid="ref-label"][data-ref="refs/heads/main"]'))
     await page.getByRole('menuitem', { name: `Cherry-pick ${picked.slice(0, 7)} onto main` }).click()
     await expect.poll(() => repo.git(['log', '-1', '--format=%s'])).toBe('topic fix')
 

@@ -72,6 +72,10 @@ export const ipcInputSchemas = {
   'repo:init': z.object({}).strict(),
   'repo:refs': z.object({ repoPath: absolutePath }),
   'repo:health': z.object({ repoPath: absolutePath }),
+  'avatar:get': z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('email'), email: z.string().min(3).max(320), source: z.enum(['github', 'gravatar']) }),
+    z.object({ kind: z.literal('github-owner'), owner: z.string().min(1).max(39) }),
+  ]),
   'commit:template': z.object({ repoPath: absolutePath }),
   'file:read': z.object({ repoPath: absolutePath, path: z.string().min(1).max(4096) }),
   'file:write': z.object({ repoPath: absolutePath, path: z.string().min(1).max(4096), content: z.string().max(6 * 1024 * 1024), baseHash: z.string().regex(/^[0-9a-f]{64}$/) }),
@@ -224,6 +228,7 @@ export const ipcInputSchemas = {
         shortcuts: z.record(z.string().regex(/^[a-z0-9.:-]{1,64}$/i), z.string().max(64)).optional(),
         autoCheckUpdates: z.boolean().optional(),
         githubClientId: z.string().regex(/^[A-Za-z0-9._-]{8,64}$/).nullable().optional(),
+        avatars: z.enum(['off', 'hosting', 'gravatar']).optional(),
       })
       .strict(),
   }),

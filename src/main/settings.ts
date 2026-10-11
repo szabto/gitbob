@@ -15,6 +15,8 @@ export interface Settings {
   autoCheckUpdates: boolean
   /** Client id of a GitHub OAuth app for "Sign in with GitHub" (device flow); null uses the built-in one. */
   githubClientId: string | null
+  /** Commit author avatars: none (initials), from the repository's hosting service, or also Gravatar. */
+  avatars: 'off' | 'hosting' | 'gravatar'
 }
 
 const DEFAULTS: Settings = {
@@ -24,6 +26,7 @@ const DEFAULTS: Settings = {
   shortcuts: {},
   autoCheckUpdates: false,
   githubClientId: null,
+  avatars: 'hosting',
 }
 
 /** Small JSON settings file in userData. Unknown or invalid values fall back to defaults. */
@@ -49,6 +52,7 @@ export class SettingsStore {
         )
       }
       if (typeof raw.autoCheckUpdates === 'boolean') this.data.autoCheckUpdates = raw.autoCheckUpdates
+      if (raw.avatars === 'off' || raw.avatars === 'hosting' || raw.avatars === 'gravatar') this.data.avatars = raw.avatars
       if (typeof raw.githubClientId === 'string' && /^[A-Za-z0-9._-]{8,64}$/.test(raw.githubClientId)) this.data.githubClientId = raw.githubClientId
     } catch {
       /* first run or unreadable file: defaults */

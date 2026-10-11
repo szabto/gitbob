@@ -111,14 +111,14 @@ test('filters the graph by branch, author and path', async () => {
     // Author filter (literal, case-insensitive), replacing the branch filter.
     await page.getByTestId('filter-button').click()
     await page.getByTestId('filter-form').getByLabel('feature').uncheck()
-    await page.getByLabel('Author').fill('ZOE@')
+    await page.getByLabel('Author', { exact: true }).fill('ZOE@')
     await page.getByRole('button', { name: 'Apply filter' }).click()
     await expect(page.getByTestId('commit-row')).toHaveCount(1)
     expect(await subjects()).toEqual(['feature by zoe'])
 
     // Path filter.
     await page.getByTestId('filter-button').click()
-    await page.getByLabel('Author').fill('')
+    await page.getByLabel('Author', { exact: true }).fill('')
     await page.getByLabel('File or folder').fill('docs')
     await page.getByRole('button', { name: 'Apply filter' }).click()
     await expect(page.getByTestId('commit-row')).toHaveCount(1)

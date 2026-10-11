@@ -51,6 +51,8 @@ export interface IpcOutputs {
   'repo:health': { suggestCommitGraph: boolean }
   'repo:write-commit-graph': void
   'file:history': FileHistoryPage
+  /** Avatar image as a data URL, or null (none, or avatars are off). */
+  'avatar:get': string | null
   /** commit.template contents without comment lines, or null. */
   'commit:template': string | null
   /** A working-tree text file for editing and a hash of the content read. */

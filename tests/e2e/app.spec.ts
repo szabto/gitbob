@@ -298,3 +298,59 @@ test('branches are shown as a tree that can be collapsed', async () => {
     await app.close()
   }
 })
+
+test('branch labels: one label when local and remote match, two when they differ; columns and WIP counts', async () => {
+  const seed = createFixtureRepo()
+  seed.commit('base', { 'a.txt': '1\n', 'gone.txt': 'x\n' })
+  seed.branch('feature')
+  const server = createFixtureRepo({ bare: true })
+  seed.git(['push', '-q', server.dir, 'main', 'feature'])
+  const repo = createFixtureRepo()
+  repo.git(['remote', 'add', 'origin', server.dir])
+  repo.git(['fetch', '-q', 'origin'])
+  repo.git(['switch', '-q', '-c', 'main', '--track', 'origin/main'])
+  repo.git(['branch', '-q', '--track', 'feature', 'origin/feature'])
+  const ahead = repo.commit('local only', { 'a.txt': '2\n' })
+  repo.write('new.txt', 'n\n')
+  repo.write('a.txt', '3\n')
+  repo.git(['rm', '-q', 'gone.txt'])
+  const { app, page } = await launch({ repo: repo.dir, userData: makeTempDir('gitbob-ud-') })
+  const label = (ref: string) => page.locator(`[data-testid="ref-label"][data-ref="${ref}"]`)
+  try {
+    // main is ahead of origin/main: the local label (laptop, checked out) is on the new commit…
+    const main = label('refs/heads/main')
+    await expect(main).toHaveAttribute('data-local', 'true')
+    await expect(main).not.toHaveAttribute('data-remotes', /./)
+    await expect(main).toContainText('✓')
+    await expect(page.locator(`[data-testid="commit-row"][data-sha="${ahead}"] [data-testid="ref-label"]`)).toHaveCount(1)
+    // …and the remote one sits on the older commit, named without the remote prefix.
+    const remoteMain = label('refs/remotes/origin/main')
+    await expect(remoteMain).toHaveAttribute('data-remotes', 'origin')
+    await expect(remoteMain).toContainText('main')
+    // feature matches origin/feature: a single label with both the laptop and the remote icon.
+    const feature = label('refs/heads/feature')
+    await expect(feature).toHaveAttribute('data-local', 'true')
+    await expect(feature).toHaveAttribute('data-remotes', 'origin')
+    await expect(label('refs/remotes/origin/feature')).toHaveCount(0)
+    await expect(feature.getByRole('img', { name: 'on this computer' })).toBeVisible()
+    await expect(feature.getByRole('img', { name: 'on origin' })).toBeVisible()
+
+    // Author initials stand in for avatars (no hosting service here).
+    await expect(page.getByTestId('avatar-node').first()).toBeVisible()
+
+    // WIP row shows modified / new / deleted counts.
+    await expect(page.getByTestId('wip-kinds')).toContainText('✎ 1')
+    await expect(page.getByTestId('wip-kinds')).toContainText('+ 1')
+    await expect(page.getByTestId('wip-kinds')).toContainText('− 1')
+
+    // Columns can be hidden from the header menu, and that is remembered.
+    await page.getByRole('button', { name: 'Choose columns' }).click()
+    await page.getByRole('menuitem', { name: /SHA/ }).click()
+    await expect(page.getByTestId('graph-header')).not.toContainText('SHA')
+    await page.reload()
+    await expect(page.getByTestId('graph-header')).toContainText('Branch / Tag')
+    await expect(page.getByTestId('graph-header')).not.toContainText('SHA')
+  } finally {
+    await app.close()
+  }
+})

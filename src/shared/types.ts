@@ -177,6 +177,8 @@ export interface RemoteInfo {
   name: string
   fetchUrl: string
   pushUrl: string
+  /** Hosting service and owner, when the URL points to a recognized one (for its project icon). */
+  hosted?: { kind: ProviderKind; owner: string }
 }
 
 // ---------------------------------------------------------------------------
@@ -444,6 +446,8 @@ export interface AppSettings {
   autoCheckUpdates: boolean
   /** GitHub OAuth app client id for "Sign in with GitHub"; null uses the built-in one (if any). */
   githubClientId: string | null
+  /** Commit author avatars: initials only, from the hosting service (GitHub), or also Gravatar. */
+  avatars: 'off' | 'hosting' | 'gravatar'
 }
 
 export interface AppInfo {

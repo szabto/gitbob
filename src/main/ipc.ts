@@ -43,6 +43,8 @@ import { listSubmodules, updateSubmodules } from '@git-core/submodules'
 import { getSignature } from '@git-core/signatures'
 import type { RecentRepositoryStore } from './recent'
 import type { UndoJournal } from './undo'
+import type { AvatarService } from './avatars'
+import { parseRemoteUrl } from '../providers'
 import { RepoHealth } from './repo-health'
 import { writeCommitGraph } from '@git-core/maintenance'
 import { getFileHistory } from '@git-core/file-history'
@@ -69,6 +71,7 @@ export interface IpcContext {
   providers: ProviderService
   updater: Updater
   undo: UndoJournal
+  avatars: AvatarService
 }
 
 /**
@@ -347,7 +350,16 @@ export function registerIpc(ctx: IpcContext): void {
       return { deleted: true }
     },
     'branch:set-upstream': ({ repoPath, name, upstream }) => setUpstream(requireOpened(repoPath), name, upstream),
-    'remote:list': ({ repoPath }) => listRemotes(requireOpened(repoPath)),
+    'remote:list': async ({ repoPath }) =>
+      (await listRemotes(requireOpened(repoPath))).map((r) => {
+        const ref = parseRemoteUrl(r.fetchUrl) ?? parseRemoteUrl(r.pushUrl)
+        return ref ? { ...r, hosted: { kind: ref.kind, owner: ref.owner.split('/')[0]! } } : r
+      }),
+    'avatar:get': (req) => {
+      const mode = ctx.getSettings().avatars
+      if (mode === 'off' || (req.kind === 'email' && req.source === 'gravatar' && mode !== 'gravatar')) return Promise.resolve(null)
+      return ctx.avatars.get(req)
+    },
     'remote:add': ({ repoPath, name, url }) => addRemote(requireOpened(repoPath), name, url),
     'remote:remove': async ({ repoPath, name }, event) => {
       requireOpened(repoPath)

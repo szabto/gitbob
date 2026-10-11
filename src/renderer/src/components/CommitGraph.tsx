@@ -5,7 +5,15 @@ import { useGraphLayout } from '../lib/useGraphLayout'
 import { useAppStore } from '../state/store'
 import { formatShortDate, shortSha } from '../lib/format'
 import { GraphCell, LANE_WIDTH, ROW_HEIGHT } from './GraphCell'
-import { RefBadge } from './RefBadge'
+import { RefLabelPill } from './RefLabelPill'
+import { ResizeHandle } from './ResizeHandle'
+import { buildRefLabels, type RefLabel } from '../lib/ref-labels'
+import { clampWidth, useGraphColumns, type GraphColumns } from '../lib/graph-columns'
+import { initials, nameHue, useAvatarSource, useEmailAvatar, type AvatarSource } from '../lib/avatars'
+import { useRemotes } from '../lib/queries'
+import { useUiStore } from '../state/ui'
+import type { GraphRow } from '@git-graph/layout'
+import type { RemoteInfo } from '@shared/types'
 import { endDrag, startDrag } from '../lib/dnd'
 import { GraphSearch } from './GraphSearch'
 import { GraphFilter } from './GraphFilter'
@@ -13,14 +21,13 @@ import { GraphFilter } from './GraphFilter'
 interface Props {
   repoPath: string
   commits: CommitSummary[]
-  refsBySha: Map<string, GitRef[]>
   headSha: string | null
   currentRef: string | null
   hasMore: boolean
   loadingMore: boolean
   onLoadMore: () => void
   /** Working tree change counts, or null when the repository has no work tree. */
-  wip: { unstaged: number; staged: number } | null
+  wip: { unstaged: number; staged: number; modified?: number; added?: number; deleted?: number } | null
   onRowMenu?: (e: React.MouseEvent, commit: CommitSummary) => void
   /** All refs, for the filter's branch picker. */
   refs: GitRef[]
@@ -31,7 +38,6 @@ const MAX_GRAPH_LANES = 24
 export function CommitGraph({
   repoPath,
   commits,
-  refsBySha,
   headSha,
   currentRef,
   hasMore,
@@ -52,6 +58,25 @@ export function CommitGraph({
   const clearReveal = useAppStore((s) => s.clearReveal)
 
   const layout = useGraphLayout(commits)
+  const [cols, setCols] = useGraphColumns()
+  const resizeStart = useRef<GraphColumns>(cols)
+  const remotes = useRemotes(repoPath)
+  const avatarSource = useAvatarSource(repoPath)
+  const labelsBySha = useMemo(() => buildRefLabels(allRefs, currentRef), [allRefs, currentRef])
+  const openMenu = useUiStore((s) => s.openMenu)
+  const resizer = (key: 'refs' | 'author' | 'date' | 'sha', sign: 1 | -1) => ({
+    onStart: () => {
+      resizeStart.current = cols
+    },
+    onResize: (dx: number) => setCols((c) => ({ ...c, [key]: clampWidth(resizeStart.current[key] + sign * dx) })),
+  })
+  const columnMenu = (e: React.MouseEvent): void => {
+    const toggle = (k: keyof GraphColumns['show'], label: string) => ({
+      label: `${cols.show[k] ? '✓ ' : '\u2003'}${label}`,
+      onSelect: () => setCols((c) => ({ ...c, show: { ...c.show, [k]: !c.show[k] } })),
+    })
+    openMenu(e.clientX, e.clientY, [toggle('refs', 'Branch / Tag'), toggle('author', 'Author'), toggle('date', 'Date'), toggle('sha', 'SHA'), 'separator', { label: 'Reset columns', onSelect: () => setCols(() => ({ refs: 180, author: 150, date: 110, sha: 80, show: { refs: true, author: true, date: true, sha: true } })) }])
+  }
   const indexBySha = useMemo(() => new Map(commits.map((c, i) => [c.sha, i])), [commits])
   const graphLanes = Math.min(layout.width, MAX_GRAPH_LANES)
   const graphColumnWidth = Math.max(graphLanes * LANE_WIDTH + 12, 64)
@@ -100,7 +125,13 @@ export function CommitGraph({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-7 shrink-0 items-center border-b border-border bg-panel text-xs font-semibold text-muted">
+      <div className="flex h-7 shrink-0 items-center border-b border-border bg-panel text-xs font-semibold text-muted" data-testid="graph-header">
+        {cols.show.refs && (
+          <div style={{ width: cols.refs }} className="relative shrink-0 truncate pl-3">
+            Branch / Tag
+            <ResizeHandle edge="right" label="Resize Branch / Tag column" {...resizer('refs', 1)} />
+          </div>
+        )}
         <div style={{ width: graphColumnWidth }} className="shrink-0 pl-3">
           Graph
         </div>
@@ -109,9 +140,27 @@ export function CommitGraph({
           <GraphFilter refs={allRefs} />
           <GraphSearch repoPath={repoPath} onMatchesChange={setMatches} />
         </div>
-        <div className="w-40 shrink-0 px-2">Author</div>
-        <div className="w-28 shrink-0 px-2">Date</div>
-        <div className="w-20 shrink-0 px-2">SHA</div>
+        {cols.show.author && (
+          <div style={{ width: cols.author }} className="relative shrink-0 px-2">
+            <ResizeHandle edge="left" label="Resize Author column" {...resizer('author', -1)} />
+            Author
+          </div>
+        )}
+        {cols.show.date && (
+          <div style={{ width: cols.date }} className="relative shrink-0 px-2">
+            <ResizeHandle edge="left" label="Resize Date column" {...resizer('date', -1)} />
+            Date
+          </div>
+        )}
+        {cols.show.sha && (
+          <div style={{ width: cols.sha }} className="relative shrink-0 px-2">
+            <ResizeHandle edge="left" label="Resize SHA column" {...resizer('sha', -1)} />
+            SHA
+          </div>
+        )}
+        <button className="shrink-0 px-2 hover:text-fg" aria-label="Choose columns" title="Choose columns" onClick={columnMenu}>
+          ⚙
+        </button>
       </div>
       <div
         ref={parentRef}
@@ -133,6 +182,7 @@ export function CommitGraph({
             }`}
             style={{ height: ROW_HEIGHT }}
           >
+            {cols.show.refs && <div className="shrink-0" style={{ width: cols.refs }} />}
             <div className="flex shrink-0 justify-center" style={{ width: graphColumnWidth }}>
               <svg width={16} height={16} aria-hidden>
                 <circle cx={8} cy={8} r={6} fill="none" stroke="#b46cff" strokeWidth={2} strokeDasharray="3 2" />
@@ -147,6 +197,11 @@ export function CommitGraph({
               {wip.staged > 0 && (
                 <span className="rounded bg-ok/15 px-1.5 text-xs text-ok">{wip.staged} staged</span>
               )}
+              <span className="flex gap-2 text-xs text-muted" data-testid="wip-kinds">
+                {!!wip.modified && <span title="Modified">✎ {wip.modified}</span>}
+                {!!wip.added && <span title="New" className="text-ok">+ {wip.added}</span>}
+                {!!wip.deleted && <span title="Deleted" className="text-err">− {wip.deleted}</span>}
+              </span>
             </div>
           </div>
         )}
@@ -154,7 +209,6 @@ export function CommitGraph({
           {items.map((item) => {
             const commit = commits[item.index]!
             const row = layout.rows[item.index]!
-            const refs = refsBySha.get(commit.sha)
             const selected = commit.sha === selectedSha
             const dimmed = matches !== null && !matches.has(commit.sha)
             return (
@@ -179,22 +233,17 @@ export function CommitGraph({
                 } ${dimmed ? 'opacity-35' : ''}`}
                 style={{ height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
               >
-                <div className="shrink-0 overflow-hidden pl-3" style={{ width: graphColumnWidth }}>
-                  <GraphCell row={row} width={layout.width} isHead={commit.sha === headSha} />
-                </div>
-                <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2">
-                  {refs?.map((r) => (
-                    <RefBadge key={r.name} gitRef={r} current={r.name === currentRef} />
-                  ))}
-                  <span className="truncate" data-testid="commit-subject">
-                    {commit.subject}
-                  </span>
-                </div>
-                <div className="w-40 shrink-0 truncate px-2 text-muted" title={commit.authorEmail}>
-                  {commit.authorName}
-                </div>
-                <div className="w-28 shrink-0 truncate px-2 text-muted">{formatShortDate(commit.authorTime)}</div>
-                <div className="w-20 shrink-0 px-2 font-mono text-xs text-muted">{shortSha(commit.sha)}</div>
+                <CommitRowCells
+                  commit={commit}
+                  row={row}
+                  width={layout.width}
+                  graphColumnWidth={graphColumnWidth}
+                  isHead={commit.sha === headSha}
+                  labels={labelsBySha.get(commit.sha)}
+                  remotes={remotes.data ?? []}
+                  cols={cols}
+                  avatarSource={avatarSource}
+                />
               </div>
             )
           })}
@@ -208,5 +257,73 @@ export function CommitGraph({
         </span>
       </div>
     </div>
+  )
+}
+
+/** The cells of one commit row; a component of its own so it can load the author's avatar. */
+function CommitRowCells({
+  commit,
+  row,
+  width,
+  graphColumnWidth,
+  isHead,
+  labels,
+  remotes,
+  cols,
+  avatarSource,
+}: {
+  commit: CommitSummary
+  row: GraphRow
+  width: number
+  graphColumnWidth: number
+  isHead: boolean
+  labels: RefLabel[] | undefined
+  remotes: RemoteInfo[]
+  cols: GraphColumns
+  avatarSource: AvatarSource
+}) {
+  const src = useEmailAvatar(commit.authorEmail, avatarSource)
+  const avatar = row.isMerge ? undefined : { src, initials: initials(commit.authorName), hue: nameHue(commit.authorName) }
+  const shown = labels?.slice(0, 2) ?? []
+  const more = (labels?.length ?? 0) - shown.length
+  return (
+    <>
+      {cols.show.refs && (
+        <div className="flex shrink-0 items-center gap-1 overflow-hidden pl-2" style={{ width: cols.refs }} data-testid="refs-cell">
+          {shown.map((l) => (
+            <RefLabelPill key={l.key} label={l} remotes={remotes} />
+          ))}
+          {more > 0 && (
+            <span className="shrink-0 rounded border border-border px-1 text-[11px] text-muted" title={labels!.slice(2).map((l) => l.name).join('\n')}>
+              +{more}
+            </span>
+          )}
+        </div>
+      )}
+      <div className="shrink-0 overflow-hidden pl-3" style={{ width: graphColumnWidth }}>
+        <GraphCell row={row} width={width} isHead={isHead} avatar={avatar} />
+      </div>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2">
+        {!cols.show.refs && labels?.map((l) => <RefLabelPill key={l.key} label={l} remotes={remotes} />)}
+        <span className="truncate" data-testid="commit-subject" title={commit.subject}>
+          {commit.subject}
+        </span>
+      </div>
+      {cols.show.author && (
+        <div className="shrink-0 truncate px-2 text-muted" style={{ width: cols.author }} title={`${commit.authorName} <${commit.authorEmail}>`}>
+          {commit.authorName}
+        </div>
+      )}
+      {cols.show.date && (
+        <div className="shrink-0 truncate px-2 text-muted" style={{ width: cols.date }}>
+          {formatShortDate(commit.authorTime)}
+        </div>
+      )}
+      {cols.show.sha && (
+        <div className="shrink-0 px-2 font-mono text-xs text-muted" style={{ width: cols.sha }}>
+          {shortSha(commit.sha)}
+        </div>
+      )}
+    </>
   )
 }

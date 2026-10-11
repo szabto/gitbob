@@ -3,7 +3,7 @@ import type { GraphRow, Segment } from '@git-graph/layout'
 import { laneColor } from './graph-colors'
 
 export const ROW_HEIGHT = 28
-export const LANE_WIDTH = 16
+export const LANE_WIDTH = 18
 
 const x = (col: number): number => col * LANE_WIDTH + LANE_WIDTH / 2
 const H = ROW_HEIGHT
@@ -27,9 +27,11 @@ interface Props {
   row: GraphRow
   width: number
   isHead: boolean
+  /** Author picture (or initials) drawn as the commit node; merges keep a small dot. */
+  avatar?: { src: string | null; initials: string; hue: number }
 }
 
-export const GraphCell = memo(function GraphCell({ row, width, isHead }: Props) {
+export const GraphCell = memo(function GraphCell({ row, width, isHead, avatar }: Props) {
   const w = Math.max(width, 1) * LANE_WIDTH
   const cx = x(row.column)
   const color = laneColor(row.color)
@@ -46,6 +48,23 @@ export const GraphCell = memo(function GraphCell({ row, width, isHead }: Props) 
       ))}
       {row.isMerge ? (
         <circle cx={cx} cy={MID} r={4} fill={color} stroke="var(--gb-bg)" strokeWidth={1.5} />
+      ) : avatar ? (
+        <g data-testid="avatar-node">
+          <clipPath id={`av-${row.sha}`}>
+            <circle cx={cx} cy={MID} r={8} />
+          </clipPath>
+          {avatar.src ? (
+            <image href={avatar.src} x={cx - 8} y={MID - 8} width={16} height={16} clipPath={`url(#av-${row.sha})`} preserveAspectRatio="xMidYMid slice" />
+          ) : (
+            <>
+              <circle cx={cx} cy={MID} r={8} fill={`hsl(${avatar.hue} 45% 45%)`} />
+              <text x={cx} y={MID + 2.6} textAnchor="middle" fontSize={7} fontWeight={600} fill="#fff">
+                {avatar.initials}
+              </text>
+            </>
+          )}
+          <circle cx={cx} cy={MID} r={8.5} fill="none" stroke={color} strokeWidth={2} />
+        </g>
       ) : (
         <circle cx={cx} cy={MID} r={6} fill={color} stroke="var(--gb-bg)" strokeWidth={2} />
       )}

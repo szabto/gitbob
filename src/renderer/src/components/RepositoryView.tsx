@@ -82,7 +82,17 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
 
   const changeCount = useMemo(() => {
     const g = groupStatus(status.data)
-    return { unstaged: g.unstaged.length + g.conflicted.length, staged: g.staged.length }
+    let modified = 0
+    let added = 0
+    let deleted = 0
+    for (const e of status.data?.entries ?? []) {
+      if (e.kind === 'ignored') continue
+      const codes = `${e.index}${e.worktree}`
+      if (e.kind === 'untracked' || codes.includes('A')) added++
+      else if (codes.includes('D')) deleted++
+      else modified++
+    }
+    return { unstaged: g.unstaged.length + g.conflicted.length, staged: g.staged.length, modified, added, deleted }
   }, [status.data])
 
   const commits = useMemo(() => history.data?.pages.flatMap((p) => p.commits) ?? [], [history.data])
@@ -255,7 +265,6 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
               <CommitGraph
                 repoPath={repo.root}
                 commits={commits}
-                refsBySha={refsBySha}
                 headSha={head.data?.sha ?? null}
                 currentRef={head.data?.ref ?? null}
                 hasMore={!!history.hasNextPage}

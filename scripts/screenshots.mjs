@@ -231,7 +231,7 @@ try {
 
   // Graph filter by author.
   await page.getByTestId('filter-button').click()
-  await page.getByLabel('Author').fill('Kenji')
+  await page.getByLabel('Author', { exact: true }).fill('Kenji')
   await shot(page, 'gitbob-filter-form')
   await page.getByRole('button', { name: 'Apply filter' }).click()
   await page.getByTestId('filter-summary').waitFor()
