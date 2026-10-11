@@ -43,6 +43,14 @@ const lines = (edit: Record<number, string> = {}) =>
   Array.from({ length: 20 }, (_, i) => edit[i + 1] ?? `line ${i + 1}`).join('\n') + '\n'
 
 const read = (repo: FixtureRepo, p: string) => readFileSync(join(repo.dir, p), 'utf8')
+/** For polling: git rewrites files by delete + create, so a read can briefly find nothing. */
+const readSoon = (repo: FixtureRepo, p: string): string | null => {
+  try {
+    return read(repo, p)
+  } catch {
+    return null
+  }
+}
 
 test.afterAll(cleanupFixtures)
 
@@ -97,7 +105,7 @@ test('stages a single hunk and single lines, unstages and discards hunks', async
     await mockConfirm(app, 1)
     await page.getByTestId('hunk-header').first().getByRole('button', { name: 'Discard hunk' }).click()
     await expect(page.getByTestId('diff-empty').or(page.getByTestId('hunk-header'))).toBeVisible()
-    await expect.poll(() => read(repo, 'f.txt')).toBe(lines({ 2: 'CHANGED two' }))
+    await expect.poll(() => readSoon(repo, 'f.txt')).toBe(lines({ 2: 'CHANGED two' }))
 
     // Unstage it again from the staged view.
     await fileRow(page, 'staged-files', 'f.txt').click()
