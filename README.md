@@ -181,7 +181,7 @@ Working with GitHub, GitLab, Bitbucket or Azure DevOps? Open **Pull requests** i
 
 Click a pull request to open it inside GitBob: read the description and comments, see who approved and whether CI passed, and switch to **Files** to read every change (GitBob downloads the pull request's commits, so diffs work offline afterwards). Leave a comment, **Approve** or **Request changes**, and when it's ready pick merge, squash or rebase and press **Merge pull request**. GitBob asks first, and refuses if someone pushed new commits since you looked.
 
-On GitHub you can also **Sign in with GitHub** instead of pasting a token: GitBob shows a short code, opens github.com in your browser, and you approve it there. (This needs a GitHub OAuth app client id with device flow enabled in **Settings → GitHub sign-in**; without one, use a token.)
+On GitHub you can also **Sign in with GitHub** instead of pasting a token: GitBob shows a short code, opens github.com in your browser, and you approve it there.
 
 ### 7. Undo, park and reuse work
 

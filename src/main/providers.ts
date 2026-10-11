@@ -37,17 +37,17 @@ export class ProviderService {
   private users = new Map<string, string>()
   private oauth: { repoPath: string; deviceCode: string; interval: number; expiresIn: number; controller: AbortController } | null = null
 
-  /** @param githubClientId GitHub OAuth app client id for device-flow sign-in (null disables it). */
+  /** @param githubClientId GitHub OAuth app client id for device-flow sign-in on a host (null disables it). */
   constructor(
     private readonly tokens: TokenStore,
-    private readonly githubClientId: () => string | null = () => null,
+    private readonly githubClientId: (host: string) => string | null = () => null,
   ) {}
 
   /** Start "Sign in with GitHub": returns the code the user enters at the verification page. */
   async startGitHubSignIn(repoPath: string): Promise<{ userCode: string; verificationUri: string }> {
     const found = await this.detect(repoPath)
     if (!found || found.ref.kind !== 'github') throw new GitError('INVALID_ARGUMENT', 'Sign-in is available for GitHub repositories.')
-    const clientId = this.githubClientId()
+    const clientId = this.githubClientId(found.ref.host)
     if (!clientId) throw new GitError('INVALID_ARGUMENT', 'GitHub sign-in is not configured. Use a personal access token instead.')
     this.oauth?.controller.abort()
     const baseUrl = process.env.GITBOB_TEST_GITHUB_OAUTH || `https://${found.ref.host}`
@@ -60,8 +60,8 @@ export class ProviderService {
   async finishGitHubSignIn(repoPath: string): Promise<{ user: string }> {
     const flow = this.oauth
     if (!flow || flow.repoPath !== repoPath) throw new GitError('INVALID_ARGUMENT', 'No GitHub sign-in in progress.')
-    const clientId = this.githubClientId()!
     const found = (await this.detect(repoPath))!
+    const clientId = this.githubClientId(found.ref.host)!
     try {
       const { accessToken } = await mapErrors(() =>
         pollDeviceFlow({
@@ -114,7 +114,6 @@ export class ProviderService {
   async status(repoPath: string): Promise<ProviderStatus> {
     const found = await this.detect(repoPath)
     const canStoreTokens = this.tokens.canStore()
-    const canSignIn = !!this.githubClientId()
     if (!found) return { repo: null, remote: null, connected: false, user: null, canStoreTokens, canSignIn: false }
     const key = tokenKey(found.ref.kind, found.ref.host)
     // Only checks that a token is saved: decrypting it would touch the OS keychain, which
@@ -126,7 +125,7 @@ export class ProviderService {
       connected,
       user: connected ? (this.users.get(key) ?? null) : null,
       canStoreTokens,
-      canSignIn: canSignIn && found.ref.kind === 'github',
+      canSignIn: found.ref.kind === 'github' && !!this.githubClientId(found.ref.host),
     }
   }
 

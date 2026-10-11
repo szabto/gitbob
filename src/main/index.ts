@@ -27,8 +27,8 @@ const iconPath = app.isPackaged
 
 let mainWindow: BrowserWindow | null = null
 
-/** Client id of GitBob's GitHub OAuth app (public, not a secret). Empty until the app is registered. */
-const BUILTIN_GITHUB_CLIENT_ID = ''
+/** Client id of GitBob's GitHub OAuth app on github.com (public, not a secret; device flow only). */
+const BUILTIN_GITHUB_CLIENT_ID = 'Ov23liyMamwxTGoZhXPJ'
 
 /**
  * Automated tests and screenshot runs set GITBOB_HIDDEN=1: windows render offscreen and are
@@ -151,7 +151,10 @@ void app.whenReady().then(async () => {
     updateSettings,
     providers: new ProviderService(
       new TokenStore(app.getPath('userData')),
-      () => settings.get().githubClientId || process.env.GITBOB_GITHUB_CLIENT_ID || BUILTIN_GITHUB_CLIENT_ID || null,
+      (host) =>
+        settings.get().githubClientId ||
+        process.env.GITBOB_GITHUB_CLIENT_ID ||
+        (host.toLowerCase() === 'github.com' ? BUILTIN_GITHUB_CLIENT_ID : null),
     ),
     recent: new RecentRepositoryStore(app.getPath('userData')),
     isTrustedSender,

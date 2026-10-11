@@ -127,7 +127,7 @@ function General({ s, update }: { s: AppSettings; update: (p: SettingsPatch) => 
       </Row>
       <Row
         label="GitHub sign-in"
-        hint="Client ID of a GitHub OAuth app with device flow enabled. Leave empty to use access tokens only."
+        hint="GitBob's own GitHub app is used on github.com. For GitHub Enterprise or your own OAuth app, enter its client ID (device flow must be enabled)."
       >
         <ClientIdField value={s.githubClientId} onSave={(v) => void update({ githubClientId: v })} />
       </Row>
@@ -365,7 +365,7 @@ function ClientIdField({ value, onSave }: { value: string | null; onSave: (v: st
         aria-label="GitHub OAuth client ID"
         value={text}
         onChange={(e) => setText(e.target.value.trim())}
-        placeholder="Ov23li…"
+        placeholder="Built-in (github.com)"
         className="min-w-0 flex-1 rounded border border-border bg-bg px-2 py-1 font-mono text-sm"
       />
       <button
