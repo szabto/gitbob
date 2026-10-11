@@ -188,3 +188,24 @@ test('the clone dialog lists the repositories of connected accounts', async () =
     await api.close()
   }
 })
+
+test('explains when GitHub hides an organization repository from the sign-in', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1' })
+  // The fake API knows acme/widgets only; this repository answers 404 like an unapproved org repo.
+  repo.git(['remote', 'add', 'origin', 'https://github.com/acme-private/secret.git'])
+  const api = await fakeGitHub('0'.repeat(40))
+  const { app, page } = await launch(repo.dir, api.url)
+  try {
+    const section = page.getByTestId('pull-requests')
+    await section.getByTestId('connect-provider').click()
+    await page.getByLabel(/Personal access token/).fill(TOKEN)
+    await page.getByTestId('prompt-dialog').getByRole('button', { name: 'Connect', exact: true }).click()
+    const error = section.getByTestId('pulls-error')
+    await expect(error).toContainText("GitHub doesn't let this sign-in see acme-private/secret")
+    await expect(error.getByRole('button', { name: 'Use an access token…' })).toBeVisible()
+  } finally {
+    await app.close()
+    await api.close()
+  }
+})

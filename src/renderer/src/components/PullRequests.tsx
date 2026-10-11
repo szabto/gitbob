@@ -147,7 +147,25 @@ export function PullRequestsSection({
           ) : pulls.isPending ? (
             <div className="px-7 py-1 text-xs text-muted">Loading…</div>
           ) : pulls.isError ? (
-            <div className="px-7 py-1 text-xs text-err">{pulls.error.message}</div>
+            <div className="px-7 py-1 text-xs" data-testid="pulls-error">
+              <p className="text-err">{pulls.error.message}</p>
+              {ref.kind === 'github' && (pulls.error as { code?: string }).code === 'NOT_FOUND' && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {status.canSignIn && (
+                    <button
+                      className="rounded border border-border px-1.5 py-0.5 hover:bg-panel-2"
+                      title="Opens GitHub, where you can request access for an organization"
+                      onClick={() => window.open('https://github.com/settings/connections/applications/Ov23liyMamwxTGoZhXPJ', '_blank')}
+                    >
+                      Request organization access
+                    </button>
+                  )}
+                  <button className="rounded border border-border px-1.5 py-0.5 hover:bg-panel-2" onClick={() => void connect()}>
+                    Use an access token…
+                  </button>
+                </div>
+              )}
+            </div>
           ) : pulls.data.length === 0 ? (
             <div className="px-7 py-1 text-xs text-muted">No open pull requests</div>
           ) : (

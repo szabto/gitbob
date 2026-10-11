@@ -160,7 +160,19 @@ export class ProviderService {
         .catch(() => null)
       if (login) this.users.set(key, login)
     }
-    return mapErrors(() => adapter.listPullRequests(ref, { state }))
+    try {
+      return await mapErrors(() => adapter.listPullRequests(ref, { state }))
+    } catch (e) {
+      // GitHub answers 404 (not 403) for repositories the token may not see, typically
+      // organization repositories whose owners haven't approved the OAuth app.
+      if (e instanceof GitError && e.code === 'NOT_FOUND' && ref.kind === 'github') {
+        throw new GitError(
+          'NOT_FOUND',
+          `GitHub doesn't let this sign-in see ${ref.owner}/${ref.repo}. If it belongs to an organization, ask its owners to approve GitBob, or connect with an access token that includes this repository.`,
+        )
+      }
+      throw e
+    }
   }
 
   async checks(repoPath: string, sha: string): Promise<CheckStatus | null> {
