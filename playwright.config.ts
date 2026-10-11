@@ -6,6 +6,8 @@ process.env.GITBOB_HIDDEN = '1'
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
+  // Windows CI runners spawn processes (git, the app) several times slower than macOS/Linux.
+  expect: { timeout: process.platform === 'win32' ? 15_000 : 5_000 },
   workers: 1,
   reporter: [['list']],
   use: { trace: 'retain-on-failure' },
