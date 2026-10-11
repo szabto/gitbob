@@ -25,6 +25,11 @@ export function MonacoEditor({
   const container = useRef<HTMLDivElement>(null)
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const onChangeRef = useRef(onChange)
+  /**
+   * Recent texts this editor reported through onChange. React may re-render with any of them while
+   * the user keeps typing; those are echoes of our own edits, not new values from the parent.
+   */
+  const emitted = useRef<string[]>([])
   const dark = useIsDark()
 
   useEffect(() => {
@@ -47,7 +52,12 @@ export function MonacoEditor({
       fontSize: 12,
       fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--font-mono') || undefined,
     })
-    const sub = e.onDidChangeModelContent(() => onChangeRef.current?.(e.getValue()))
+    const sub = e.onDidChangeModelContent(() => {
+      const text = e.getValue()
+      emitted.current.push(text)
+      if (emitted.current.length > 20) emitted.current.shift()
+      onChangeRef.current?.(text)
+    })
     editor.current = e
     onReady?.(e)
     return () => {
@@ -62,7 +72,11 @@ export function MonacoEditor({
 
   useEffect(() => {
     const e = editor.current
+    // While typing, React re-renders with text the editor already moved past; applying it would
+    // drop the newest keystrokes. Only values that didn't come from this editor are applied.
+    if (emitted.current.includes(value)) return
     if (e && e.getValue() !== value) {
+      emitted.current = []
       // Keep undo history by editing through the model.
       e.executeEdits('gitbob', [{ range: e.getModel()!.getFullModelRange(), text: value }])
       e.pushUndoStop()

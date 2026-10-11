@@ -242,10 +242,14 @@ test('edit a file in the app, save and stage it, and refuse to overwrite outside
   repo.write('notes.txt', 'first line\nsecond line\n')
   const { app, page } = await launch(repo.dir)
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
-  const typeAtEnd = async (text: string) => {
-    await page.locator('[data-testid="file-editor-monaco"] .view-lines').click()
+  // Wait for the file to be in the editor, put the cursor at its very end, type, and check it landed.
+  const typeAtEnd = async (text: string, expectLoaded: string) => {
+    const lines = page.locator('[data-testid="file-editor-monaco"] .view-lines')
+    await expect(lines).toContainText(expectLoaded)
+    await lines.locator('.view-line').last().click()
     await page.keyboard.press(`${mod}+End`)
     await page.keyboard.type(text)
+    await expect(lines).toContainText(text.trim())
   }
   try {
     await page.getByTestId('wip-row').click()
@@ -253,7 +257,7 @@ test('edit a file in the app, save and stage it, and refuse to overwrite outside
     await page.getByTestId('diff-view').getByRole('button', { name: 'Edit' }).click()
     const editor = page.getByTestId('file-editor')
     await expect(editor.locator('.monaco-editor')).toBeVisible()
-    await typeAtEnd('third line\n')
+    await typeAtEnd('third line\n', 'second line')
     await expect(editor).toContainText('unsaved')
     await editor.getByRole('button', { name: 'Save and stage' }).click()
     await expect(page.getByTestId('notice')).toContainText('Saved and staged notes.txt')
@@ -267,7 +271,7 @@ test('edit a file in the app, save and stage it, and refuse to overwrite outside
     await page.getByTestId('diff-view').getByRole('button', { name: 'Edit' }).click()
     await expect(editor.locator('.monaco-editor')).toBeVisible()
     repo.write('notes.txt', 'and once more\n')
-    await typeAtEnd('mine\n')
+    await typeAtEnd('mine\n', 'changed again outside')
     await editor.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByTestId('error-message')).toContainText('changed outside GitBob')
     expect(read(repo, 'notes.txt')).toBe('and once more\n')
