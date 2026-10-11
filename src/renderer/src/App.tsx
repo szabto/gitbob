@@ -7,6 +7,7 @@ import { Welcome } from './components/Welcome'
 import { RepositoryView } from './components/RepositoryView'
 import { ErrorBanner } from './components/ErrorBanner'
 import { ContextMenu, PromptDialog } from './components/Overlays'
+import { CloneDialog } from './components/CloneDialog'
 import { CredentialDialog } from './components/CredentialDialog'
 import { TabBar } from './components/TabBar'
 import { CommandHost } from './components/CommandHost'
@@ -33,16 +34,12 @@ export function App() {
 
   const setBusy = useUiStore((s) => s.setBusy)
   const setProgress = useUiStore((s) => s.setProgress)
-  const ask = useUiStore((s) => s.ask)
   useEffect(() => subscribe('op:progress', (p) => setProgress(p)), [setProgress])
 
-  const cloneRepository = useCallback(async () => {
-    const url = await ask({
-      title: 'Clone a repository',
-      label: 'Repository URL',
-      placeholder: 'https://github.com/owner/repo.git',
-      confirmLabel: 'Choose folder…',
-    })
+  const [cloneOpen, setCloneOpen] = useState(false)
+  const cloneRepository = useCallback(() => setCloneOpen(true), [])
+  const finishClone = useCallback(async (url: string | null) => {
+    setCloneOpen(false)
     if (!url) return
     setBusy('Cloning…')
     try {
@@ -53,7 +50,7 @@ export function App() {
     } finally {
       setBusy(null)
     }
-  }, [ask, setBusy, handleOpened, showError])
+  }, [setBusy, handleOpened, showError])
 
   const initRepository = useCallback(async () => {
     try {
@@ -169,6 +166,7 @@ export function App() {
       <CommandHost repo={repo} app={commandApp} />
       <ContextMenu />
       <PromptDialog />
+      {cloneOpen && <CloneDialog onClose={(url) => void finishClone(url)} />}
       <CredentialDialog />
     </div>
   )

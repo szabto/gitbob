@@ -79,6 +79,12 @@ export class TokenStore {
     await this.persist(data)
   }
 
+  /** Keys of all stored tokens. Reads only the local file, never the keychain. */
+  async keys(): Promise<string[]> {
+    if (this.ephemeral) return [...this.memory.keys()]
+    return Object.keys(await this.load()).filter((k) => !!this.cache?.[k])
+  }
+
   private async persist(data: Record<string, string>): Promise<void> {
     this.cache = data
     await mkdir(dirname(this.file), { recursive: true })

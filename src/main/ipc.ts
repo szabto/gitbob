@@ -412,6 +412,8 @@ export function registerIpc(ctx: IpcContext): void {
     },
     'provider:pulls': ({ repoPath, state }) => ctx.providers.pullRequests(requireOpened(repoPath), state),
     'provider:checks': ({ repoPath, sha }) => ctx.providers.checks(requireOpened(repoPath), sha),
+    'provider:accounts': () => ctx.providers.accounts(),
+    'provider:hosted-repos': ({ kind, host }) => ctx.providers.hostedRepositories(kind, host),
     'provider:create-pr': ({ repoPath, ...input }) => ctx.providers.createPullRequest(requireOpened(repoPath), input),
     'provider:pr': ({ repoPath, number }) => ctx.providers.pullRequest(requireOpened(repoPath), number),
     'provider:pr-comments': ({ repoPath, number }) => ctx.providers.comments(requireOpened(repoPath), number),

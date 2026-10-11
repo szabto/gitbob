@@ -265,6 +265,33 @@ export function summarizeChecks(items: CheckItem[]): CheckStatus {
   return { state, total, failed: failed.length, pending: pending.length, ...(url ? { url } : {}) }
 }
 
+/** An https(:) clone URL with any user info removed; null if it isn't one. */
+export function safeCloneUrl(u: unknown): string | null {
+  if (typeof u !== 'string' || !u) return null
+  try {
+    const p = new URL(u)
+    if (p.protocol !== 'https:' && p.protocol !== 'http:') return null
+    p.username = ''
+    p.password = ''
+    return p.href
+  } catch {
+    return null
+  }
+}
+
+/** An ssh clone URL (`git@host:path` or `ssh://…`) without whitespace or a leading dash; else null. */
+export function safeSshUrl(u: unknown): string | null {
+  if (typeof u !== 'string' || !u || /\s/.test(u) || u.startsWith('-')) return null
+  return /^ssh:\/\/[^/]+\/./.test(u) || /^[\w.-]+@[\w.-]+:[^/]/.test(u) ? u : null
+}
+
+/** Limit for repository listings: 1..300, default 300. */
+export function repoLimit(limit: number | undefined): number {
+  if (limit === undefined) return 300
+  if (!Number.isInteger(limit) || limit < 1) throw new ProviderError('INVALID_ARGUMENT', 'Invalid result limit.')
+  return Math.min(limit, 300)
+}
+
 /** Encode each path segment of a branch name (keeps `/` separators). */
 export function encodeBranchPath(branch: string): string {
   return branch.split('/').map(encodeURIComponent).join('/')

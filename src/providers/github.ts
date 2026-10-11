@@ -17,6 +17,7 @@ import {
   type RepoRef,
   type ReviewEvent,
   type ReviewerState,
+  type HostedRepository,
 } from './types'
 import {
   MERGE_METHODS,
@@ -46,6 +47,9 @@ import {
   type CheckItem,
   type CheckItemState,
   safeWebUrl,
+  repoLimit,
+  safeCloneUrl,
+  safeSshUrl,
 } from './util'
 
 const LABEL = 'GitHub'
@@ -82,6 +86,25 @@ export class GitHubAdapter implements ProviderAdapter {
     const { data } = await this.req('/user')
     const u = expectObject(data, LABEL)
     return { login: str(u.login), name: optStr(u.name) }
+  }
+
+  async listRepositories(host: string, opts: { limit?: number } = {}): Promise<HostedRepository[]> {
+    const limit = repoLimit(opts.limit)
+    const perPage = Math.min(this.opts.pageSize ?? 100, 100)
+    const first = `/user/repos?sort=updated&direction=desc&affiliation=owner,collaborator,organization_member&per_page=${perPage}`
+    const repos = await paginate(limit, async (cursor) => {
+      const res = await this.req(cursor ?? first)
+      return { items: expectArray(res.data, LABEL), next: parseLinkNext(res.headers.get('link')) }
+    })
+    return repos.flatMap((r): HostedRepository[] => {
+      const o = obj(r)
+      const cloneUrl = safeCloneUrl(o.clone_url)
+      if (!cloneUrl || !str(o.full_name)) return []
+      return [{
+        kind: 'github', host, fullName: str(o.full_name), description: optStr(o.description), private: o.private === true,
+        cloneUrl, sshUrl: safeSshUrl(o.ssh_url), updatedAt: optStr(o.pushed_at) ?? optStr(o.updated_at),
+      }]
+    })
   }
 
   async listPullRequests(repo: RepoRef, opts: ListPullRequestsOptions): Promise<PullRequest[]> {

@@ -17,6 +17,7 @@ import {
   type RepoRef,
   type ReviewEvent,
   type ReviewerState,
+  type HostedRepository,
 } from './types'
 import {
   MERGE_METHODS,
@@ -45,6 +46,9 @@ import {
   type CheckItem,
   type CheckItemState,
   safeWebUrl,
+  repoLimit,
+  safeCloneUrl,
+  safeSshUrl,
 } from './util'
 
 const LABEL = 'GitLab'
@@ -84,6 +88,26 @@ export class GitLabAdapter implements ProviderAdapter {
     const { data } = await this.req('/user')
     const u = expectObject(data, LABEL)
     return { login: str(u.username), name: optStr(u.name) }
+  }
+
+  async listRepositories(host: string, opts: { limit?: number } = {}): Promise<HostedRepository[]> {
+    const limit = repoLimit(opts.limit)
+    const perPage = Math.min(this.opts.pageSize ?? 100, 100)
+    const first = `/projects?membership=true&simple=true&order_by=last_activity_at&sort=desc&per_page=${perPage}`
+    const repos = await paginate(limit, async (cursor) => {
+      const res = await this.req(cursor ?? first)
+      return { items: expectArray(res.data, LABEL), next: parseLinkNext(res.headers.get('link')) }
+    })
+    return repos.flatMap((r): HostedRepository[] => {
+      const o = obj(r)
+      const cloneUrl = safeCloneUrl(o.http_url_to_repo)
+      if (!cloneUrl || !str(o.path_with_namespace)) return []
+      return [{
+        kind: 'gitlab', host, fullName: str(o.path_with_namespace), description: optStr(o.description),
+        private: str(o.visibility, 'private') !== 'public',
+        cloneUrl, sshUrl: safeSshUrl(o.ssh_url_to_repo), updatedAt: optStr(o.last_activity_at),
+      }]
+    })
   }
 
   async listPullRequests(repo: RepoRef, opts: ListPullRequestsOptions): Promise<PullRequest[]> {

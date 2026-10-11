@@ -84,6 +84,8 @@ export const IPC_CHANNELS = [
   'provider:pulls',
   'provider:checks',
   'provider:create-pr',
+  'provider:accounts',
+  'provider:hosted-repos',
   'provider:pr',
   'provider:pr-comments',
   'provider:pr-comment',

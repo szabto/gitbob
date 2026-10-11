@@ -236,6 +236,11 @@ export const ipcInputSchemas = {
   'provider:disconnect': z.object({ repoPath: absolutePath }),
   'provider:pulls': z.object({ repoPath: absolutePath, state: z.enum(['open', 'all']).default('open') }),
   'provider:checks': z.object({ repoPath: absolutePath, sha: shaSchema }),
+  'provider:accounts': z.object({}).strict(),
+  'provider:hosted-repos': z.object({
+    kind: z.enum(['github', 'gitlab', 'bitbucket', 'azure']),
+    host: z.string().regex(/^[a-z0-9.-]+(?::\d{1,5})?$/i).max(255),
+  }),
   'provider:pr': z.object({ repoPath: absolutePath, number: prNumber }),
   'provider:pr-comments': z.object({ repoPath: absolutePath, number: prNumber }),
   'provider:pr-comment': z.object({ repoPath: absolutePath, number: prNumber, body: z.string().trim().min(1).max(65_536) }),

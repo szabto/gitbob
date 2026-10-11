@@ -17,6 +17,7 @@ import {
   type RepoRef,
   type ReviewEvent,
   type ReviewerState,
+  type HostedRepository,
 } from './types'
 import {
   MERGE_METHODS,
@@ -44,6 +45,9 @@ import {
   type CheckItem,
   type CheckItemState,
   safeWebUrl,
+  repoLimit,
+  safeCloneUrl,
+  safeSshUrl,
 } from './util'
 
 const LABEL = 'Azure DevOps'
@@ -98,6 +102,39 @@ export class AzureDevOpsAdapter implements ProviderAdapter {
     const { data } = await this.req(`/_apis/profile/profiles/me?${API_VERSION}`, { baseUrl: this.profileBaseUrl })
     const u = expectObject(data, LABEL)
     return { login: str(u.emailAddress) || str(u.publicAlias) || str(u.id), name: optStr(u.displayName) }
+  }
+
+  /**
+   * Repositories in every organization the user belongs to (profile → accounts → git
+   * repositories). Needs a PAT for "All accessible organizations" with Code (read).
+   */
+  async listRepositories(host: string, opts: { limit?: number } = {}): Promise<HostedRepository[]> {
+    const limit = repoLimit(opts.limit)
+    const profile = expectObject((await this.req(`/_apis/profile/profiles/me?${API_VERSION}`, { baseUrl: this.profileBaseUrl })).data, LABEL)
+    const memberId = encodeURIComponent(str(profile.id))
+    if (!memberId) throw new ProviderError('BAD_RESPONSE', `${LABEL} returned an unexpected response.`)
+    const accounts = expectArray(
+      expectObject((await this.req(`/_apis/accounts?memberId=${memberId}&${API_VERSION}`, { baseUrl: this.profileBaseUrl })).data, LABEL).value ?? [],
+      LABEL,
+    )
+    const orgs = accounts.map((a) => str(obj(a).accountName)).filter((n) => /^[\w.-]+$/.test(n)).slice(0, 20)
+    const perOrg = await Promise.all(
+      orgs.map(async (org) => {
+        const res = await this.req(`/${encodeURIComponent(org)}/_apis/git/repositories?${API_VERSION}`)
+        return expectArray(expectObject(res.data, LABEL).value ?? [], LABEL).flatMap((r): HostedRepository[] => {
+          const o = obj(r)
+          const cloneUrl = safeCloneUrl(o.remoteUrl)
+          const project = str(obj(o.project).name)
+          if (!cloneUrl || !str(o.name) || o.isDisabled === true) return []
+          return [{
+            kind: 'azure', host, fullName: `${org}/${project}/${str(o.name)}`, description: null,
+            private: str(obj(o.project).visibility, 'private') !== 'public',
+            cloneUrl, sshUrl: safeSshUrl(o.sshUrl), updatedAt: optStr(obj(o.project).lastUpdateTime),
+          }]
+        })
+      }),
+    )
+    return perOrg.flat().sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')).slice(0, limit)
   }
 
   async listPullRequests(repo: RepoRef, opts: ListPullRequestsOptions): Promise<PullRequest[]> {

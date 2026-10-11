@@ -65,6 +65,9 @@ export function PullRequestsSection({
     void qc.invalidateQueries({ queryKey: ['provider', repoPath] })
     void qc.invalidateQueries({ queryKey: ['pulls', repoPath] })
     void qc.invalidateQueries({ queryKey: ['checks', repoPath] })
+    // The clone dialog's account and repository lists depend on which tokens are saved.
+    void qc.invalidateQueries({ queryKey: ['provider-accounts'] })
+    qc.removeQueries({ queryKey: ['hosted-repos'] })
   }
 
   const connect = async (): Promise<void> => {

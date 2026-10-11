@@ -1,5 +1,7 @@
 import type {
   AppInfo,
+  HostedRepository,
+  ProviderAccount,
   PullRequestComment,
   PullRequestDetail,
   ConflictDescription,
@@ -132,6 +134,8 @@ export interface IpcOutputs {
   /** null when the repository has no connected provider. */
   'provider:checks': CheckStatus | null
   'provider:create-pr': PullRequest
+  'provider:accounts': ProviderAccount[]
+  'provider:hosted-repos': HostedRepository[]
   'provider:pr': PullRequestDetail
   'provider:pr-comments': PullRequestComment[]
   'provider:pr-comment': PullRequestComment

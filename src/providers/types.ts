@@ -1,5 +1,6 @@
 import type {
   CheckStatus,
+  HostedRepository,
   MergeMethod,
   MergeableState,
   ProviderKind,
@@ -14,6 +15,7 @@ import type {
 } from '@shared/types'
 export type {
   CheckStatus,
+  HostedRepository,
   MergeMethod,
   MergeableState,
   ProviderKind,
@@ -103,6 +105,11 @@ export interface ProviderAdapter {
    * provider exposes none (Bitbucket Cloud: fetch the source branch instead). Pure; no network.
    */
   pullRequestRefspec(repo: RepoRef, number: number): string | null
+  /**
+   * Repositories the token's user can access, most recently updated first (at most `limit`,
+   * default 300). `host` is the account host stored with the results.
+   */
+  listRepositories(host: string, opts?: { limit?: number }): Promise<HostedRepository[]>
 }
 
 export interface AdapterOptions {

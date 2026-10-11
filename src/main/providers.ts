@@ -1,6 +1,8 @@
 import type {
   CheckStatus,
   FileChange,
+  HostedRepository,
+  ProviderAccount,
   MergeMethod,
   ProviderKind,
   ProviderStatus,
@@ -238,6 +240,26 @@ export class ProviderService {
   ): Promise<PullRequest> {
     const { ref, adapter } = await this.connected(repoPath)
     return mapErrors(() => adapter.createPullRequest(ref, input))
+  }
+
+  /** Hosting accounts with a saved token (no keychain access). */
+  async accounts(): Promise<ProviderAccount[]> {
+    const out: ProviderAccount[] = []
+    for (const key of await this.tokens.keys()) {
+      const m = /^(github|gitlab|bitbucket|azure):(.+)$/.exec(key)
+      if (m) out.push({ kind: m[1] as ProviderKind, host: m[2]! })
+    }
+    return out.sort((a, b) => a.kind.localeCompare(b.kind) || a.host.localeCompare(b.host))
+  }
+
+  /** Repositories the user of a connected account can clone, most recently updated first. */
+  async hostedRepositories(kind: ProviderKind, host: string): Promise<HostedRepository[]> {
+    const key = tokenKey(kind, host)
+    if (!(await this.tokens.has(key))) throw new GitError('INVALID_ARGUMENT', `Not connected to ${host}.`)
+    const token = await this.tokens.get(key)
+    if (!token) throw new GitError('INVALID_ARGUMENT', `The saved token for ${host} could not be read. Connect it again.`)
+    const ref: RepoRef = { kind, host, owner: '', repo: '', webUrl: `https://${host}` }
+    return mapErrors(() => this.adapterFor(ref, token).listRepositories(host))
   }
 }
 

@@ -350,6 +350,28 @@ export interface RepoRef {
   webUrl: string
 }
 
+/** A repository the signed-in user can access on a hosting service (for cloning). */
+export interface HostedRepository {
+  kind: ProviderKind
+  /** Account host the token is stored for, e.g. `github.com`, `dev.azure.com`. */
+  host: string
+  /** `owner/name` (GitLab: full namespace path; Azure: `organization/project/name`). */
+  fullName: string
+  description: string | null
+  private: boolean
+  /** HTTPS clone URL without credentials. */
+  cloneUrl: string
+  sshUrl: string | null
+  /** ISO timestamp of the last update/push, when known. */
+  updatedAt: string | null
+}
+
+/** A hosting-service account with a saved token. */
+export interface ProviderAccount {
+  kind: ProviderKind
+  host: string
+}
+
 export interface PullRequest {
   /** Provider-global id (GitHub/GitLab numeric id; Bitbucket/Azure: same as number). */
   id: number | string

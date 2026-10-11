@@ -31,6 +31,11 @@ async function fakeGitHub(headSha: string) {
     if (req.headers.authorization !== `Bearer ${TOKEN}`) return json(401, { message: 'Bad credentials' })
     const url = new URL(req.url ?? '/', 'http://x')
     if (url.pathname === '/user') return json(200, { login: 'octo-tester', name: 'Octo' })
+    if (url.pathname === '/user/repos')
+      return json(200, [
+        { full_name: 'acme/widgets', description: 'Widget factory', private: true, clone_url: 'https://github.com/acme/widgets.git', ssh_url: 'git@github.com:acme/widgets.git', pushed_at: '2026-10-02T00:00:00Z' },
+        { full_name: 'octo-tester/dotfiles', description: null, private: false, clone_url: 'https://github.com/octo-tester/dotfiles.git', ssh_url: 'git@github.com:octo-tester/dotfiles.git', pushed_at: '2026-09-01T00:00:00Z' },
+      ])
     if (url.pathname === '/repos/acme/widgets/pulls' && req.method === 'GET') return json(200, pulls)
     if (url.pathname === '/repos/acme/widgets/pulls' && req.method === 'POST') {
       const input = JSON.parse(await body(req)) as Record<string, unknown>
@@ -130,6 +135,54 @@ test('connects GitHub with a token, lists pull requests, shows CI and creates a 
     expect(api.created).toEqual([
       { title: 'Add login form', body: 'Adds the login form.', head: 'feature/login', base: 'main', draft: true },
     ])
+  } finally {
+    await app.close()
+    await api.close()
+  }
+})
+
+test('the clone dialog lists the repositories of connected accounts', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1' })
+  repo.git(['remote', 'add', 'origin', 'https://github.com/acme/widgets.git'])
+  const api = await fakeGitHub('0'.repeat(40))
+  const { app, page } = await launch(repo.dir, api.url)
+  const openClone = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.send('menu:clone-repository'))
+  try {
+    // Not connected yet: a plain URL field with a hint.
+    await openClone()
+    const dialog = page.getByTestId('clone-dialog')
+    await expect(dialog).toContainText('to pick from your repositories here')
+    await expect(dialog.getByTestId('clone-repo-list')).toHaveCount(0)
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+
+    const section = page.getByTestId('pull-requests')
+    await section.getByTestId('connect-provider').click()
+    await page.getByLabel(/Personal access token/).fill(TOKEN)
+    await page.getByTestId('prompt-dialog').getByRole('button', { name: 'Connect', exact: true }).click()
+    await expect(page.getByTestId('notice')).toContainText('Connected to GitHub')
+
+    await openClone()
+    await expect(dialog).toContainText('From GitHub')
+    const list = dialog.getByTestId('clone-repo-list')
+    await expect(list.getByTestId('clone-repo')).toHaveCount(2)
+    await expect(list.getByTestId('clone-repo').first()).toContainText('acme/widgets')
+    await expect(list.getByTestId('clone-repo').first()).toContainText('Private')
+
+    // Typing filters; Enter picks the highlighted repository.
+    const input = dialog.getByLabel('Repository URL')
+    await input.fill('dot')
+    await expect(list.getByTestId('clone-repo')).toHaveCount(1)
+    await input.press('Enter')
+    await expect(input).toHaveValue('https://github.com/octo-tester/dotfiles.git')
+    await dialog.getByText('Use SSH').click()
+    await expect(input).toHaveValue('git@github.com:octo-tester/dotfiles.git')
+
+    // Clicking a repository works too.
+    await input.click()
+    await list.locator('[data-name="acme/widgets"]').click()
+    await expect(input).toHaveValue('git@github.com:acme/widgets.git')
+    await expect(dialog.getByRole('button', { name: 'Choose folder…' })).toBeEnabled()
   } finally {
     await app.close()
     await api.close()

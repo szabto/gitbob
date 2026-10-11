@@ -17,6 +17,7 @@ import {
   type RepoRef,
   type ReviewEvent,
   type ReviewerState,
+  type HostedRepository,
 } from './types'
 import {
   MERGE_METHODS,
@@ -44,6 +45,9 @@ import {
   type CheckItem,
   type CheckItemState,
   safeWebUrl,
+  repoLimit,
+  safeCloneUrl,
+  safeSshUrl,
 } from './util'
 
 const LABEL = 'Bitbucket'
@@ -89,6 +93,27 @@ export class BitbucketAdapter implements ProviderAdapter {
     const u = expectObject(data, LABEL)
     // `username` was removed for privacy; `nickname` is the public handle.
     return { login: str(u.nickname) || str(u.username) || str(u.account_id), name: optStr(u.display_name) }
+  }
+
+  async listRepositories(host: string, opts: { limit?: number } = {}): Promise<HostedRepository[]> {
+    const limit = repoLimit(opts.limit)
+    const perPage = Math.min(this.opts.pageSize ?? 100, 100)
+    const repos = await paginate(limit, async (cursor) => {
+      const res = await this.req(cursor ?? `/repositories?role=member&sort=-updated_on&pagelen=${perPage}`)
+      const body = expectObject(res.data, LABEL)
+      return { items: expectArray(body.values ?? [], LABEL), next: optStr(body.next) }
+    })
+    return repos.flatMap((r): HostedRepository[] => {
+      const o = obj(r)
+      const links = Array.isArray(obj(o.links).clone) ? (obj(o.links).clone as unknown[]).map(obj) : []
+      const href = (name: string) => links.find((l) => l.name === name)?.href
+      const cloneUrl = safeCloneUrl(href('https'))
+      if (!cloneUrl || !str(o.full_name)) return []
+      return [{
+        kind: 'bitbucket', host, fullName: str(o.full_name), description: optStr(o.description), private: o.is_private !== false,
+        cloneUrl, sshUrl: safeSshUrl(href('ssh')), updatedAt: optStr(o.updated_on),
+      }]
+    })
   }
 
   async listPullRequests(repo: RepoRef, opts: ListPullRequestsOptions): Promise<PullRequest[]> {
