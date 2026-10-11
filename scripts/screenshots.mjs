@@ -163,7 +163,7 @@ try {
 
   // Interactive rebase dialog.
   await page.locator('[data-testid="commit-row"]', { hasText: 'Release 0.2.0' }).click({ button: 'right' })
-  await page.getByRole('menuitem', { name: /Interactive rebase/ }).click()
+  await page.getByRole('menuitem', { name: /Interactive rebase commits after/ }).click()
   await page.getByTestId('rebase-row').first().waitFor()
   await page.getByLabel('Action for Document the forecast API').selectOption('reword')
   await page.getByLabel('New message for Document the forecast API').fill('Document getForecast() and the retry helper')

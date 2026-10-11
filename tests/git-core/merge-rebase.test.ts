@@ -63,10 +63,13 @@ describe('merge and rebase onto a branch', () => {
 
   it('rejects refs that are not branches/tags or could be options', async () => {
     const { repo, f1 } = diverged()
-    for (const bad of ['--abort', 'feature', f1, 'refs/heads/../x', 'refs/heads/missing']) {
+    for (const bad of ['--abort', 'feature', 'refs/heads/../x', 'refs/heads/missing']) {
       await expect(mergeRef(repo.dir, bad, { mode: 'ff' })).rejects.toThrow()
       await expect(rebaseOnto(repo.dir, bad)).rejects.toThrow()
     }
+    // A commit id can be rebased onto ("Rebase onto this commit"), but merging needs a branch or tag.
+    await expect(mergeRef(repo.dir, f1, { mode: 'ff' })).rejects.toThrow()
+    await expect(rebaseOnto(repo.dir, 'f'.repeat(40))).rejects.toThrow()
     repo.git(['switch', '-q', '--detach', 'HEAD'])
     await expect(rebaseOnto(repo.dir, 'refs/heads/main')).rejects.toThrow(/Check out a branch/)
   })

@@ -52,6 +52,18 @@ export interface IpcOutputs {
   'repo:health': { suggestCommitGraph: boolean }
   'repo:write-commit-graph': void
   'file:history': FileHistoryPage
+  /** A native confirmation dialog; true if confirmed. */
+  'app:confirm': boolean
+  'app:copy': void
+  'commit:reword-head': void
+  /** deleted: false if the user declined. */
+  'branch:delete-remote': { deleted: boolean }
+  'branch:fast-forward': { moved: boolean }
+  /** Fetch the branch's upstream and fast-forward it (it isn't checked out). */
+  'branch:pull-other': { moved: boolean }
+  'compare:files': FileChange[]
+  /** null if the save dialog was cancelled. */
+  'commit:save-patch': { path: string } | null
   'profile:list': { active: string; profiles: ProfileInfo[] }
   'profile:create': ProfileInfo
   'profile:rename': void

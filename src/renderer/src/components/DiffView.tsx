@@ -13,6 +13,7 @@ const targetLabel: Record<DiffTarget['kind'], string> = {
   untracked: 'New file',
   commit: 'Commit',
   range: 'Pull request',
+  'worktree-compare': 'Compared with working directory',
 }
 
 const lineCls: Record<DiffLine['type'], string> = {
@@ -64,6 +65,7 @@ export function DiffView({
           {targetLabel[target.kind]}
           {target.kind === 'commit' ? ` ${target.sha.slice(0, 7)}` : ''}
           {target.kind === 'range' ? ` ${target.base.slice(0, 7)}…${target.head.slice(0, 7)}` : ''}
+          {target.kind === 'worktree-compare' ? `: ${target.sha.slice(0, 7)}` : ''}
         </span>
         <span className="truncate font-mono text-xs" data-testid="diff-path">
           {diff.data?.oldPath ? `${diff.data.oldPath} → ` : ''}

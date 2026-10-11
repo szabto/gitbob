@@ -319,19 +319,33 @@ export async function mergeRef(repoPath: string, ref: string, opts: { mode: Merg
 
 /** Commits on the current branch that a rebase onto `ref` would rewrite. */
 export async function commitsToRebase(repoPath: string, ref: string): Promise<number> {
-  await assertMergeableRef(repoPath, ref)
+  if (SHA_RE.test(ref)) await resolveCommit(repoPath, ref)
+  else await assertMergeableRef(repoPath, ref)
   const r = await runGit(['rev-list', '--count', `${ref}..HEAD`], { cwd: repoPath })
   return Number(r.stdout.trim()) || 0
 }
 
-/** Rebase the current branch onto a branch or tag (`git rebase <ref>`). A conflict stops it. */
+/** Rebase the current branch onto a branch, tag or commit (`git rebase <ref>`). A conflict stops it. */
 export async function rebaseOnto(repoPath: string, ref: string): Promise<void> {
-  await assertMergeableRef(repoPath, ref)
+  if (SHA_RE.test(ref)) await resolveCommit(repoPath, ref)
+  else await assertMergeableRef(repoPath, ref)
   await assertNoOperation(repoPath)
   const branch = await runGit(['symbolic-ref', '-q', 'HEAD'], { cwd: repoPath, okExitCodes: [0, 1] })
   if (branch.exitCode !== 0) throw new GitError('INVALID_ARGUMENT', 'Check out a branch before rebasing')
   const r = await runGit(['rebase', ref], { cwd: repoPath, env: NO_EDITOR_ENV, timeoutMs: COMMIT_TIMEOUT, okExitCodes: ALL_EXIT_CODES })
   if (r.exitCode !== 0) throw await stoppedError(repoPath, 'Rebase', r)
+}
+
+/** Change only the message of HEAD (`commit --amend --only`): staged changes are left alone. */
+export async function rewordHead(repoPath: string, message: string): Promise<void> {
+  if (typeof message !== 'string' || !message.trim() || message.includes('\0')) throw new GitError('INVALID_ARGUMENT', 'The commit message is empty')
+  await assertNoOperation(repoPath)
+  await runGit(['commit', '--amend', '--only', '--allow-empty', '--no-verify', '--cleanup=strip', '-F', '-'], {
+    cwd: repoPath,
+    env: NO_EDITOR_ENV,
+    input: message,
+    timeoutMs: COMMIT_TIMEOUT,
+  })
 }
 
 // ---------------------------------------------------------------------------

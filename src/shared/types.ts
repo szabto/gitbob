@@ -164,6 +164,8 @@ export type DiffTarget =
   | { kind: 'commit'; sha: string; path: string; oldPath?: string }
   /** Changes between two commits (e.g. a pull request: merge base → head). */
   | { kind: 'range'; base: string; head: string; path: string; oldPath?: string }
+  /** A commit compared with the working tree. */
+  | { kind: 'worktree-compare'; sha: string; path: string; oldPath?: string }
 
 export interface CommitResult {
   sha: string
@@ -178,7 +180,7 @@ export interface RemoteInfo {
   fetchUrl: string
   pushUrl: string
   /** Hosting service and owner, when the URL points to a recognized one (for its project icon). */
-  hosted?: { kind: ProviderKind; owner: string }
+  hosted?: { kind: ProviderKind; owner: string; webUrl: string }
 }
 
 // ---------------------------------------------------------------------------

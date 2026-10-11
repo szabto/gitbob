@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { IPC_CHANNELS, type IpcChannel } from '@shared/channels'
 import { ipcInputSchemas } from '@shared/ipc'
 import type { IpcOutputs } from '@shared/ipc-types'
@@ -26,15 +26,16 @@ import {
   deleteBranch,
   renameBranch,
   setUpstream,
+  fastForwardBranch,
 } from '@git-core/branches'
-import { addRemote, fetch, listRemotes, pull, push, removeRemote, type NetworkOptions } from '@git-core/remotes'
+import { addRemote, deleteRemoteBranch, fetch, listRemotes, pull, push, removeRemote, type NetworkOptions } from '@git-core/remotes'
 import type { NetworkSession } from './network'
 import type { ProviderService } from './providers'
 import { appInfo, gitIdentity, setGitIdentity, validateGitPath } from './app-info'
 import type { Updater } from './updater'
 import { applyStash, applyStashFile, createStash, dropStash, getStashFiles, listStashes, stashToBranch } from '@git-core/stash'
 import { createTag, deleteTag, listTags, pushTag } from '@git-core/tags'
-import { abortOperation, cherryPick, commitsToRebase, continueOperation, mergeRef, rebaseOnto, reset, revert, skipOperation } from '@git-core/history'
+import { abortOperation, cherryPick, commitsToRebase, continueOperation, mergeRef, rebaseOnto, reset, revert, rewordHead, skipOperation } from '@git-core/history'
 import { getReflog } from '@git-core/reflog'
 import { cleanupRebaseFiles, getRebaseTodo, interactiveRebase } from '@git-core/rebase'
 import { getBlame } from '@git-core/blame'
@@ -50,6 +51,7 @@ import { RepoHealth } from './repo-health'
 import { openTerminal } from './terminal'
 import { writeCommitGraph } from '@git-core/maintenance'
 import { getFileHistory } from '@git-core/file-history'
+import { getWorktreeCompareFiles, saveCommitPatch } from '@git-core/compare'
 import { readFileForEdit, saveEditedFile } from '@git-core/worktree-file'
 import { getOperation } from '@git-core/status'
 import { resolveRepoPath } from '@git-core/paths'
@@ -266,6 +268,44 @@ export function registerIpc(ctx: IpcContext): void {
         app.exit(0)
       }, 50)
     },
+    'commit:reword-head': ({ repoPath, message }) =>
+      journaled(requireOpened(repoPath), 'Edit commit message', () => rewordHead(repoPath, message), (b, a) => branchMove(b, a, 'soft')),
+    'branch:delete-remote': async ({ repoPath, remote, branch }, event) => {
+      requireOpened(repoPath)
+      const confirmed = await confirmDestructive(event, {
+        message: `Delete ${remote}/${branch} on the server?`,
+        detail: `The branch is deleted from ${remote} for everyone. Commits that only it contains can be lost there. Your local branches are not touched.`,
+        confirmLabel: 'Delete remote branch',
+      })
+      if (!confirmed) return { deleted: false }
+      await ctx.network.run(event.sender, (net) => deleteRemoteBranch(repoPath, { ...net, remote, branch }), repoPath)
+      return { deleted: true }
+    },
+    'branch:fast-forward': ({ repoPath, branch, to }) =>
+      journaled(requireOpened(repoPath), `Fast-forward ${branch}`, () => fastForwardBranch(repoPath, branch, to), () => null),
+    'branch:pull-other': async ({ repoPath, branch }, event) => {
+      requireOpened(repoPath)
+      const local = (await listRefs(repoPath)).find((r) => r.name === `refs/heads/${branch}`)
+      if (!local?.upstream) throw new GitError('INVALID_ARGUMENT', `${branch} has no upstream branch`)
+      const m = /^refs\/remotes\/([^/]+)\//.exec(local.upstream)
+      if (!m) throw new GitError('INVALID_ARGUMENT', `${branch} tracks a local branch`)
+      await ctx.network.run(event.sender, (net) => fetch(repoPath, { ...net, prune: false, remote: m[1]! }), repoPath)
+      return fastForwardBranch(repoPath, branch, local.upstream)
+    },
+    'compare:files': ({ repoPath, sha }) => getWorktreeCompareFiles(requireOpened(repoPath), sha),
+    'commit:save-patch': async ({ repoPath, sha }, event) => {
+      requireOpened(repoPath)
+      const subject = (await getCommitDetails(repoPath, sha)).subject
+      const slug = subject.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50) || 'commit'
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const opts = { title: 'Save patch', defaultPath: `${sha.slice(0, 7)}-${slug}.patch`, filters: [{ name: 'Patch', extensions: ['patch'] }] }
+      const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
+      if (res.canceled || !res.filePath) return null
+      await saveCommitPatch(repoPath, sha, res.filePath)
+      return { path: res.filePath }
+    },
+    'app:copy': async ({ text }) => clipboard.writeText(text),
+    'app:confirm': ({ message, detail, confirmLabel }, event) => confirmDestructive(event, { message, detail: detail ?? '', confirmLabel }),
     'repo:health': async ({ repoPath }) => ({ suggestCommitGraph: await health.suggestCommitGraph(requireOpened(repoPath)) }),
     'repo:write-commit-graph': async ({ repoPath }) => {
       await writeCommitGraph(requireOpened(repoPath))
@@ -388,7 +428,7 @@ export function registerIpc(ctx: IpcContext): void {
     'remote:list': async ({ repoPath }) =>
       (await listRemotes(requireOpened(repoPath))).map((r) => {
         const ref = parseRemoteUrl(r.fetchUrl) ?? parseRemoteUrl(r.pushUrl)
-        return ref ? { ...r, hosted: { kind: ref.kind, owner: ref.owner.split('/')[0]! } } : r
+        return ref ? { ...r, hosted: { kind: ref.kind, owner: ref.owner.split('/')[0]!, webUrl: ref.webUrl } } : r
       }),
     'avatar:get': (req) => {
       const mode = ctx.getSettings().avatars
@@ -545,7 +585,7 @@ export function registerIpc(ctx: IpcContext): void {
     'undo:redo': ({ repoPath }) => ctx.undo.redo(requireOpened(repoPath)),
     'blame:get': ({ repoPath, path, rev }) => getBlame(requireOpened(repoPath), path, rev),
     'worktree:list': ({ repoPath }) => listWorktrees(requireOpened(repoPath)),
-    'worktree:add': async ({ repoPath, newBranch, branch }, event) => {
+    'worktree:add': async ({ repoPath, newBranch, branch, startPoint }, event) => {
       requireOpened(repoPath)
       // The folder is chosen in a native dialog, never sent by the renderer.
       const win = BrowserWindow.fromWebContents(event.sender)
@@ -557,7 +597,11 @@ export function registerIpc(ctx: IpcContext): void {
       const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
       const path = res.filePaths[0]
       if (res.canceled || !path) return null
-      await addWorktree(repoPath, path, { ...(newBranch ? { newBranch } : {}), ...(branch ? { branch } : {}) })
+      await addWorktree(
+        repoPath,
+        path,
+        branch ? { branch } : newBranch ? { newBranch, ...(startPoint ? { startPoint } : {}) } : { detach: true, ...(startPoint ? { startPoint } : {}) },
+      )
       return { path }
     },
     'worktree:remove': async ({ repoPath, path, force }, event) => {

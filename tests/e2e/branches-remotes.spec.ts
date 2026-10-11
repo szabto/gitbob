@@ -104,7 +104,7 @@ test('creates, pushes, renames, checks out and deletes branches', async () => {
 
     // Rename via context menu.
     await sidebarRef(page, 'refs/heads/feature/login').click({ button: 'right' })
-    await page.getByRole('menuitem', { name: 'Rename…' }).click()
+    await page.getByRole('menuitem', { name: /^Rename / }).click()
     await page.getByLabel('New name').fill('feature/signin')
     await page.getByRole('button', { name: 'Rename' }).click()
     await expect(sidebarRef(page, 'refs/heads/feature/signin')).toBeVisible()
@@ -140,7 +140,7 @@ test('checks out a remote branch as a tracking branch and a commit detached', as
 
     const seed = alice.rev('main')
     await page.locator(`[data-sha="${seed}"]`).click({ button: 'right' })
-    await page.getByRole('menuitem', { name: 'Checkout this commit (detached)' }).click()
+    await page.getByRole('menuitem', { name: 'Checkout this commit' }).click()
     await expect(page.getByTestId('head-label')).toHaveText(`HEAD detached at ${seed.slice(0, 7)}`)
   } finally {
     await app.close()

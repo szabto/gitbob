@@ -38,7 +38,7 @@ function RemoteIcon({ remote, info }: { remote: string; info: RemoteInfo | undef
 }
 
 /** A branch / tag label in the graph: name, ✓ when checked out, 💻 when local, remote project icons. */
-export function RefLabelPill({ label, remotes }: { label: RefLabel; remotes: RemoteInfo[] }) {
+export function RefLabelPill({ label, remotes, onMenu }: { label: RefLabel; remotes: RemoteInfo[]; onMenu?: (e: React.MouseEvent) => void }) {
   const drop = useDropTarget(label.primary)
   const draggable = label.kind !== 'other'
   const title = [label.local?.name, ...label.remotes.map((r) => r.ref.name), label.tag?.name].filter(Boolean).join('\n')
@@ -54,6 +54,15 @@ export function RefLabelPill({ label, remotes }: { label: RefLabel; remotes: Rem
       onDragStart={draggable ? (e) => startDrag(e, { kind: 'ref', ref: label.primary }) : undefined}
       onDragEnd={endDrag}
       {...(draggable ? drop.props : {})}
+      onContextMenu={
+        onMenu
+          ? (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onMenu(e)
+            }
+          : undefined
+      }
       data-testid="ref-label"
       data-ref={label.primary.name}
       data-local={label.local ? 'true' : undefined}

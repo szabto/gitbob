@@ -61,6 +61,7 @@ export const diffTargetSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('untracked'), path: repoPathSchema }),
   z.object({ kind: z.literal('commit'), sha: shaSchema, path: repoPathSchema, oldPath: repoPathSchema.optional() }),
   z.object({ kind: z.literal('range'), base: shaSchema, head: shaSchema, path: repoPathSchema, oldPath: repoPathSchema.optional() }),
+  z.object({ kind: z.literal('worktree-compare'), sha: shaSchema, path: repoPathSchema, oldPath: repoPathSchema.optional() }),
 ])
 
 export const ipcInputSchemas = {
@@ -72,6 +73,14 @@ export const ipcInputSchemas = {
   'repo:init': z.object({}).strict(),
   'repo:refs': z.object({ repoPath: absolutePath }),
   'repo:health': z.object({ repoPath: absolutePath }),
+  'app:copy': z.object({ text: z.string().min(1).max(100_000) }),
+  'app:confirm': z.object({ message: z.string().min(1).max(300), detail: z.string().max(1000).optional(), confirmLabel: z.string().min(1).max(40) }),
+  'commit:reword-head': z.object({ repoPath: absolutePath, message: z.string().trim().min(1).max(100_000) }),
+  'branch:delete-remote': z.object({ repoPath: absolutePath, remote: z.string().min(1).max(255), branch: branchName }),
+  'branch:fast-forward': z.object({ repoPath: absolutePath, branch: branchName, to: z.string().min(1).max(1024) }),
+  'branch:pull-other': z.object({ repoPath: absolutePath, branch: branchName }),
+  'compare:files': z.object({ repoPath: absolutePath, sha: shaSchema }),
+  'commit:save-patch': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'profile:list': z.object({}).strict(),
   'profile:create': z.object({ name: z.string().trim().min(1).max(60) }),
   'profile:rename': z.object({ id: z.string().regex(/^[a-z0-9]{1,32}$/), name: z.string().trim().min(1).max(60) }),
@@ -220,6 +229,8 @@ export const ipcInputSchemas = {
     repoPath: absolutePath,
     newBranch: branchName.optional(),
     branch: branchName.optional(),
+    /** Commit for a new branch or a detached worktree (default HEAD). */
+    startPoint: shaSchema.optional(),
   }),
   'worktree:remove': z.object({ repoPath: absolutePath, path: absolutePath, force: z.boolean().default(false) }),
   'submodule:list': z.object({ repoPath: absolutePath }),

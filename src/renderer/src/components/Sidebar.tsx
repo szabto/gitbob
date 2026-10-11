@@ -25,7 +25,7 @@ export function Sidebar({
   repoPath,
   currentBranch,
   provider,
-  onCreatePullRequest,
+  refMenu,
 }: {
   refs: GitRef[]
   currentRef: string | null
@@ -35,7 +35,8 @@ export function Sidebar({
   repoPath: string
   currentBranch: string | null
   provider: ProviderStatus | null
-  onCreatePullRequest: (branch: GitRef) => void
+  /** The full GitKraken-style menu for a branch or tag. */
+  refMenu: (ref: GitRef) => MenuEntry[]
 }) {
   const selectStash = useAppStore((s) => s.selectStash)
   const selectedStash = useAppStore((s) => s.selectedStash)
@@ -66,50 +67,6 @@ export function Sidebar({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-  const remoteBranchNames = remote.map((r) => r.shortName)
-
-  const mergeEntries = (r: GitRef): MenuEntry[] =>
-    currentBranch && r.name !== currentRef
-      ? [
-          { label: `Merge ${r.shortName} into ${currentBranch}`, onSelect: () => void actions.merge(r) },
-          { label: `Rebase ${currentBranch} onto ${r.shortName}…`, onSelect: () => void actions.rebase(r) },
-        ]
-      : []
-
-  const localMenu = (r: GitRef): MenuEntry[] => [
-    { label: `Checkout ${r.shortName}`, disabled: r.name === currentRef, onSelect: () => void actions.checkout(r.name) },
-    { label: 'Create branch here…', onSelect: () => void actions.createBranch(r.target) },
-    ...mergeEntries(r),
-    'separator',
-    { label: 'Rename…', onSelect: () => void actions.rename(r.shortName) },
-    r.upstream
-      ? { label: 'Unset upstream', onSelect: () => void actions.unsetUpstream(r.shortName) }
-      : { label: 'Set upstream…', onSelect: () => void actions.setUpstream(r.shortName, remoteBranchNames) },
-    ...(provider?.connected && r.upstream?.startsWith(`refs/remotes/${provider.remote}/`)
-      ? [{ label: 'Create pull request…', onSelect: () => onCreatePullRequest(r) }]
-      : []),
-    ...(r.upstream
-      ? [
-          {
-            label: 'Force push (with lease)…',
-            onSelect: () => void actions.forcePush(r, r.upstream!.replace(/^refs\/remotes\/([^/]+)\/.*$/, '$1')),
-          },
-        ]
-      : []),
-    'separator',
-    {
-      label: `Delete ${r.shortName}…`,
-      danger: true,
-      disabled: r.name === currentRef,
-      onSelect: () => void actions.deleteBranch(r.shortName),
-    },
-  ]
-
-  const remoteMenu = (r: GitRef): MenuEntry[] => [
-    { label: `Checkout ${r.shortName}`, onSelect: () => void actions.checkout(r.name) },
-    { label: 'Create branch here…', onSelect: () => void actions.createBranch(r.target) },
-    ...mergeEntries(r),
-  ]
 
   return (
     <aside className="flex w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-panel py-2" data-testid="sidebar">
@@ -150,7 +107,7 @@ export function Sidebar({
               active={r.name === currentRef}
               onClick={() => reveal(r.target)}
               onDoubleClick={() => r.name !== currentRef && void actions.checkout(r.name)}
-              onMenu={(e) => openMenu(e.clientX, e.clientY, localMenu(r))}
+              onMenu={(e) => openMenu(e.clientX, e.clientY, refMenu(r))}
               {...hideProps(r)}
             />
           )}
@@ -187,7 +144,7 @@ export function Sidebar({
                 active={false}
                 onClick={() => reveal(r.target)}
                 onDoubleClick={() => void actions.checkout(r.name)}
-                onMenu={(e) => openMenu(e.clientX, e.clientY, remoteMenu(r))}
+                onMenu={(e) => openMenu(e.clientX, e.clientY, refMenu(r))}
                 {...hideProps(r)}
               />
             )}

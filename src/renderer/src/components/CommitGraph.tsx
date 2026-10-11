@@ -29,6 +29,8 @@ interface Props {
   /** Working tree change counts, or null when the repository has no work tree. */
   wip: { unstaged: number; staged: number; modified?: number; added?: number; deleted?: number } | null
   onRowMenu?: (e: React.MouseEvent, commit: CommitSummary) => void
+  /** Right-click on a branch / tag label. */
+  onRefMenu?: (e: React.MouseEvent, ref: GitRef) => void
   /** All refs, for the filter's branch picker. */
   refs: GitRef[]
 }
@@ -45,6 +47,7 @@ export function CommitGraph({
   onLoadMore,
   wip,
   onRowMenu,
+  onRefMenu,
   refs: allRefs,
 }: Props) {
   const parentRef = useRef<HTMLDivElement>(null)
@@ -245,6 +248,7 @@ export function CommitGraph({
                   remotes={remotes.data ?? []}
                   cols={cols}
                   avatarSource={avatarSource}
+                  onRefMenu={onRefMenu}
                 />
               </div>
             )
@@ -272,7 +276,9 @@ function CommitRowCells({
   remotes,
   cols,
   avatarSource,
+  onRefMenu,
 }: {
+  onRefMenu?: (e: React.MouseEvent, ref: GitRef) => void
   commit: CommitSummary
   row: GraphRow
   width: number
@@ -292,7 +298,7 @@ function CommitRowCells({
       {cols.show.refs && (
         <div className="flex shrink-0 items-center gap-1 overflow-hidden pl-2" style={{ width: cols.refs }} data-testid="refs-cell">
           {shown.map((l) => (
-            <RefLabelPill key={l.key} label={l} remotes={remotes} />
+            <RefLabelPill key={l.key} label={l} remotes={remotes} {...(onRefMenu ? { onMenu: (e: React.MouseEvent) => onRefMenu(e, l.primary) } : {})} />
           ))}
           {more > 0 && (
             <span className="shrink-0 rounded border border-border px-1 text-[11px] text-muted" title={labels!.slice(2).map((l) => l.name).join('\n')}>

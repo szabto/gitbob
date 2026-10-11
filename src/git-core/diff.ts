@@ -246,6 +246,13 @@ export async function getFileDiff(
       args = ['diff-tree', '-p', '-r', '-M', '--no-commit-id', ...DIFF_OPTS, base, head, '--', ...paths]
       break
     }
+    case 'worktree-compare': {
+      if (target.oldPath !== undefined) resolveRepoPath(repoPath, target.oldPath)
+      const sha = await verifyCommit(repoPath, target.sha)
+      const paths = target.oldPath && target.oldPath !== target.path ? [target.path, target.oldPath] : [target.path]
+      args = ['diff', ...DIFF_OPTS, '--no-relative', '-M', sha, '--', ...paths]
+      break
+    }
   }
 
   const r = await runGit(args, {

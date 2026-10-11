@@ -229,6 +229,13 @@ export async function getFileContents(
       ])
       return combine(oldSide, newSide)
     }
+    case 'worktree-compare': {
+      if (target.oldPath !== undefined) resolveRepoPath(repoPath, target.oldPath)
+      const sha = await verifyCommit(repoPath, target.sha)
+      const [prev] = await lookupBlobs(repoPath, [`${sha}:${target.oldPath ?? path}`])
+      const [oldSide, newSide] = await Promise.all([readBlob(repoPath, prev ?? null, maxBytes), readWorktreeFile(repoPath, path, maxBytes)])
+      return combine(oldSide, newSide)
+    }
     default:
       throw new GitError('INVALID_ARGUMENT', 'Invalid diff target')
   }

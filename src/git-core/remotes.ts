@@ -125,6 +125,13 @@ export async function push(
   })
 }
 
+/** Delete a branch on a remote (`git push <remote> --delete refs/heads/<branch>`). Destructive: confirm first. */
+export async function deleteRemoteBranch(repoPath: string, opts: NetworkOptions & { remote: string; branch: string }): Promise<void> {
+  assertValidRemoteName(opts.remote)
+  await assertValidBranchName(repoPath, opts.branch)
+  await runGit(['push', progressFlag(opts), opts.remote, '--delete', `refs/heads/${opts.branch}`], await run(repoPath, opts)).catch(networkError)
+}
+
 function progressFlag(opts: NetworkOptions): string {
   return opts.onProgress ? '--progress' : '--no-progress'
 }

@@ -42,7 +42,7 @@ test('interactive rebase: reword, squash and drop', async () => {
   const { app, page } = await launch(repo.dir)
   try {
     await row(page, 'base').click({ button: 'right' })
-    await page.getByRole('menuitem', { name: /Interactive rebase main onto here/ }).click()
+    await page.getByRole('menuitem', { name: /Interactive rebase commits after/ }).click()
     const dialog = page.getByTestId('rebase-dialog')
     await expect(dialog.getByTestId('rebase-row')).toHaveCount(4)
 

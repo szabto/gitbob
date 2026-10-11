@@ -76,7 +76,7 @@ test('creates an annotated tag and deletes it with confirmation', async () => {
   const { app, page } = await launch(repo.dir)
   try {
     await row(page, 'first').click({ button: 'right' })
-    await page.getByRole('menuitem', { name: 'Create tag here…' }).click()
+    await page.getByRole('menuitem', { name: 'Create annotated tag here…' }).click()
     await page.getByLabel('Tag name').fill('v1.0.0')
     await page.getByRole('button', { name: 'Next', exact: true }).click()
     await page.getByLabel(/Message/).fill('First release')
@@ -108,7 +108,7 @@ test('cherry-pick conflict shows the operation banner and can be aborted', async
   const { app, page } = await launch(repo.dir)
   try {
     await row(page, 'theirs change').click({ button: 'right' })
-    await page.getByRole('menuitem', { name: 'Cherry-pick this commit' }).click()
+    await page.getByRole('menuitem', { name: 'Cherry pick commit' }).click()
     await expect(page.getByTestId('error-message')).toContainText('conflicts')
     await expect(page.getByTestId('operation-banner')).toContainText('Cherry-pick in progress')
     await expect(page.getByTestId('operation-banner')).toContainText('1 conflicted file')
@@ -134,12 +134,12 @@ test('cherry-pick and revert without conflicts create commits', async () => {
   const { app, page } = await launch(repo.dir)
   try {
     await row(page, 'add b').click({ button: 'right' })
-    await page.getByRole('menuitem', { name: 'Cherry-pick this commit' }).click()
+    await page.getByRole('menuitem', { name: 'Cherry pick commit' }).click()
     await expect(page.getByTestId('commit-row').first()).toContainText('add b')
     expect(read(repo, 'b.txt')).toBe('b\n')
 
     await row(page, 'add c').click({ button: 'right' })
-    await page.getByRole('menuitem', { name: 'Revert this commit' }).click()
+    await page.getByRole('menuitem', { name: 'Revert commit' }).click()
     await expect(page.getByTestId('commit-row').first()).toContainText('Revert "add c"')
     expect(repo.git(['ls-files'])).not.toContain('c.txt')
   } finally {
@@ -312,6 +312,66 @@ test('stash one file, view an untracked stashed file, apply a single file, and t
     // git stash branch checks out first and applies after, so the label can update before the file.
     await expect.poll(() => read(repo, 'a.txt')).toBe('edited a\n')
     await expect(page.getByTestId('stash-item')).toHaveCount(1)
+  } finally {
+    await app.close()
+  }
+})
+
+test('GitKraken-style menus: edit, move and drop commits, fast-forward, compare, copy, solo, delete remote branch', async () => {
+  const server = createFixtureRepo({ bare: true })
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1\n' })
+  repo.branch('behind')
+  repo.commit('first change', { 'b.txt': 'b\n' })
+  repo.commit('second change', { 'c.txt': 'c\n' })
+  repo.commit('third change', { 'd.txt': 'd\n' })
+  repo.git(['remote', 'add', 'origin', server.dir])
+  repo.git(['push', '-q', 'origin', 'behind:old-remote'])
+  repo.git(['fetch', '-q', 'origin'])
+  const { app, page } = await launch(repo.dir)
+  const menu = async (target: ReturnType<Page['locator']>, item: string | RegExp) => {
+    await target.click({ button: 'right' })
+    await page.getByRole('menuitem', { name: item }).click()
+  }
+  const subjects = () => repo.git(['log', '--format=%s', 'main']).split('\n')
+  try {
+    // Edit the message of an older commit (a rebase reword under the hood).
+    await menu(row(page, 'first change'), 'Edit commit message…')
+    await page.getByLabel('Commit message').fill('first change, better worded')
+    await page.getByRole('button', { name: 'Save message' }).click()
+    await expect.poll(subjects).toEqual(['third change', 'second change', 'first change, better worded', 'base'])
+
+    // Move a commit up, then drop one (confirmed natively).
+    await menu(row(page, 'second change'), 'Move commit up')
+    await expect.poll(subjects).toEqual(['second change', 'third change', 'first change, better worded', 'base'])
+    await mockConfirm(app, 1)
+    await menu(row(page, 'third change'), 'Drop commit…')
+    await expect.poll(subjects).toEqual(['second change', 'first change, better worded', 'base'])
+
+    // Branch label menu in the graph: fast-forward a branch that isn't checked out.
+    await menu(page.locator('[data-testid="ref-label"][data-ref="refs/heads/behind"]'), 'Fast-forward behind to main')
+    await expect.poll(() => repo.rev('behind')).toBe(repo.rev('main'))
+
+    // Compare a commit with the working directory.
+    repo.write('a.txt', 'edited\n')
+    await menu(row(page, 'base'), 'Compare commit against working directory')
+    await expect(page.getByTestId('compare-file')).toHaveCount(3)
+    await page.locator('[data-testid="compare-file"][data-path="a.txt"]').click()
+    await expect(page.getByTestId('compare-view').getByTestId('diff-table')).toContainText('edited')
+    await page.getByTestId('compare-view').getByRole('button', { name: 'Close' }).first().click()
+
+    // Copy the commit SHA.
+    await menu(row(page, 'base'), 'Copy commit SHA')
+    expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(repo.rev('main~2'))
+
+    // Solo shows only that branch.
+    await menu(page.locator('[data-testid="ref-item"][data-ref="refs/remotes/origin/old-remote"]'), 'Solo')
+    await expect(page.getByTestId('filter-summary')).toBeVisible()
+    await page.getByRole('button', { name: 'Clear filter' }).first().click()
+
+    // Delete a branch on the server (confirmed natively).
+    await menu(page.locator('[data-testid="ref-item"][data-ref="refs/remotes/origin/old-remote"]'), 'Delete origin/old-remote…')
+    await expect.poll(() => server.git(['branch', '--list', 'old-remote'])).toBe('')
   } finally {
     await app.close()
   }

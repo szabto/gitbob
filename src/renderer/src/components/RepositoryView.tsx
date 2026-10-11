@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { GitRef, RepositoryInfo } from '@shared/types'
+import type { CommitSummary, GitRef, RepositoryInfo } from '@shared/types'
 import { useHead, useHistory, useInvalidateRepo, useRefs, useStatus } from '../lib/queries'
 import { call, subscribe } from '../lib/api'
 import { groupStatus } from '../lib/status'
@@ -17,8 +17,11 @@ import { StashPanel } from './StashPanel'
 import { OperationBanner } from './OperationBanner'
 import { SpeedUpBanner } from './SpeedUpBanner'
 import { FileHistoryView } from './FileHistoryView'
+import { CompareView } from './CompareView'
 import { DropHandler, makeDropHandler } from '../lib/dnd'
 import { Picker } from './Picker'
+import { commitMenu, localBranchMenu, remoteBranchMenu, tidy, type MenuContext } from '../lib/menus'
+import { useHiddenRefs, useHiddenStore } from '../state/hidden'
 import { BlameView } from './BlameView'
 import { PullRequestView } from './PullRequestView'
 import { RebaseDialog } from './RebaseDialog'
@@ -26,7 +29,7 @@ import { CreatePullRequestDialog, PROVIDER_NAMES } from './PullRequests'
 import { useAppInfo, useProviderStatus, useRecent } from '../lib/queries'
 import { displayPath } from '../lib/format'
 import type { GitRef as GitRefType } from '@shared/types'
-import { useUiStore } from '../state/ui'
+import { useUiStore, type MenuEntry } from '../state/ui'
 
 // Monaco-based; loaded on first use.
 const ConflictEditor = lazy(() => import('./ConflictEditor'))
@@ -53,6 +56,7 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
   const conflictPath = useAppStore((s) => s.conflictPath)
   const blame = useAppStore((s) => s.blame)
   const fileHistory = useAppStore((s) => s.fileHistory)
+  const compareSha = useAppStore((s) => s.compareSha)
   const prNumber = useAppStore((s) => s.prNumber)
   const rebaseBase = useAppStore((s) => s.rebaseBase)
   const openRebase = useAppStore((s) => s.openRebase)
@@ -123,7 +127,6 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
   const stashes = useStashes(repo.root)
   const selectedStash = useAppStore((s) => s.selectedStash)
   const stashEntry = stashes.data?.find((s) => s.sha === selectedStash?.sha)
-  const branchLabel = currentBranchName(head.data?.ref ?? null)
   const provider = useProviderStatus(repo.root)
   const appInfo = useAppInfo()
   const [prBranch, setPrBranch] = useState<GitRefType | null>(null)
@@ -147,6 +150,55 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
     } catch (e) {
       showError(e)
     }
+  }
+
+  const hiddenRefs = useHiddenRefs(repo.root)
+  const toggleHidden = useHiddenStore((s) => s.toggle)
+  const setHistoryFilter = useAppStore((s) => s.setHistoryFilter)
+  const openCompare = useAppStore((s) => s.openCompare)
+  const commitBySha = useMemo(() => new Map(commits.map((c) => [c.sha, c])), [commits])
+  // Ancestors of HEAD among the loaded commits, computed on first use per HEAD / page set.
+  const ancestors = useRef<{ key: string; set: Set<string> } | null>(null)
+  const onCurrentBranch = (sha: string): boolean => {
+    const headSha = head.data?.sha
+    if (!headSha) return false
+    const key = `${headSha}:${commits.length}`
+    if (ancestors.current?.key !== key) {
+      const set = new Set<string>()
+      const stack = [headSha]
+      while (stack.length) {
+        const s = stack.pop()!
+        if (set.has(s)) continue
+        set.add(s)
+        for (const p of commitBySha.get(s)?.parents ?? []) stack.push(p)
+      }
+      ancestors.current = { key, set }
+    }
+    return ancestors.current.set.has(sha)
+  }
+  const menuCtx: MenuContext = {
+    actions,
+    bare: repo.bare,
+    headSha: head.data?.sha ?? null,
+    currentRef: head.data?.ref?.startsWith('refs/heads/') ? head.data.ref : null,
+    refs: refs.data ?? [],
+    remotes: remotes.data ?? [],
+    provider: provider.data ?? null,
+    hidden: hiddenRefs,
+    onCurrentBranch,
+    openRebase,
+    openCompare,
+    setHistoryFilter,
+    toggleHidden: (ref) => toggleHidden(repo.root, ref),
+    onCreatePullRequest: setPrBranch,
+  }
+  const commitFor = (sha: string): CommitSummary =>
+    commitBySha.get(sha) ?? { sha, parents: [], authorName: '', authorEmail: '', authorTime: 0, committerName: '', committerEmail: '', commitTime: 0, subject: sha.slice(0, 7) }
+  const refMenu = (ref: GitRef): MenuEntry[] => {
+    const commit = commitFor(ref.target)
+    if (ref.kind === 'head') return tidy(localBranchMenu(menuCtx, ref, commit))
+    if (ref.kind === 'remote') return tidy(remoteBranchMenu(menuCtx, ref, commit))
+    return tidy(commitMenu(menuCtx, commit))
   }
 
   const dropHandler = makeDropHandler({ currentRef: head.data?.ref ?? null, actions }, openMenu)
@@ -325,14 +377,16 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
             repoPath={repo.root}
             currentBranch={currentBranch}
             provider={provider.data ?? null}
-            onCreatePullRequest={setPrBranch}
+            refMenu={refMenu}
           />
           <main className="flex min-w-0 flex-1 flex-col">
             {status.data && <OperationBanner status={status.data} actions={actions} />}
             <SpeedUpBanner repoPath={repo.root} historyLoaded={!!history.data} />
             {prNumber && provider.data?.repo && !diffTarget ? (
               <PullRequestView repoPath={repo.root} number={prNumber} providerName={PROVIDER_NAMES[provider.data.repo.kind]} />
-            ) : fileHistory ? (
+            ) : compareSha ? (
+            <CompareView key={compareSha} repoPath={repo.root} sha={compareSha} />
+          ) : fileHistory ? (
               <FileHistoryView key={fileHistory} repoPath={repo.root} path={fileHistory} />
             ) : blame ? (
               <BlameView repoPath={repo.root} path={blame.path} {...(blame.rev ? { rev: blame.rev } : {})} />
@@ -363,49 +417,8 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
                 onLoadMore={() => void history.fetchNextPage()}
                 wip={repo.bare || historyFilter ? null : changeCount}
                 refs={refs.data ?? []}
-                onRowMenu={(e, commit) =>
-                  openMenu(e.clientX, e.clientY, [
-                    { label: 'Create branch here…', onSelect: () => void actions.createBranch(commit.sha) },
-                    { label: 'Create tag here…', onSelect: () => void actions.createTag(commit.sha) },
-                    'separator',
-                    {
-                      label: 'Cherry-pick this commit',
-                      disabled: repo.bare || commit.sha === head.data?.sha,
-                      onSelect: () => void actions.cherryPick(commit.sha),
-                    },
-                    { label: 'Revert this commit', disabled: repo.bare, onSelect: () => void actions.revert(commit.sha) },
-                    {
-                      label: `Interactive rebase ${branchLabel} onto here…`,
-                      disabled: repo.bare || !head.data?.ref || commit.sha === head.data?.sha,
-                      onSelect: () => openRebase(commit.sha),
-                    },
-                    ...(head.data?.sha && !repo.bare
-                      ? ([
-                          'separator',
-                          {
-                            label: `Reset ${branchLabel} to here (soft: keep changes staged)`,
-                            onSelect: () => void actions.reset(commit.sha, 'soft'),
-                          },
-                          {
-                            label: `Reset ${branchLabel} to here (mixed: keep changes unstaged)`,
-                            onSelect: () => void actions.reset(commit.sha, 'mixed'),
-                          },
-                          {
-                            label: `Reset ${branchLabel} to here (hard: discard changes)…`,
-                            danger: true,
-                            onSelect: () => void actions.reset(commit.sha, 'hard'),
-                          },
-                        ] as const)
-                      : []),
-                    {
-                      label: 'Checkout this commit (detached)',
-                      disabled: repo.bare,
-                      onSelect: () => void actions.checkoutCommit(commit.sha),
-                    },
-                    'separator',
-                    { label: 'Copy commit SHA', onSelect: () => void navigator.clipboard.writeText(commit.sha) },
-                  ])
-                }
+                onRowMenu={(e, commit) => openMenu(e.clientX, e.clientY, tidy(commitMenu(menuCtx, commit)))}
+                onRefMenu={(e, ref) => openMenu(e.clientX, e.clientY, refMenu(ref))}
               />
             )}
           </main>
@@ -477,10 +490,6 @@ function ToolbarButton({
       )}
     </span>
   )
-}
-
-function currentBranchName(ref: string | null): string {
-  return ref?.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : 'HEAD'
 }
 
 function FilteredEmpty() {

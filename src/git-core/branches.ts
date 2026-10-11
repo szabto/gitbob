@@ -113,3 +113,26 @@ export async function setUpstream(repoPath: string, name: string, upstream: stri
   }
   await runGit(['branch', `--set-upstream-to=${upstream}`, name], { cwd: repoPath })
 }
+
+/**
+ * Move a local branch forward to `to` without checking it out, only if that is a fast-forward
+ * (the branch's commit is an ancestor of `to`). Refuses for the checked-out branch.
+ */
+export async function fastForwardBranch(repoPath: string, branch: string, to: string): Promise<{ moved: boolean }> {
+  await assertValidBranchName(repoPath, branch)
+  const ref = `refs/heads/${branch}`
+  const cur = await runGit(['symbolic-ref', '-q', 'HEAD'], { cwd: repoPath, okExitCodes: [0, 1] })
+  if (cur.stdout.trim() === ref) throw new GitError('INVALID_ARGUMENT', `${branch} is checked out; use Pull or Merge instead`)
+  const resolve = async (rev: string): Promise<string> => {
+    const r = await runGit(['rev-parse', '-q', '--verify', `${rev}^{commit}`], { cwd: repoPath, okExitCodes: [0, 1, 128] })
+    if (r.exitCode !== 0) throw new GitError('NOT_FOUND', `${rev.replace(/^refs\/(heads|remotes)\//, '')} does not exist`)
+    return r.stdout.trim()
+  }
+  if (to.startsWith('-')) throw new GitError('INVALID_ARGUMENT', 'Invalid target')
+  const [from, target] = await Promise.all([resolve(ref), resolve(to)])
+  if (from === target) return { moved: false }
+  const anc = await runGit(['merge-base', '--is-ancestor', from, target], { cwd: repoPath, okExitCodes: [0, 1] })
+  if (anc.exitCode !== 0) throw new GitError('GIT_FAILED', `${branch} can't be fast-forwarded: it has commits that aren't in the target`)
+  await runGit(['update-ref', '-m', `GitBob: fast-forward ${branch}`, ref, target, from], { cwd: repoPath })
+  return { moved: true }
+}
