@@ -198,7 +198,7 @@ describe('getStashFiles', () => {
       expect.arrayContaining([
         { status: 'M', path: 'a.txt', additions: 1, deletions: 0 },
         { status: 'D', path: 'b.txt', additions: 0, deletions: 1 },
-        { status: 'A', path: 'dir/new.txt', additions: 2, deletions: 0 },
+        { status: 'A', path: 'dir/new.txt', additions: 2, deletions: 0, untrackedIn: expect.stringMatching(/^[0-9a-f]{40}$/) },
       ]),
     )
     expect(files).toHaveLength(3)
