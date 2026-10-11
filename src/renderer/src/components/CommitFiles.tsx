@@ -170,12 +170,12 @@ export function CommitFiles({ repoPath, sha, files, isMerge = false }: { repoPat
 
   return (
     <div>
-      <div className="mt-5 mb-1 flex items-center gap-2 text-xs">
-        <h3 className="font-semibold tracking-wider text-muted uppercase">
-          {files.length} file{files.length === 1 ? '' : 's'} changed
-          {isMerge && ' (vs first parent)'}
-        </h3>
-        <div className="ml-auto flex overflow-hidden rounded border border-border" role="group" aria-label="File list layout">
+      <h3 className="mt-5 text-xs font-semibold tracking-wider text-muted uppercase">
+        {files.length} file{files.length === 1 ? '' : 's'} changed
+        {isMerge && <span className="font-normal tracking-normal normal-case"> (vs first parent)</span>}
+      </h3>
+      <div className="mt-1 mb-1 flex items-center gap-2 text-xs">
+        <div className="flex overflow-hidden rounded border border-border" role="group" aria-label="File list layout">
           {(['path', 'tree'] as const).map((m) => (
             <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)} className={`px-1.5 py-0.5 ${mode === m ? 'bg-accent/20 text-fg' : 'text-muted hover:bg-panel-2'}`}>
               {m === 'path' ? 'Path' : 'Tree'}

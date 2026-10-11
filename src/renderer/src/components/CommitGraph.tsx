@@ -137,8 +137,8 @@ export function CommitGraph({
         <div style={{ width: graphColumnWidth }} className="shrink-0 pl-3">
           Graph
         </div>
-        <div className="flex min-w-0 flex-1 items-center px-2">
-          <span className="mr-2">Message</span>
+        <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
+          <span className="shrink-0">Message</span>
           <GraphFilter refs={allRefs} />
           <GraphSearch repoPath={repoPath} onMatchesChange={setMatches} />
         </div>

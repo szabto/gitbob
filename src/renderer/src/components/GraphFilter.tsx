@@ -29,12 +29,12 @@ export function GraphFilter({ refs }: { refs: GitRef[] }) {
     : null
 
   return (
-    <div className="relative flex min-w-0 items-center gap-1 font-normal" ref={popover}>
+    <div className="relative flex shrink-0 items-center gap-1 font-normal" ref={popover}>
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         data-testid="filter-button"
-        className={`rounded border px-1.5 text-[11px] leading-4 ${
+        className={`shrink-0 rounded border px-1.5 text-[11px] leading-4 ${
           filter ? 'border-accent text-accent' : 'border-border text-muted hover:text-fg'
         }`}
       >

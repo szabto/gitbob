@@ -212,7 +212,7 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
             footer={head.data?.sha ? [{ key: 'create', label: 'Create branch…', onSelect: () => void actions.createBranch(head.data!.sha!) }] : []}
           />
           {currentRefObj?.upstream && (
-            <span className="text-xs text-muted" data-testid="tracking-status" title={currentRefObj.upstream}>
+            <span className="shrink-0 text-xs whitespace-nowrap text-muted" data-testid="tracking-status" title={currentRefObj.upstream}>
               {currentRefObj.upstreamGone
                 ? 'upstream gone'
                 : `↑${currentRefObj.ahead ?? 0} ↓${currentRefObj.behind ?? 0}`}

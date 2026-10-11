@@ -67,7 +67,8 @@ const fake = await new Promise((resolveServer) => {
 })
 const userData = mkdtempSync(join(tmpdir(), 'gitbob-shot-ud-'))
 // README/site screenshots use the dark theme regardless of the OS appearance.
-writeFileSync(join(userData, 'settings.json'), JSON.stringify({ theme: 'dark' }))
+// Initials instead of avatars: deterministic pictures and no requests to GitHub while shooting.
+writeFileSync(join(userData, 'settings.json'), JSON.stringify({ theme: 'dark', avatars: 'off' }))
 
 async function launch(args) {
   const app = await electron.launch({
@@ -239,6 +240,7 @@ try {
   await page.getByRole('button', { name: 'Clear filter' }).first().click()
 
   // Stash panel.
+  await page.locator('[data-testid="stashes"] > div > button').click()
   await page.getByTestId('stash-item').first().click()
   await page.getByTestId('stash-panel').waitFor()
   await shot(page, 'gitbob-stash')

@@ -113,7 +113,9 @@ New to Git, or just new to GitBob? This is the whole tour.
 - **Clone…** (<kbd>⇧⌘O</kbd>) downloads a project from a URL such as `https://github.com/owner/repo.git`; you pick where it goes, and GitBob shows the progress.
 - **New repository…** starts version control in a folder.
 
-Every project opens in its own **tab**, so you can keep several open at once. GitBob remembers your tabs and recent projects for next time.
+Every project opens in its own **tab**, so you can keep several open at once. GitBob remembers your tabs and recent projects for next time. Click the repository or branch name in the toolbar to switch quickly; **Terminal** opens a terminal right in the project folder.
+
+**Profiles** keep work and personal life apart: each one has its own settings, open projects, connected accounts and Git name and email (so company commits get your company email). Switch from the 👤 menu in the top-right corner.
 
 <p align="center">
   <img src="docs/images/gitbob-welcome.png" alt="The GitBob start screen with the panda logo, an Open Repository button and a list of recent repositories" width="80%">
@@ -124,11 +126,11 @@ Every project opens in its own **tab**, so you can keep several open at once. Gi
 Each row is a **commit**, a saved snapshot of your project, newest at the top.
 
 - **Colored lines** are lines of work. When a line splits off, someone started a branch; when two lines join, a branch was merged.
-- **Labels** next to a message show where branches point: <code>main</code> is a local branch, <code>origin/main</code> is the same branch on the server, and 🏷 marks a tag such as a release.
-- The **ringed dot** is where you are right now (HEAD). The ● in the left sidebar marks your current branch, and arrows like ↑1 ↓2 tell you how many commits you are ahead of or behind the server.
+- **Labels** in the Branch / Tag column show where branches point. A 💻 laptop means the branch is on your computer; the remote's project picture (or a cloud) means it's on the server. When both point to the same commit they share one label; when you have unpushed work they sit on different commits. 🏷 marks a tag such as a release, and ✓ the branch you're on.
+- Each commit's **dot shows its author** (their picture for GitHub projects, otherwise their initials), and the **ringed dot** is where you are right now (HEAD). The ● in the left sidebar marks your current branch, and arrows like ↑1 ↓2 tell you how many commits you are ahead of or behind the server.
 - Click a commit to see its full message, author, parents and changed files. Click a file to see exactly what changed.
 
-Too busy to read? Click **Filter** above the commit list to show only certain branches, one author's commits, or the history of a file or folder.
+Drag column edges to resize them, or hide columns with ⚙. Too busy to read? Hover a branch in the sidebar and click the 👁 eye to hide it from the graph (**Show all** brings everything back), type in the sidebar's filter box to find a branch, or click **Filter** above the commit list to show only certain branches, one author's commits, or the history of a file or folder.
 
 Looking for something? Press <kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd> and type part of a message, an author's name or a commit id. GitBob searches the **entire** history, highlights the matches and jumps between them with <kbd>Enter</kbd>.
 
@@ -337,7 +339,7 @@ Every screenshot in this README is the real app working on a real Git repository
   <tr>
     <td width="33%" valign="top">
       <h4>📜 History</h4>
-      Commit graph across all branches, remotes and tags · filters by branch, author and path · merge and octopus-merge lanes · branch/tag/HEAD labels · commit details · whole-history search by message, author or id · keyboard navigation · incremental loading
+      Commit graph across all branches, remotes and tags · Branch / Tag column with on-this-computer / on-the-server icons · author avatars · resizable columns · hide branches from the graph · filters by branch, author and path · merge and octopus-merge lanes · branch/tag/HEAD labels · commit details · whole-history search by message, author or id · keyboard navigation · incremental loading
     </td>
     <td width="33%" valign="top">
       <h4>🧩 Working tree</h4>
@@ -359,13 +361,13 @@ Every screenshot in this README is the real app working on a real Git repository
     </td>
     <td width="33%" valign="top">
       <h4>🔗 Hosting services</h4>
-      GitHub, GitLab, Bitbucket and Azure DevOps via personal access tokens (stored encrypted by the OS) · Sign in with GitHub (device flow) · clone from a searchable list of your repositories on every connected service · pull requests: list, view, files, line comments, comment, approve / request changes, merge / squash / rebase · CI status per commit · create pull requests, also as drafts
+      GitHub, GitLab, Bitbucket and Azure DevOps via personal access tokens (stored encrypted by the OS) · Sign in with GitHub (device flow) · clone from a searchable list of your repositories on every connected service · issues · pull requests: list, view, files, line comments, comment, approve / request changes, merge / squash / rebase · CI status per commit · create pull requests, also as drafts
     </td>
   </tr>
   <tr>
     <td width="33%" valign="top">
       <h4>🎨 Comfortable</h4>
-      Command palette · rebindable shortcuts · settings · accessible dialogs and contrast (checked with axe-core) · repository tabs (restored on restart) · clone with progress · new repository · light, dark or match-system theme · blame · file history · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories · first-run setup (Git check, name and email) · in-app updates on Windows and Linux AppImage
+      Command palette · rebindable shortcuts · settings · accessible dialogs and contrast (checked with axe-core) · repository tabs (restored on restart) · clone with progress · new repository · light, dark or match-system theme · blame · file history · worktrees · submodules · GPG/SSH signature status · native menus · keyboard navigation · recent repositories · first-run setup (Git check, name and email) · profiles (own settings, projects, accounts, Git identity) · status bar with zoom · in-app updates on Windows and Linux AppImage
     </td>
   </tr>
 </table>
