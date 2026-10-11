@@ -4,6 +4,7 @@ import { GitError } from './errors'
 import { LITERAL_PATHSPECS_ENV, PATHSPEC_STDIN, pathspecInput, validateRepoPaths } from './paths'
 import { runGit } from './runner'
 import { runStatus } from './status'
+import { assertValidBranchName } from './branches'
 import type { StashEntry } from '@shared/types'
 export type { StashEntry }
 
@@ -194,7 +195,58 @@ export async function getStashFiles(repoPath: string, index: number, opts: { exp
   const tracked = await diffFiles(repoPath, [`${sha}^1`, sha])
   const u = await runGit(['rev-parse', '-q', '--verify', `${sha}^3^{commit}`], { cwd: repoPath, okExitCodes: [0, 1] })
   if (u.exitCode !== 0) return tracked
-  const untracked = await diffFiles(repoPath, ['--root', u.stdout.trim()])
+  const untrackedSha = u.stdout.trim()
+  const untracked = await diffFiles(repoPath, ['--root', untrackedSha])
   const seen = new Set(tracked.map((f) => f.path))
-  return [...tracked, ...untracked.filter((f) => !seen.has(f.path))]
+  return [...tracked, ...untracked.filter((f) => !seen.has(f.path)).map((f) => ({ ...f, untrackedIn: untrackedSha }))]
+}
+
+/**
+ * `git stash branch`: create a branch at the commit the stash was made on, check it out, apply the
+ * stash there (with its staged changes) and drop it if that succeeded.
+ */
+export async function stashToBranch(repoPath: string, index: number, name: string, opts: { expectedSha?: string } = {}): Promise<void> {
+  await assertValidBranchName(repoPath, name)
+  await resolveStash(repoPath, index, opts.expectedSha)
+  const exists = await runGit(['rev-parse', '-q', '--verify', `refs/heads/${name}`], { cwd: repoPath, okExitCodes: [0, 1] })
+  if (exists.exitCode === 0) throw new GitError('INVALID_ARGUMENT', `A branch named "${name}" already exists`)
+  const r = await runGit(['stash', 'branch', name, `stash@{${index}}`], { cwd: repoPath, timeoutMs: STASH_TIMEOUT, okExitCodes: ALL_EXIT_CODES })
+  if (r.exitCode !== 0) {
+    const detail = combinedOutput(r)
+    throw new GitError('GIT_FAILED', /would be overwritten/i.test(detail) ? 'Your local changes are in the way. Commit or stash them first; the stash was kept.' : firstMeaningfulLine(detail) || 'git stash branch failed', { detail, exitCode: r.exitCode })
+  }
+}
+
+/**
+ * Bring one file's stashed changes back into the working tree, keeping the stash. Tracked
+ * changes are applied as a patch, which refuses (instead of overwriting) if the file changed
+ * since; an untracked file is restored only if no file of that name exists.
+ */
+export async function applyStashFile(repoPath: string, index: number, path: string, opts: { expectedSha?: string } = {}): Promise<void> {
+  validateRepoPaths(repoPath, [path])
+  const sha = await resolveStash(repoPath, index, opts.expectedSha)
+  const files = await getStashFiles(repoPath, index, opts)
+  const file = files.find((f) => f.path === path)
+  if (!file) throw new GitError('NOT_FOUND', `${path} is not in stash@{${index}}`)
+  if (file.untrackedIn) {
+    const { entries } = await runStatus(repoPath)
+    const present = await runGit(['ls-files', '-z', '--cached', '--others', '--', path], { cwd: repoPath, env: LITERAL_PATHSPECS_ENV })
+    if (present.stdout || entries.some((e) => e.path === path)) {
+      throw new GitError('INVALID_ARGUMENT', `${path} already exists; move it away first so it isn't overwritten.`)
+    }
+    await runGit(['restore', `--source=${file.untrackedIn}`, '--worktree', '--', path], { cwd: repoPath, env: LITERAL_PATHSPECS_ENV })
+    return
+  }
+  const patch = await runGit(['diff', '--binary', '--no-ext-diff', '--no-color', '-M', `${sha}^1`, sha, '--', path, ...(file.oldPath ? [file.oldPath] : [])], {
+    cwd: repoPath,
+    env: LITERAL_PATHSPECS_ENV,
+  })
+  if (!patch.stdout) return
+  const r = await runGit(['apply', '--whitespace=nowarn', '-'], { cwd: repoPath, input: patch.stdout, okExitCodes: ALL_EXIT_CODES })
+  if (r.exitCode !== 0) {
+    throw new GitError('GIT_FAILED', `The stashed changes to ${path} don't apply to your current version of it. Apply the whole stash to merge them.`, {
+      detail: combinedOutput(r),
+      exitCode: r.exitCode,
+    })
+  }
 }

@@ -324,7 +324,7 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
           )}
           {rebaseBase && <RebaseDialog repoPath={repo.root} base={rebaseBase} onClose={() => openRebase(null)} />}
           {wipSelected && !repo.bare ? (
-            <StagingPanel repo={repo} onStash={() => void actions.stash()} />
+            <StagingPanel repo={repo} onStash={() => void actions.stash()} onStashFiles={(paths) => void actions.stashFiles(paths)} />
           ) : stashEntry ? (
             <StashPanel repoPath={repo.root} stash={stashEntry} actions={actions} />
           ) : (

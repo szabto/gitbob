@@ -1,3 +1,4 @@
+import { useUiStore } from '../state/ui'
 import type { StashEntry } from '@shared/types'
 import { useStashFiles } from '../lib/queries'
 import { useAppStore } from '../state/store'
@@ -16,6 +17,7 @@ export function StashPanel({
   actions: ReturnType<typeof useRepoActions>
 }) {
   const files = useStashFiles(repoPath, stash)
+  const openMenu = useUiStore((st) => st.openMenu)
   const selectStash = useAppStore((s) => s.selectStash)
   const showDiff = useAppStore((s) => s.showDiff)
 
@@ -49,6 +51,13 @@ export function StashPanel({
             Apply
           </button>
           <button
+            className="rounded border border-border px-3 py-1 hover:bg-panel-2"
+            title="Create a branch where the stash was made and apply it there"
+            onClick={() => void actions.stashToBranch(stash).then((ok) => ok && selectStash(null))}
+          >
+            Branch…
+          </button>
+          <button
             className="ml-auto rounded border border-border px-3 py-1 text-err hover:bg-err/10"
             onClick={() => void actions.dropStash(stash)}
           >
@@ -65,13 +74,29 @@ export function StashPanel({
           {files.data?.map((f) => (
             <li
               key={f.path}
-              className="-mx-1 flex cursor-default items-center gap-2 rounded px-1 py-0.5 hover:bg-fg/[0.05]"
-              onClick={() => showDiff({ kind: 'commit', sha: stash.sha, path: f.path })}
+              data-testid="stash-file"
+              data-path={f.path}
+              className="group -mx-1 flex cursor-default items-center gap-2 rounded px-1 py-0.5 hover:bg-fg/[0.05]"
+              onClick={() => showDiff({ kind: 'commit', sha: f.untrackedIn ?? stash.sha, path: f.path })}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                openMenu(e.clientX, e.clientY, [{ label: `Apply only ${f.path}`, onSelect: () => void actions.applyStashFile(stash, f.path) }])
+              }}
             >
               <span className={`w-3 shrink-0 font-bold ${statusCls[f.status] ?? 'text-muted'}`}>{f.status}</span>
               <span className="min-w-0 flex-1 truncate">{f.path}</span>
+              <button
+                className="hidden shrink-0 rounded border border-border px-1 font-sans text-[11px] group-hover:inline hover:bg-panel-2"
+                title="Bring back only this file's changes (the stash is kept)"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void actions.applyStashFile(stash, f.path)
+                }}
+              >
+                Apply file
+              </button>
               {f.additions !== null && (
-                <span className="shrink-0">
+                <span className="shrink-0 group-hover:hidden">
                   <span className="text-ok">+{f.additions}</span> <span className="text-err">-{f.deletions}</span>
                 </span>
               )}

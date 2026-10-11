@@ -262,3 +262,52 @@ test('undo and redo a commit, a new branch and a branch delete; stale history is
     await app.close()
   }
 })
+
+test('stash one file, view an untracked stashed file, apply a single file, and turn a stash into a branch', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': 'one\n', 'b.txt': 'bee\n' })
+  repo.write('a.txt', 'edited a\n')
+  repo.write('b.txt', 'edited b\n')
+  repo.write('new.txt', 'brand new\n')
+  const { app, page } = await launch(repo.dir)
+  const status = (path: string) => page.locator(`[data-testid="unstaged-files"] [data-path="${path}"]`)
+  try {
+    // Stash only a.txt from its context menu.
+    await page.getByTestId('wip-row').click()
+    await status('a.txt').click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Stash a.txt…' }).click()
+    await page.getByLabel('Message (optional)').fill('just a')
+    await page.getByRole('button', { name: 'Stash', exact: true }).click()
+    await expect(page.getByTestId('stash-item')).toHaveText('just a')
+    expect(read(repo, 'a.txt')).toBe('one\n')
+    expect(read(repo, 'b.txt')).toBe('edited b\n')
+
+    // Stash the rest (with the untracked file); its diff shows in the panel.
+    await page.getByRole('button', { name: 'Stash…' }).click()
+    await page.getByLabel('Message (optional)').fill('the rest')
+    await page.getByRole('button', { name: 'Stash', exact: true }).click()
+    await expect(page.getByTestId('stash-item')).toHaveCount(2)
+    await page.getByTestId('stash-item').filter({ hasText: 'the rest' }).click()
+    await page.locator('[data-testid="stash-file"][data-path="new.txt"]').click()
+    await expect(page.getByTestId('diff-table')).toContainText('brand new')
+
+    // Bring back only b.txt; the stash stays.
+    await page.locator('[data-testid="stash-file"][data-path="b.txt"]').click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Apply only b.txt' }).click()
+    await expect(page.getByTestId('notice')).toContainText('Restored b.txt')
+    expect(read(repo, 'b.txt')).toBe('edited b\n')
+    await expect(page.getByTestId('stash-item')).toHaveCount(2)
+
+    // Turn "just a" into a branch.
+    await page.getByTestId('stash-item').filter({ hasText: 'just a' }).click()
+    await page.getByTestId('stash-panel').getByRole('button', { name: 'Branch…' }).click()
+    await page.getByLabel('Branch name').fill('rescue-a')
+    await page.getByRole('button', { name: 'Create branch' }).click()
+    // b.txt is modified locally, but stash branch only touches a.txt.
+    await expect(page.getByTestId('head-label')).toHaveText('rescue-a')
+    expect(read(repo, 'a.txt')).toBe('edited a\n')
+    await expect(page.getByTestId('stash-item')).toHaveCount(1)
+  } finally {
+    await app.close()
+  }
+})

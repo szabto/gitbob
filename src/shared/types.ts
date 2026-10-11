@@ -67,6 +67,8 @@ export interface FileChange {
   additions: number | null
   /** Lines deleted; null for binary files. */
   deletions: number | null
+  /** Stash files only: the commit holding this untracked file (the stash's third parent). */
+  untrackedIn?: string
 }
 
 export interface CommitDetails extends CommitSummary {

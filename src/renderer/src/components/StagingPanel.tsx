@@ -14,11 +14,19 @@ import {
   summaryHint,
   usesConventionalCommits,
 } from '../lib/commit-message'
-import { useUiStore } from '../state/ui'
+import { useUiStore, type MenuEntry } from '../state/ui'
 import { groupStatus, statusBadge } from '../lib/status'
 import { useAppStore } from '../state/store'
 
-export function StagingPanel({ repo, onStash }: { repo: RepositoryInfo; onStash: () => void }) {
+export function StagingPanel({
+  repo,
+  onStash,
+  onStashFiles,
+}: {
+  repo: RepositoryInfo
+  onStash: () => void
+  onStashFiles?: (paths: string[]) => void
+}) {
   const repoPath = repo.root
   const status = useStatus(repoPath)
   const showDiff = useAppStore((s) => s.showDiff)
@@ -94,6 +102,10 @@ export function StagingPanel({ repo, onStash }: { repo: RepositoryInfo; onStash:
             groups.unstaged.length > 0 ? { label: 'Stage all', run: () => stageAll.mutate() } : undefined
           }
           action={{ label: 'Stage', run: (p) => stage.mutate(p) }}
+          menu={(e) => [
+            ...(onStashFiles && status.data?.branch.oid ? [{ label: `Stash ${e.path}…`, onSelect: () => onStashFiles([e.path]) }] : []),
+            ...(e.kind !== 'untracked' ? [{ label: 'File history', onSelect: () => useAppStore.getState().openFileHistory(e.path) }] : []),
+          ]}
           secondaryAction={{ label: 'Discard', run: (p) => discard.mutate(p), danger: true }}
           onOpen={(e) =>
             showDiff(e.kind === 'untracked' ? { kind: 'untracked', path: e.path } : { kind: 'unstaged', path: e.path })
@@ -110,6 +122,10 @@ export function StagingPanel({ repo, onStash }: { repo: RepositoryInfo; onStash:
             groups.staged.length > 0 ? { label: 'Unstage all', run: () => unstageAll.mutate() } : undefined
           }
           action={{ label: 'Unstage', run: (p) => unstage.mutate(p) }}
+          menu={(e) => [
+            ...(onStashFiles && status.data?.branch.oid ? [{ label: `Stash ${e.path}…`, onSelect: () => onStashFiles([e.path]) }] : []),
+            ...(e.kind !== 'untracked' ? [{ label: 'File history', onSelect: () => useAppStore.getState().openFileHistory(e.path) }] : []),
+          ]}
           onOpen={(e) => showDiff({ kind: 'staged', path: e.path, ...(e.origPath ? { oldPath: e.origPath } : {}) })}
           isActive={(e) => isActive({ kind: 'staged', path: e.path })}
           disabled={busy}
@@ -136,6 +152,7 @@ function FileSection({
   action,
   secondaryAction,
   onOpen,
+  menu,
   isActive,
   disabled,
 }: {
@@ -147,6 +164,8 @@ function FileSection({
   action: Action
   secondaryAction?: Action
   onOpen: (e: StatusEntry) => void
+  /** Right-click menu for a file. */
+  menu?: (e: StatusEntry) => MenuEntry[]
   isActive: (e: StatusEntry) => boolean
   disabled: boolean
 }) {
@@ -179,6 +198,12 @@ function FileSection({
                 isActive(e) ? 'bg-accent/20' : 'hover:bg-fg/[0.04]'
               }`}
               onClick={() => onOpen(e)}
+              onContextMenu={(ev) => {
+                const items = menu?.(e) ?? []
+                if (!items.length) return
+                ev.preventDefault()
+                useUiStore.getState().openMenu(ev.clientX, ev.clientY, items)
+              }}
             >
               <span className={`w-3 shrink-0 font-bold ${badge.cls}`} title={badge.title}>
                 {badge.label}

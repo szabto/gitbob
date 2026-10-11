@@ -32,7 +32,7 @@ import type { NetworkSession } from './network'
 import type { ProviderService } from './providers'
 import { appInfo, gitIdentity, setGitIdentity, validateGitPath } from './app-info'
 import type { Updater } from './updater'
-import { applyStash, createStash, dropStash, getStashFiles, listStashes } from '@git-core/stash'
+import { applyStash, applyStashFile, createStash, dropStash, getStashFiles, listStashes, stashToBranch } from '@git-core/stash'
 import { createTag, deleteTag, listTags, pushTag } from '@git-core/tags'
 import { abortOperation, cherryPick, commitsToRebase, continueOperation, mergeRef, rebaseOnto, reset, revert, skipOperation } from '@git-core/history'
 import { getReflog } from '@git-core/reflog'
@@ -385,8 +385,10 @@ export function registerIpc(ctx: IpcContext): void {
       return { pushed: true }
     },
     'stash:list': ({ repoPath }) => listStashes(requireOpened(repoPath)),
-    'stash:create': ({ repoPath, message, includeUntracked }) =>
-      createStash(requireOpened(repoPath), { includeUntracked, ...(message?.trim() ? { message: message.trim() } : {}) }),
+    'stash:create': ({ repoPath, message, includeUntracked, paths }) =>
+      createStash(requireOpened(repoPath), { includeUntracked, ...(message?.trim() ? { message: message.trim() } : {}), ...(paths?.length ? { paths } : {}) }),
+    'stash:branch': ({ repoPath, index, sha, name }) => stashToBranch(requireOpened(repoPath), index, name, { expectedSha: sha }),
+    'stash:apply-file': ({ repoPath, index, sha, path }) => applyStashFile(requireOpened(repoPath), index, path, { expectedSha: sha }),
     'stash:apply': ({ repoPath, index, sha, pop }) =>
       applyStash(requireOpened(repoPath), index, { pop, restoreIndex: true, expectedSha: sha }),
     'stash:drop': async ({ repoPath, index, sha }, event) => {

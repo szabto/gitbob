@@ -147,6 +147,33 @@ export function useRepoActions(repoPath: string) {
       const res = await run(null, () => call('stash:create', { repoPath, message, includeUntracked: true }))
       if (res && !res.created) showNotice('There were no local changes to stash.')
     },
+    stashFiles: async (paths: string[]) => {
+      const message = await ask({
+        title: paths.length === 1 ? `Stash ${paths[0]}` : `Stash ${paths.length} files`,
+        label: 'Message (optional)',
+        placeholder: 'What were you working on?',
+        confirmLabel: 'Stash',
+        allowEmpty: true,
+      })
+      if (message === null) return
+      const res = await run(null, () => call('stash:create', { repoPath, message, includeUntracked: true, paths }))
+      if (res && !res.created) showNotice('There were no local changes to stash.')
+    },
+    stashToBranch: async (s: { index: number; sha: string }) => {
+      const name = await ask({ title: 'Create branch from stash', label: 'Branch name', confirmLabel: 'Create branch' })
+      if (!name) return false
+      const ok = await run(null, async () => {
+        await call('stash:branch', { repoPath, index: s.index, sha: s.sha, name })
+        showNotice(`Created ${name} with the stashed changes. The stash was removed.`)
+        return true
+      })
+      return ok === true
+    },
+    applyStashFile: (s: { index: number; sha: string }, path: string) =>
+      run(null, async () => {
+        await call('stash:apply-file', { repoPath, index: s.index, sha: s.sha, path })
+        showNotice(`Restored ${path} from the stash. The stash was kept.`)
+      }),
     applyStash: (s: { index: number; sha: string }, pop: boolean) =>
       run(null, () => call('stash:apply', { repoPath, index: s.index, sha: s.sha, pop })),
     dropStash: (s: { index: number; sha: string }) =>

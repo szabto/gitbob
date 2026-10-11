@@ -103,6 +103,8 @@ export interface IpcOutputs {
   'stash:apply': void
   'stash:drop': { dropped: boolean }
   'stash:files': FileChange[]
+  'stash:branch': void
+  'stash:apply-file': void
   'tag:list': TagInfo[]
   'tag:create': void
   'tag:delete': { deleted: boolean }

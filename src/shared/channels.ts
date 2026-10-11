@@ -55,6 +55,8 @@ export const IPC_CHANNELS = [
   'stash:apply',
   'stash:drop',
   'stash:files',
+  'stash:branch',
+  'stash:apply-file',
   'tag:list',
   'tag:create',
   'tag:delete',
