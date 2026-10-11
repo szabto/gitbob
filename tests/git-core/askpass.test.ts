@@ -8,7 +8,6 @@ import { startHttpGitServer } from '../helpers/http-git-server'
 
 afterEach(cleanupFixtures)
 
-const posixOnly = process.platform === 'win32' ? it.skip : it
 
 async function setup() {
   const seed = createFixtureRepo()
@@ -39,7 +38,7 @@ describe('askpass helpers', () => {
 })
 
 describe('AskpassServer against a real authenticated HTTP remote', () => {
-  posixOnly('answers username and password prompts so fetch and push succeed', async () => {
+  it('answers username and password prompts so fetch and push succeed', async () => {
     const { server, work, bare } = await setup()
     const prompts: AskpassPrompt[] = []
     const askpass = new AskpassServer(async (p) => {
@@ -71,7 +70,7 @@ describe('AskpassServer against a real authenticated HTTP remote', () => {
     }
   })
 
-  posixOnly('a cancelled prompt fails the operation with an authentication error', async () => {
+  it('a cancelled prompt fails the operation with an authentication error', async () => {
     const { server, work } = await setup()
     const askpass = new AskpassServer(async () => null)
     await askpass.start()
@@ -85,7 +84,7 @@ describe('AskpassServer against a real authenticated HTTP remote', () => {
     }
   })
 
-  posixOnly('wrong credentials are rejected', async () => {
+  it('wrong credentials are rejected', async () => {
     const { server, work } = await setup()
     const askpass = new AskpassServer(async (p) => (p.secret ? 'wrong' : 'alice'))
     await askpass.start()
@@ -100,7 +99,7 @@ describe('AskpassServer against a real authenticated HTTP remote', () => {
     }
   })
 
-  posixOnly('rejects connections without the session token', async () => {
+  it('rejects connections without the session token', async () => {
     const askpass = new AskpassServer(async () => 'leaked')
     await askpass.start()
     try {

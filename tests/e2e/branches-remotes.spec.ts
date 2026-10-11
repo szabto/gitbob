@@ -146,7 +146,6 @@ test('checks out a remote branch as a tracking branch and a commit detached', as
 })
 
 test('prompts for HTTPS credentials and can cancel the prompt', async () => {
-  test.skip(process.platform === 'win32', 'askpass helper test is POSIX-only for now')
   const seed = createFixtureRepo()
   seed.commit('seed', { 'f.txt': '1\n' })
   seed.branch('from-server')
@@ -189,7 +188,6 @@ test('prompts for HTTPS credentials and can cancel the prompt', async () => {
 })
 
 test('remembers HTTPS credentials through the configured credential helper', async () => {
-  test.skip(process.platform === 'win32', 'askpass helper test is POSIX-only for now')
   const seed = createFixtureRepo()
   seed.commit('seed', { 'f.txt': '1\n' })
   const bare = createFixtureRepo({ bare: true })
@@ -228,7 +226,7 @@ test('remembers HTTPS credentials through the configured credential helper', asy
 })
 
 test('asks for an SSH key passphrase and to trust a new host', async () => {
-  test.skip(process.platform === 'win32', 'askpass helper test is POSIX-only for now')
+  test.skip(process.platform === 'win32', 'the fake ssh used here is a POSIX shell script')
   const seed = createFixtureRepo()
   seed.commit('over ssh', { 'a.txt': '1' })
   const bare = createFixtureRepo({ bare: true })
