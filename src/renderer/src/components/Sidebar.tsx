@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useHiddenRefs, useHiddenStore } from '../state/hidden'
+import { isMac } from '../lib/shortcuts'
 import { endDrag, startDrag, useDropTarget } from '../lib/dnd'
 import { useReflog, useSubmodules, useWorktrees } from '../lib/queries'
 import { formatShortDate, shortSha } from '../lib/format'
@@ -37,9 +39,31 @@ export function Sidebar({
   const selectedStash = useAppStore((s) => s.selectedStash)
   const reveal = useAppStore((s) => s.reveal)
   const openMenu = useUiStore((s) => s.openMenu)
-  const local = refs.filter((r) => r.kind === 'head')
-  const remote = refs.filter((r) => r.kind === 'remote')
-  const tags = refs.filter((r) => r.kind === 'tag')
+  const [query, setQuery] = useState('')
+  const hidden = useHiddenRefs(repoPath)
+  const toggleHidden = useHiddenStore((s) => s.toggle)
+  const showAll = useHiddenStore((s) => s.showAll)
+  const q = query.trim().toLowerCase()
+  const match = (r: GitRef): boolean => !q || r.shortName.toLowerCase().includes(q)
+  const graphRefs = refs.filter((r) => r.kind === 'head' || (r.kind === 'remote' && !r.name.endsWith('/HEAD')) || r.kind === 'tag')
+  const hiddenCount = graphRefs.filter((r) => hidden.includes(r.name)).length
+  const hideProps = (r: GitRef) =>
+    r.name === currentRef ? {} : { hidden: hidden.includes(r.name), onToggleHidden: () => toggleHidden(repoPath, r.name) }
+  const local = refs.filter((r) => r.kind === 'head' && match(r))
+  const remote = refs.filter((r) => r.kind === 'remote' && match(r))
+  const tags = refs.filter((r) => r.kind === 'tag' && match(r))
+  const filtering = q.length > 0
+  // ⌥⌘F / Ctrl+Alt+F focuses the branch filter.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.altKey && (isMac ? e.metaKey : e.ctrlKey) && e.code === 'KeyF') {
+        e.preventDefault()
+        document.getElementById('sidebar-filter')?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const remoteBranchNames = remote.map((r) => r.shortName)
 
   const mergeEntries = (r: GitRef): MenuEntry[] =>
@@ -86,8 +110,31 @@ export function Sidebar({
   ]
 
   return (
-    <aside className="w-60 shrink-0 overflow-y-auto border-r border-border bg-panel py-2" data-testid="sidebar">
-      <Section title="Local" count={local.length} testId="local-branches">
+    <aside className="flex w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-panel py-2" data-testid="sidebar">
+      <div className="mb-1 px-3" style={{ order: -1 }}>
+        <div className="mb-1 flex items-center text-xs text-muted" data-testid="viewing">
+          <span>
+            Viewing {graphRefs.length - hiddenCount}/{graphRefs.length}
+          </span>
+          {hiddenCount > 0 && (
+            <button className="ml-auto text-accent hover:underline" onClick={() => showAll(repoPath)}>
+              Show all
+            </button>
+          )}
+        </div>
+        <input
+          id="sidebar-filter"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+          placeholder={`Filter (${isMac ? '⌥⌘F' : 'Ctrl+Alt+F'})`}
+          aria-label="Filter branches and tags"
+          className="w-full rounded border border-border bg-bg px-2 py-0.5 text-xs outline-none focus:border-accent"
+        />
+      </div>
+      {/* Spacer: open sections above, collapsed ones docked below. */}
+      <div className="flex-1" style={{ order: 1 }} />
+      <Section title="Local" count={local.length} testId="local-branches" {...(filtering ? { open: true, onToggle: () => {} } : {})}>
         <RefTree
           refs={local}
           scope="local"
@@ -102,6 +149,7 @@ export function Sidebar({
               onClick={() => reveal(r.target)}
               onDoubleClick={() => r.name !== currentRef && void actions.checkout(r.name)}
               onMenu={(e) => openMenu(e.clientX, e.clientY, localMenu(r))}
+              {...hideProps(r)}
             />
           )}
         />
@@ -114,6 +162,7 @@ export function Sidebar({
         count={remote.length}
         testId="remote-branches"
         action={{ label: '+', title: 'Add remote', onClick: () => void actions.addRemote() }}
+        {...(filtering ? { open: true, onToggle: () => {} } : {})}
       >
         {remotes.map((name) => (
           <RemoteGroup
@@ -136,12 +185,13 @@ export function Sidebar({
                 onClick={() => reveal(r.target)}
                 onDoubleClick={() => void actions.checkout(r.name)}
                 onMenu={(e) => openMenu(e.clientX, e.clientY, remoteMenu(r))}
+                {...hideProps(r)}
               />
             )}
           />
         ))}
       </Section>
-      <Section title="Tags" count={tags.length} testId="tags">
+      <Section title="Tags" count={tags.length} testId="tags" {...(filtering ? { open: true, onToggle: () => {} } : {})}>
         <RefTree
           refs={tags}
           scope="tags"
@@ -160,6 +210,7 @@ export function Sidebar({
                 { label: `Delete tag ${r.shortName}…`, danger: true, onSelect: () => void actions.deleteTag(r.shortName) },
               ])
             }
+            {...hideProps(r)}
           />
           )}
         />
@@ -351,6 +402,42 @@ function ReflogSection({
   )
 }
 
+const SECTIONS_KEY = 'gitbob.sidebarSections'
+/** Sections start collapsed unless `defaultOpen` (Local, Pull requests, LFS); each remembers its state. */
+export function useSectionOpen(id: string, defaultOpen = id === 'local-branches'): [boolean, (v: boolean) => void] {
+  const read = (): boolean => {
+    try {
+      const v = (JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '{}') as Record<string, unknown>)[id]
+      return typeof v === 'boolean' ? v : defaultOpen
+    } catch {
+      return defaultOpen
+    }
+  }
+  const [open, setOpen] = useState(read)
+  return [
+    open,
+    (v: boolean) => {
+      setOpen(v)
+      try {
+        const all = JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '{}') as Record<string, boolean>
+        localStorage.setItem(SECTIONS_KEY, JSON.stringify({ ...all, [id]: v }))
+      } catch {
+        /* per-viewer convenience */
+      }
+    },
+  ]
+}
+
+function EyeIcon({ off }: { off: boolean }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
+      <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="8" cy="8" r="2" fill="currentColor" />
+      {off && <path d="M2.5 13.5l11-11" stroke="currentColor" strokeWidth="1.5" />}
+    </svg>
+  )
+}
+
 function Section({
   title,
   count,
@@ -369,11 +456,12 @@ function Section({
   open?: boolean
   onToggle?: () => void
 }) {
-  const [localOpen, setLocalOpen] = useState(true)
+  const [localOpen, setLocalOpen] = useSectionOpen(testId)
   const open = controlledOpen ?? localOpen
   const setOpen = (v: boolean): void => (onToggle ? onToggle() : setLocalOpen(v))
   return (
-    <section className="mb-1" data-testid={testId}>
+    // Collapsed sections dock at the bottom of the sidebar (after the spacer), like GitKraken.
+    <section className="mb-1" data-testid={testId} style={{ order: open ? 0 : 2 }}>
       <div className="flex items-center pr-2">
         <button
           onClick={() => setOpen(!open)}
@@ -408,6 +496,8 @@ function RefItem({
   onMenu,
   label,
   depth = 0,
+  hidden = false,
+  onToggleHidden,
 }: {
   gitRef: GitRef
   label?: string
@@ -416,10 +506,24 @@ function RefItem({
   onClick: () => void
   onDoubleClick?: () => void
   onMenu?: (e: React.MouseEvent) => void
+  /** Hidden from the graph (shown dimmed, with a crossed-out eye). */
+  hidden?: boolean
+  onToggleHidden?: () => void
 }) {
   const drop = useDropTarget(gitRef)
   return (
-    <li>
+    <li className="group relative">
+      {onToggleHidden && (
+        <button
+          aria-label={hidden ? `Show ${gitRef.shortName} in the graph` : `Hide ${gitRef.shortName} from the graph`}
+          title={hidden ? 'Show in the graph' : 'Hide from the graph'}
+          data-testid="hide-ref"
+          onClick={onToggleHidden}
+          className={`absolute top-0.5 left-2 z-10 rounded p-0.5 text-muted hover:text-fg ${hidden ? '' : 'hidden group-hover:block'}`}
+        >
+          <EyeIcon off={hidden} />
+        </button>
+      )}
       <button
         draggable
         onDragStart={(e) => startDrag(e, { kind: 'ref', ref: gitRef })}
@@ -436,10 +540,11 @@ function RefItem({
         title={gitRef.name}
         data-testid="ref-item"
         data-ref={gitRef.name}
+        data-hidden={hidden || undefined}
         style={{ paddingLeft: 28 + depth * 12 }}
         className={`flex w-full items-center gap-2 truncate py-0.5 pr-3 text-left hover:bg-panel-2 ${
           active ? 'font-semibold text-accent' : ''
-        } ${drop.isOver ? 'bg-accent/20 outline outline-1 -outline-offset-1 outline-accent' : ''}`}
+        } ${hidden ? 'opacity-45' : ''} ${drop.isOver ? 'bg-accent/20 outline outline-1 -outline-offset-1 outline-accent' : ''}`}
       >
         {active && <span aria-label="current branch">●</span>}
         <span className="truncate">{label ?? gitRef.shortName}</span>

@@ -597,3 +597,28 @@ describe('getCommitPage with a filter', () => {
     }
   })
 })
+
+describe('hidden branches', () => {
+  it('leaves out commits reachable only from hidden refs, keeping shared history and HEAD', async () => {
+    const repo = createFixtureRepo()
+    const base = repo.commit('base', { 'a.txt': '1' })
+    repo.branch('side')
+    repo.checkout('side')
+    const side = repo.commit('side only', { 's.txt': 's' })
+    repo.tag('v-side')
+    repo.checkout('main')
+    const main = repo.commit('main work', { 'm.txt': 'm' })
+    const all = await getCommitPage(repo.dir, { skip: 0, limit: 100 })
+    expect(all.commits.map((c) => c.sha)).toContain(side)
+    const hidden = await getCommitPage(repo.dir, { skip: 0, limit: 100, hidden: ['refs/heads/side', 'refs/tags/v-side'] })
+    expect(hidden.commits.map((c) => c.sha)).toEqual([main, base])
+    // Paging uses the cached walk; a different hidden set must not reuse it.
+    const page2 = await getCommitPage(repo.dir, { skip: 1, limit: 1, hidden: ['refs/heads/side', 'refs/tags/v-side'] })
+    expect(page2.commits.map((c) => c.sha)).toEqual([base])
+    const page2all = await getCommitPage(repo.dir, { skip: 1, limit: 1 })
+    expect(page2all.commits).toHaveLength(1)
+    // Hiding the checked-out branch keeps it visible through HEAD; malformed entries are ignored.
+    const headHidden = await getCommitPage(repo.dir, { skip: 0, limit: 100, hidden: ['refs/heads/main', 'refs/heads/*', '--all'] })
+    expect(headHidden.commits.map((c) => c.sha)).toEqual(expect.arrayContaining([main, side, base]))
+  })
+})

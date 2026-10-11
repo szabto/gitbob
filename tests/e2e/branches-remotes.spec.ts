@@ -1,6 +1,7 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { basename, dirname, join, resolve } from 'node:path'
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
+import { openAllSidebarSections } from '../helpers/ui'
 import { cleanupFixtures, cloneFixtureRepo, createFixtureRepo, makeTempDir, type FixtureRepo } from '../helpers/fixture'
 import { startHttpGitServer } from '../helpers/http-git-server'
 
@@ -25,6 +26,7 @@ async function launch(repo: string, extraEnv: Record<string, string> = {}): Prom
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
+  await openAllSidebarSections(page)
   return { app, page }
 }
 

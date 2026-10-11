@@ -1,3 +1,4 @@
+import { useHiddenRefs } from '../state/hidden'
 import { useCallback } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { DiffTarget, HistoryFilter } from '@shared/types'
@@ -14,11 +15,12 @@ export function useHead(repoPath: string, enabled = true) {
 }
 
 export function useHistory(repoPath: string, filter: HistoryFilter | null = null) {
+  const hidden = useHiddenRefs(repoPath)
   return useInfiniteQuery({
-    queryKey: ['log', repoPath, filter],
+    queryKey: ['log', repoPath, filter, hidden],
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
-      call('log:page', { repoPath, skip: pageParam, limit: PAGE_SIZE, ...(filter ? { filter } : {}) }),
+      call('log:page', { repoPath, skip: pageParam, limit: PAGE_SIZE, ...(filter ? { filter } : {}), ...(hidden.length ? { hidden } : {}) }),
     getNextPageParam: (last, pages) => (last.hasMore ? pages.length * PAGE_SIZE : undefined),
   })
 }

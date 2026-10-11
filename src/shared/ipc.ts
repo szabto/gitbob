@@ -96,6 +96,7 @@ export const ipcInputSchemas = {
         path: repoPathSchema.optional(),
       })
       .optional(),
+    hidden: z.array(fullRefName).max(1000).optional(),
   }),
   'commit:details': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'log:search': z.object({ repoPath: absolutePath, query: z.string().trim().min(1).max(200) }),

@@ -201,8 +201,10 @@ export function registerIpc(ctx: IpcContext): void {
     },
     'repo:refs': ({ repoPath }) => listRefs(requireOpened(repoPath)),
     'repo:head': ({ repoPath }) => getHead(requireOpened(repoPath)),
-    'log:page': ({ repoPath, skip, limit, filter }) =>
-      health.timeFirstPage(requireOpened(repoPath), filter ? -1 : skip, () => getCommitPage(repoPath, { skip, limit, ...(filter ? { filter } : {}) })),
+    'log:page': ({ repoPath, skip, limit, filter, hidden }) =>
+      health.timeFirstPage(requireOpened(repoPath), filter ? -1 : skip, () =>
+        getCommitPage(repoPath, { skip, limit, ...(filter ? { filter } : {}), ...(hidden?.length ? { hidden } : {}) }),
+      ),
     'log:search': ({ repoPath, query }) => searchCommits(requireOpened(repoPath), query),
     'commit:details': ({ repoPath, sha }) => getCommitDetails(requireOpened(repoPath), sha),
     'commit:all-files': ({ repoPath, sha }) => listCommitFiles(requireOpened(repoPath), sha),

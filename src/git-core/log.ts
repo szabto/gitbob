@@ -46,6 +46,23 @@ export interface LogPageOptions {
   limit: number
   signal?: AbortSignal
   filter?: LogFilter
+  /** Branches / tags hidden from the graph (full ref names); commits only they reach are left out. */
+  hidden?: readonly string[]
+}
+
+const HIDDEN_REF_RE = /^refs\/(heads|remotes|tags)\/[^\s*?[\\]+$/
+
+/**
+ * `--branches --remotes --tags` with hidden refs excluded. git's `--exclude` patterns apply to the
+ * next group only and are written without that group's `refs/heads/` (… ) prefix.
+ */
+export function refGroups(hidden: readonly string[] = []): string[] {
+  const valid = hidden.filter((r) => HIDDEN_REF_RE.test(r) && !r.includes('..')).slice(0, 1000)
+  const group = (prefix: string, flag: string): string[] => [
+    ...valid.filter((r) => r.startsWith(prefix)).map((r) => `--exclude=${r.slice(prefix.length)}`),
+    flag,
+  ]
+  return [...group('refs/heads/', '--branches'), ...group('refs/remotes/', '--remotes'), ...group('refs/tags/', '--tags')]
 }
 
 /**
@@ -231,11 +248,11 @@ async function normalizeFilter(repoPath: string, filter: LogFilter | undefined, 
  * followed, and the path is matched literally (GIT_LITERAL_PATHSPECS=1).
  * `--author` is matched as a fixed string (`-F`), case-insensitively (`-i`).
  */
-function filteredLogArgs(filter: NormalizedFilter, skip: number, maxCount: number, unbornHead: boolean): string[] {
+function filteredLogArgs(filter: NormalizedFilter, skip: number, maxCount: number, unbornHead: boolean, hidden: readonly string[] = []): string[] {
   const args = ['log', '-z', '--date-order', '--parents', `--format=${LOG_FORMAT}`, `--skip=${skip}`, `--max-count=${maxCount}`]
   if (filter.author) args.push('-F', '-i', `--author=${filter.author}`)
   if (filter.refs.length) args.push(...filter.refs)
-  else args.push('--branches', '--remotes', '--tags', ...(unbornHead ? [] : ['HEAD']))
+  else args.push(...refGroups(hidden), ...(unbornHead ? [] : ['HEAD']))
   args.push('--')
   if (filter.path) args.push(filter.path)
   return args
@@ -259,7 +276,7 @@ export async function getCommitPage(repoPath: string, opts: LogPageOptions): Pro
       const refs = await runGit(['for-each-ref', '--format=%(objectname) %(refname)', ...WALK_REFS], { cwd: repoPath, signal })
       if (!VISIBLE_REF.test(refs.stdout)) return { commits: [], hasMore: false }
     }
-    const { stdout } = await runGit(filteredLogArgs(filter, opts.skip, opts.limit + 1, head?.unborn ?? false), {
+    const { stdout } = await runGit(filteredLogArgs(filter, opts.skip, opts.limit + 1, head?.unborn ?? false, opts.hidden), {
       cwd: repoPath,
       signal,
       timeoutMs: 120_000,
@@ -274,12 +291,12 @@ export async function getCommitPage(repoPath: string, opts: LogPageOptions): Pro
   ])
   // An empty repository (no commits on any ref) has nothing to show.
   if (head.unborn && !VISIBLE_REF.test(refs.stdout)) return { commits: [], hasMore: false }
-  const revs = ['--branches', '--remotes', '--tags']
+  const revs = refGroups(opts.hidden)
   if (!head.unborn) revs.push('HEAD')
 
   if (opts.skip > 0) {
     try {
-      const fingerprint = [head.sha ?? '-', shallow, refs.stdout].join('\n')
+      const fingerprint = [head.sha ?? '-', shallow, revs.join(' '), refs.stdout].join('\n')
       return await pageFromWalkOrder(repoPath, fingerprint, revs, opts)
     } catch (err) {
       if (err instanceof GitError && err.code === 'CANCELLED') throw err

@@ -1,6 +1,7 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { existsSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
+import { openAllSidebarSections } from '../helpers/ui'
 import { cleanupFixtures, createFixtureRepo, makeTempDir } from '../helpers/fixture'
 
 const appDir = resolve(import.meta.dirname, '../..')
@@ -23,6 +24,7 @@ async function launch(repo?: string): Promise<{ app: ElectronApplication; page: 
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
+  if (repo) await openAllSidebarSections(page)
   return { app, page }
 }
 
@@ -50,6 +52,7 @@ test('clones a repository into a chosen folder and opens it', async () => {
     await expect(page.getByTestId('repo-tab')).toHaveCount(1)
     const name = basename(server.dir).replace(/\.git$/, '')
     expect(existsSync(join(parent, name, 'a.txt'))).toBe(true)
+    await openAllSidebarSections(page)
     await expect(page.locator('[data-testid="ref-item"][data-ref="refs/remotes/origin/main"]')).toBeVisible()
   } finally {
     await app.close()

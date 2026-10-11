@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useSectionOpen } from './Sidebar'
+
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { call } from '../lib/api'
 import { useUiStore } from '../state/ui'
 
 /** Git LFS status and actions; hidden for repositories that don't use LFS (and can't). */
 export function LfsSection({ repoPath }: { repoPath: string }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useSectionOpen('lfs', true)
   const qc = useQueryClient()
   const status = useQuery({ queryKey: ['lfs', repoPath], queryFn: () => call('lfs:status', { repoPath }), staleTime: 60_000 })
   const { ask, showError, showNotice, setBusy, openMenu } = useUiStore.getState()
@@ -33,7 +34,7 @@ export function LfsSection({ repoPath }: { repoPath: string }) {
   const missing = s.files.filter((f) => !f.downloaded).length
 
   return (
-    <section className="mb-1" data-testid="lfs">
+    <section className="mb-1" data-testid="lfs" style={{ order: open ? 0 : 2 }}>
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}

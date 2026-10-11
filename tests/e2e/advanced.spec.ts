@@ -1,6 +1,7 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { openAllSidebarSections } from '../helpers/ui'
 import { cleanupFixtures, createFixtureRepo, makeTempDir } from '../helpers/fixture'
 
 const appDir = resolve(import.meta.dirname, '../..')
@@ -23,6 +24,7 @@ async function launch(repo: string): Promise<{ app: ElectronApplication; page: P
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
+  await openAllSidebarSections(page)
   return { app, page }
 }
 

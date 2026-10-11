@@ -1,5 +1,6 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { basename, resolve } from 'node:path'
+import { openAllSidebarSections } from '../helpers/ui'
 import { cleanupFixtures, createFixtureRepo, makeTempDir, type FixtureRepo } from '../helpers/fixture'
 
 const appDir = resolve(import.meta.dirname, '../..')
@@ -11,6 +12,7 @@ async function launch(opts: { repo?: string; userData: string }): Promise<{ app:
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
+  if (opts.repo) await openAllSidebarSections(page)
   return { app, page }
 }
 
@@ -381,6 +383,49 @@ test('commit details: uncommitted-changes banner, tree view and all files', asyn
 
     await panel.getByRole('button', { name: 'View changes' }).click()
     await expect(page.getByTestId('staging-panel')).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
+test('sidebar: hide a branch from the graph, filter branches, and collapsed sections dock at the bottom', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1\n' })
+  repo.branch('experiment')
+  repo.branch('feature/login')
+  repo.checkout('experiment')
+  repo.commit('try something', { 'x.txt': 'x\n' })
+  repo.checkout('main')
+  repo.commit('main work', { 'm.txt': 'm\n' })
+  const userData = makeTempDir('gitbob-ud-')
+  const { app, page } = await launch({ repo: repo.dir, userData })
+  const item = (ref: string) => page.locator(`[data-testid="ref-item"][data-ref="${ref}"]`)
+  try {
+    await expect(page.getByTestId('viewing')).toContainText('Viewing 3/3')
+    await expect(page.locator('[data-testid="commit-row"]', { hasText: 'try something' })).toBeVisible()
+
+    await item('refs/heads/experiment').hover()
+    await page.getByRole('button', { name: 'Hide experiment from the graph' }).click()
+    await expect(page.locator('[data-testid="commit-row"]', { hasText: 'try something' })).toHaveCount(0)
+    await expect(page.getByTestId('commit-row')).toHaveCount(2)
+    await expect(item('refs/heads/experiment')).toHaveAttribute('data-hidden', 'true')
+    await expect(page.getByTestId('viewing')).toContainText('Viewing 2/3')
+    // The checked-out branch can't be hidden.
+    await expect(page.getByRole('button', { name: 'Hide main from the graph' })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Show all' }).click()
+    await expect(page.locator('[data-testid="commit-row"]', { hasText: 'try something' })).toBeVisible()
+
+    // Filter narrows the branch list.
+    await page.getByLabel('Filter branches and tags').fill('log')
+    await expect(page.locator('[data-testid="local-branches"] [data-testid="ref-item"]')).toHaveCount(1)
+    await expect(item('refs/heads/feature/login')).toBeVisible()
+    await page.getByLabel('Filter branches and tags').fill('')
+
+    // A collapsed section sorts below the spacer (docked at the bottom).
+    const tags = page.getByTestId('tags')
+    await tags.locator('> div > button').click()
+    await expect(tags).toHaveCSS('order', '2')
   } finally {
     await app.close()
   }

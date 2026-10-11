@@ -1,3 +1,4 @@
+import { useSectionOpen } from './Sidebar'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { GitRef, ProviderKind, ProviderStatus, RepoRef } from '@shared/types'
@@ -49,7 +50,7 @@ export function PullRequestsSection({
   remoteRefs: GitRef[]
   actions: ReturnType<typeof useRepoActions>
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useSectionOpen('pull-requests', true)
   const qc = useQueryClient()
   const { ask, showError, showNotice, openMenu } = useUiStore.getState()
   const pulls = usePullRequests(repoPath, status.connected && open)
@@ -104,7 +105,7 @@ export function PullRequestsSection({
   }
 
   return (
-    <section className="mb-1" data-testid="pull-requests">
+    <section className="mb-1" data-testid="pull-requests" style={{ order: open ? 0 : 2 }}>
       <div className="flex items-center pr-2">
         <button
           onClick={() => setOpen(!open)}
