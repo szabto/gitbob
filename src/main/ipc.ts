@@ -43,6 +43,8 @@ import { listSubmodules, updateSubmodules } from '@git-core/submodules'
 import { getSignature } from '@git-core/signatures'
 import type { RecentRepositoryStore } from './recent'
 import type { UndoJournal } from './undo'
+import { RepoHealth } from './repo-health'
+import { writeCommitGraph } from '@git-core/maintenance'
 import { getOperation } from '@git-core/status'
 import { resolveRepoPath } from '@git-core/paths'
 import { headSnapshot, readRef, type HeadSnapshot, type UndoStep } from '@git-core/undo'
@@ -139,6 +141,7 @@ function checkoutSteps(before: HeadSnapshot, after: HeadSnapshot): { undo: UndoS
 }
 
 export function registerIpc(ctx: IpcContext): void {
+  const health = new RepoHealth()
   /**
    * Run a mutation of an opened repository and, if it completed (no conflict stop), record how
    * to undo and redo it. Recording problems never fail the operation itself.
@@ -194,10 +197,15 @@ export function registerIpc(ctx: IpcContext): void {
     'repo:refs': ({ repoPath }) => listRefs(requireOpened(repoPath)),
     'repo:head': ({ repoPath }) => getHead(requireOpened(repoPath)),
     'log:page': ({ repoPath, skip, limit, filter }) =>
-      getCommitPage(requireOpened(repoPath), { skip, limit, ...(filter ? { filter } : {}) }),
+      health.timeFirstPage(requireOpened(repoPath), filter ? -1 : skip, () => getCommitPage(repoPath, { skip, limit, ...(filter ? { filter } : {}) })),
     'log:search': ({ repoPath, query }) => searchCommits(requireOpened(repoPath), query),
     'commit:details': ({ repoPath, sha }) => getCommitDetails(requireOpened(repoPath), sha),
-    'status:get': ({ repoPath }) => getStatus(requireOpened(repoPath)),
+    'status:get': ({ repoPath }) => health.timeStatus(requireOpened(repoPath), () => getStatus(repoPath)),
+    'repo:health': async ({ repoPath }) => ({ suggestCommitGraph: await health.suggestCommitGraph(requireOpened(repoPath)) }),
+    'repo:write-commit-graph': async ({ repoPath }) => {
+      await writeCommitGraph(requireOpened(repoPath))
+      health.commitGraphWritten(repoPath)
+    },
     'index:stage': ({ repoPath, paths }) => stagePaths(requireOpened(repoPath), paths),
     'index:unstage': ({ repoPath, paths }) => unstagePaths(requireOpened(repoPath), paths),
     'index:stage-all': ({ repoPath }) => stageAll(requireOpened(repoPath)),

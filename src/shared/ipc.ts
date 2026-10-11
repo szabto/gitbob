@@ -71,6 +71,8 @@ export const ipcInputSchemas = {
   'repo:clone': z.object({ url: z.string().trim().min(1).max(2048) }),
   'repo:init': z.object({}).strict(),
   'repo:refs': z.object({ repoPath: absolutePath }),
+  'repo:health': z.object({ repoPath: absolutePath }),
+  'repo:write-commit-graph': z.object({ repoPath: absolutePath }),
   'repo:head': z.object({ repoPath: absolutePath }),
   'log:page': z.object({
     repoPath: absolutePath,

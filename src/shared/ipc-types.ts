@@ -46,6 +46,9 @@ export interface IpcOutputs {
   'repo:clone': RepositoryInfo | null
   'repo:init': RepositoryInfo | null
   'repo:refs': GitRef[]
+  /** Performance hints for a slow repository. */
+  'repo:health': { suggestCommitGraph: boolean }
+  'repo:write-commit-graph': void
   'repo:head': HeadState
   'log:page': CommitPage
   'log:search': { shas: string[]; truncated: boolean }

@@ -15,6 +15,7 @@ import { useRepoActions } from '../lib/actions'
 import { useRemotes, useStashes, useUndoState } from '../lib/queries'
 import { StashPanel } from './StashPanel'
 import { OperationBanner } from './OperationBanner'
+import { SpeedUpBanner } from './SpeedUpBanner'
 import { BlameView } from './BlameView'
 import { PullRequestView } from './PullRequestView'
 import { RebaseDialog } from './RebaseDialog'
@@ -222,6 +223,7 @@ export function RepositoryView({ repo, onOpen, onClose }: Props) {
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {status.data && <OperationBanner status={status.data} actions={actions} />}
+          <SpeedUpBanner repoPath={repo.root} historyLoaded={!!history.data} />
           {prNumber && provider.data?.repo && !diffTarget ? (
             <PullRequestView repoPath={repo.root} number={prNumber} providerName={PROVIDER_NAMES[provider.data.repo.kind]} />
           ) : blame ? (

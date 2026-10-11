@@ -1,6 +1,6 @@
 import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { cleanupFixtures, createFixtureRepo, makeTempDir } from '../helpers/fixture'
@@ -220,5 +220,45 @@ test('first run: checks Git, sets name and email globally, and tips can be hidde
     await expect(page.getByTestId('tips')).toHaveCount(0)
   } finally {
     await app.close()
+  }
+})
+
+test('offers to speed up a slow history by writing the commit-graph', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('one', { 'a.txt': '1\n' })
+  repo.commit('two', { 'a.txt': '2\n' })
+  // Every call counts as slow here, so the hint shows for this tiny repository.
+  const { app, page } = await launch(repo.dir, undefined, { GITBOB_TEST_SLOW_MS: '0' })
+  try {
+    const banner = page.getByTestId('speed-up-banner')
+    await expect(banner).toBeVisible()
+    await banner.getByRole('button', { name: 'Speed up history' }).click()
+    await expect(page.getByTestId('notice')).toContainText('History index built')
+    await expect(banner).toHaveCount(0)
+    expect(existsSync(join(repo.dir, '.git/objects/info/commit-graph'))).toBe(true)
+    await expect(page.getByTestId('commit-row')).toHaveCount(2)
+  } finally {
+    await app.close()
+  }
+})
+
+test('the speed-up hint can be dismissed and stays dismissed', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('one', { 'a.txt': '1\n' })
+  const userData = makeTempDir('gitbob-ud-')
+  const first = await launch(repo.dir, userData, { GITBOB_TEST_SLOW_MS: '0' })
+  try {
+    await first.page.getByTestId('speed-up-banner').getByRole('button', { name: 'Not now' }).click()
+    await expect(first.page.getByTestId('speed-up-banner')).toHaveCount(0)
+  } finally {
+    await first.app.close()
+  }
+  const second = await launch(repo.dir, userData, { GITBOB_TEST_SLOW_MS: '0' })
+  try {
+    await expect(second.page.getByTestId('commit-row')).toHaveCount(1)
+    await expect(second.page.getByTestId('speed-up-banner')).toHaveCount(0)
+    expect(existsSync(join(repo.dir, '.git/objects/info/commit-graph'))).toBe(false)
+  } finally {
+    await second.app.close()
   }
 })
