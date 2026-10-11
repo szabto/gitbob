@@ -68,6 +68,7 @@ export function CommitGraph({
   const labelsBySha = useMemo(() => buildRefLabels(allRefs, currentRef), [allRefs, currentRef])
   const openMenu = useUiStore((s) => s.openMenu)
   const historyFilter = useAppStore((s) => s.historyFilter)
+  const setHistoryFilter = useAppStore((s) => s.setHistoryFilter)
   const total = useCommitCount(repoPath, hasMore && !historyFilter)
   const resizer = (key: 'refs' | 'author' | 'date' | 'sha', sign: 1 | -1) => ({
     onStart: () => {
@@ -167,6 +168,24 @@ export function CommitGraph({
           ⚙
         </button>
       </div>
+      {historyFilter && (
+        // Always reachable, however narrow the Message column is.
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-accent/10 px-3 py-1 text-xs" data-testid="filter-banner">
+          <span className="min-w-0 truncate">
+            Showing only{' '}
+            {[
+              historyFilter.refs?.length ? historyFilter.refs.map((r) => r.replace(/^refs\/(heads|remotes|tags)\//, '')).join(', ') : null,
+              historyFilter.author ? `author “${historyFilter.author}”` : null,
+              historyFilter.path ? `path “${historyFilter.path}”` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          <button className="ml-auto shrink-0 text-accent hover:underline" onClick={() => setHistoryFilter(null)}>
+            Show all
+          </button>
+        </div>
+      )}
       <div
         ref={parentRef}
         className="min-h-0 flex-1 overflow-auto outline-none"
