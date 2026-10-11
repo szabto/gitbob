@@ -340,10 +340,13 @@ test('GitKraken-style menus: edit, move and drop commits, fast-forward, compare,
     await page.getByLabel('Commit message').fill('first change, better worded')
     await page.getByRole('button', { name: 'Save message' }).click()
     await expect.poll(subjects).toEqual(['third change', 'second change', 'first change, better worded', 'base'])
+    // Wait for the graph to show the rewritten commits before using their menus.
+    await expect(row(page, 'first change, better worded')).toBeVisible()
 
     // Move a commit up, then drop one (confirmed natively).
     await menu(row(page, 'second change'), 'Move commit up')
     await expect.poll(subjects).toEqual(['second change', 'third change', 'first change, better worded', 'base'])
+    await expect(page.getByTestId('commit-row').first()).toContainText('second change')
     await mockConfirm(app, 1)
     await menu(row(page, 'third change'), 'Drop commit…')
     await expect.poll(subjects).toEqual(['second change', 'first change, better worded', 'base'])
