@@ -412,7 +412,7 @@ Every shortcut can be changed in **Settings → Keyboard shortcuts**. Don't reme
 
 **Does it send data anywhere?** No telemetry, no analytics. The only network traffic is Git talking to your remotes, the hosting service you connect yourself, and, only if you ask for it in Settings, a check of GitHub Releases for a newer GitBob.
 
-**Windows and Linux?** Yes. Every change is tested automatically on macOS, Windows and Linux (the full end-to-end suite runs on macOS and Linux), and each release ships installers for all three.
+**Windows and Linux?** Yes. Every change is tested automatically on macOS, Windows and Linux, including the full end-to-end suite that drives the real app, and each release ships installers for all three.
 
 <br>
 
