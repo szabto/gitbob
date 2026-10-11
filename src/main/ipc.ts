@@ -46,6 +46,7 @@ import type { UndoJournal } from './undo'
 import { RepoHealth } from './repo-health'
 import { writeCommitGraph } from '@git-core/maintenance'
 import { getFileHistory } from '@git-core/file-history'
+import { readFileForEdit, saveEditedFile } from '@git-core/worktree-file'
 import { getOperation } from '@git-core/status'
 import { resolveRepoPath } from '@git-core/paths'
 import { headSnapshot, readRef, type HeadSnapshot, type UndoStep } from '@git-core/undo'
@@ -297,6 +298,8 @@ export function registerIpc(ctx: IpcContext): void {
         (before, after) => branchMove(before, after, 'soft'),
       ),
     'commit:last-message': ({ repoPath }) => getLastCommitMessage(requireOpened(repoPath)),
+    'file:read': ({ repoPath, path }) => readFileForEdit(requireOpened(repoPath), path),
+    'file:write': ({ repoPath, path, content, baseHash }) => saveEditedFile(requireOpened(repoPath), path, content, baseHash),
     'commit:template': ({ repoPath }) => getCommitTemplate(requireOpened(repoPath)),
     'branch:create': ({ repoPath, name, startPoint, checkout }) =>
       journaled(

@@ -227,3 +227,48 @@ test('a repository using LFS without git-lfs installed shows a warning', async (
     await app.close()
   }
 })
+
+test('edit a file in the app, save and stage it, and refuse to overwrite outside changes', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'notes.txt': 'first line\n' })
+  repo.write('notes.txt', 'first line\nsecond line\n')
+  const { app, page } = await launch(repo.dir)
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
+  const typeAtEnd = async (text: string) => {
+    await page.locator('[data-testid="file-editor-monaco"] .view-lines').click()
+    await page.keyboard.press(`${mod}+End`)
+    await page.keyboard.type(text)
+  }
+  try {
+    await page.getByTestId('wip-row').click()
+    await fileRow(page, 'unstaged-files', 'notes.txt').click()
+    await page.getByTestId('diff-view').getByRole('button', { name: 'Edit' }).click()
+    const editor = page.getByTestId('file-editor')
+    await expect(editor.locator('.monaco-editor')).toBeVisible()
+    await typeAtEnd('third line\n')
+    await expect(editor).toContainText('unsaved')
+    await editor.getByRole('button', { name: 'Save and stage' }).click()
+    await expect(page.getByTestId('notice')).toContainText('Saved and staged notes.txt')
+    expect(read(repo, 'notes.txt')).toBe('first line\nsecond line\nthird line\n')
+    expect(repo.git(['diff', '--cached', '--name-only'])).toBe('notes.txt')
+
+    // Another program changes the file while it is open: saving is refused, nothing is lost.
+    repo.write('notes.txt', 'first line\nsecond line\nthird line\nfrom elsewhere\n')
+    await page.locator('[data-testid="unstaged-files"] [data-path="notes.txt"]').click()
+    repo.write('notes.txt', 'changed again outside\n')
+    await page.getByTestId('diff-view').getByRole('button', { name: 'Edit' }).click()
+    await expect(editor.locator('.monaco-editor')).toBeVisible()
+    repo.write('notes.txt', 'and once more\n')
+    await typeAtEnd('mine\n')
+    await editor.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByTestId('error-message')).toContainText('changed outside GitBob')
+    expect(read(repo, 'notes.txt')).toBe('and once more\n')
+
+    // Cancelling with unsaved edits asks first.
+    await editor.getByRole('button', { name: 'Cancel' }).click()
+    await editor.getByRole('button', { name: 'Discard' }).click()
+    await expect(page.getByTestId('file-editor')).toHaveCount(0)
+  } finally {
+    await app.close()
+  }
+})

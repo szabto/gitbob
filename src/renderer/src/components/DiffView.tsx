@@ -26,6 +26,7 @@ const prefix: Record<DiffLine['type'], string> = { context: ' ', add: '+', del: 
 
 // Monaco is large; load it only when the side-by-side view is first used.
 const SideBySideDiff = lazy(() => import('./SideBySideDiff').then((m) => ({ default: m.SideBySideDiff })))
+const FileEditor = lazy(() => import('./FileEditor').then((m) => ({ default: m.FileEditor })))
 
 export function DiffView({
   repoPath,
@@ -40,12 +41,21 @@ export function DiffView({
   showHistoryButton?: boolean
 }) {
   const diff = useFileDiff(repoPath, target)
+  const [editing, setEditing] = useState(false)
   const showDiff = useAppStore((s) => s.showDiff)
   const openBlame = useAppStore((s) => s.openBlame)
   const openFileHistory = useAppStore((s) => s.openFileHistory)
   const mode = useUiStore((s) => s.diffMode)
   const setMode = useUiStore((s) => s.setDiffMode)
   const contents = useFileContents(repoPath, target, mode === 'split')
+
+  if (editing) {
+    return (
+      <Suspense fallback={<div className="p-4 text-xs text-muted">Loading editor…</div>}>
+        <FileEditor repoPath={repoPath} path={target.path} onDone={() => setEditing(false)} />
+      </Suspense>
+    )
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="diff-view">
@@ -83,6 +93,15 @@ export function DiffView({
             }
           >
             Blame
+          </button>
+        )}
+        {(target.kind === 'unstaged' || target.kind === 'untracked') && !diff.data?.binary && !diff.data?.isDeleted && (
+          <button
+            className="rounded border border-border px-2 py-0.5 text-xs hover:bg-panel-2"
+            title="Edit this file here"
+            onClick={() => setEditing(true)}
+          >
+            Edit
           </button>
         )}
         {showHistoryButton && target.kind !== 'untracked' && (

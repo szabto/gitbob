@@ -1,11 +1,9 @@
-import { randomBytes } from 'node:crypto'
-import { lstat, mkdir, open, rename, rm } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
 import { hasConflictMarkers } from '@shared/conflict-markers'
-import { assertDirInsideRepo, readBlob, readWorktreeFile } from './contents'
+import { readBlob, readWorktreeFile } from './contents'
 import { GitError } from './errors'
 import { LITERAL_PATHSPECS_ENV, resolveRepoPath } from './paths'
 import { runGit } from './runner'
+import { writeRepoFile } from './worktree-file'
 import type { ConflictVersions } from '@shared/types'
 import type { ConflictKind, ConflictDescription } from '@shared/types'
 export type { ConflictKind, ConflictDescription }
@@ -129,46 +127,9 @@ export async function saveConflictResolution(
     throw new GitError('INVALID_ARGUMENT', 'Invalid path')
   }
 
-  const abs = resolveRepoPath(repoPath, path)
-  const dir = dirname(abs)
-  // The nearest existing ancestor must resolve inside the repository before anything is created.
-  await assertDirInsideRepo(repoPath, dir)
-  await mkdir(dir, { recursive: true })
-  const realDir = await assertDirInsideRepo(repoPath, dir)
-  if (realDir === null) throw new GitError('INTERNAL', 'Could not create the directory for the file')
-  const file = join(realDir, basename(abs))
-
-  let mode: number
-  try {
-    const st = await lstat(file)
-    if (st.isSymbolicLink()) {
-      throw new GitError('INVALID_ARGUMENT', `Cannot write a resolution over a symbolic link: ${path}`)
-    }
-    if (!st.isFile()) throw new GitError('INVALID_ARGUMENT', `Not a regular file: ${path}`)
-    mode = st.mode & 0o777
-  } catch (e) {
-    if (e instanceof GitError) throw e
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
-    // Missing in the worktree: take the executable bit from the index stages.
-    const exec = entries.some((x) => x.mode === '100755')
-    mode = exec ? 0o755 : 0o644
-  }
-
-  const tmp = join(realDir, `.${basename(abs)}.gitbob-${randomBytes(6).toString('hex')}.tmp`)
-  try {
-    const handle = await open(tmp, 'wx', mode)
-    try {
-      await handle.writeFile(content, 'utf8')
-      await handle.chmod(mode) // creation mode is subject to the umask
-      await handle.sync()
-    } finally {
-      await handle.close()
-    }
-    await rename(tmp, file)
-  } catch (e) {
-    await rm(tmp, { force: true }).catch(() => undefined)
-    throw e
-  }
+  // Missing in the worktree: take the executable bit from the index stages.
+  const exec = entries.some((x) => x.mode === '100755')
+  await writeRepoFile(repoPath, path, content, exec ? 0o755 : 0o644)
 
   if (opts.markResolved) {
     await runGit(['add', '--', path], { cwd: repoPath, env: LITERAL_PATHSPECS_ENV, timeoutMs: INDEX_TIMEOUT })

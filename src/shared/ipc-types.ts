@@ -53,6 +53,10 @@ export interface IpcOutputs {
   'file:history': FileHistoryPage
   /** commit.template contents without comment lines, or null. */
   'commit:template': string | null
+  /** A working-tree text file for editing and a hash of the content read. */
+  'file:read': { text: string; hash: string }
+  /** Saved only if the file still had baseHash; returns the new hash. */
+  'file:write': { hash: string }
   'branch:merge': { fastForward: boolean; upToDate: boolean }
   /** done: false if the user declined the confirmation. */
   'branch:rebase': { done: boolean }

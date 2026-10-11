@@ -73,6 +73,8 @@ export const ipcInputSchemas = {
   'repo:refs': z.object({ repoPath: absolutePath }),
   'repo:health': z.object({ repoPath: absolutePath }),
   'commit:template': z.object({ repoPath: absolutePath }),
+  'file:read': z.object({ repoPath: absolutePath, path: z.string().min(1).max(4096) }),
+  'file:write': z.object({ repoPath: absolutePath, path: z.string().min(1).max(4096), content: z.string().max(6 * 1024 * 1024), baseHash: z.string().regex(/^[0-9a-f]{64}$/) }),
   'branch:merge': z.object({ repoPath: absolutePath, ref: z.string().min(6).max(1024), mode: z.enum(['ff', 'no-ff', 'ff-only']).default('ff') }),
   'branch:rebase': z.object({ repoPath: absolutePath, onto: z.string().min(6).max(1024) }),
   'file:history': z.object({ repoPath: absolutePath, path: z.string().min(1).max(4096), skip: z.number().int().min(0).max(10_000_000).default(0) }),
