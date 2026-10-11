@@ -305,7 +305,8 @@ test('stash one file, view an untracked stashed file, apply a single file, and t
     await page.getByRole('button', { name: 'Create branch' }).click()
     // b.txt is modified locally, but stash branch only touches a.txt.
     await expect(page.getByTestId('head-label')).toHaveText('rescue-a')
-    expect(read(repo, 'a.txt')).toBe('edited a\n')
+    // git stash branch checks out first and applies after, so the label can update before the file.
+    await expect.poll(() => read(repo, 'a.txt')).toBe('edited a\n')
     await expect(page.getByTestId('stash-item')).toHaveCount(1)
   } finally {
     await app.close()
