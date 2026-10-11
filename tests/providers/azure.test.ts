@@ -282,7 +282,7 @@ describe('AzureDevOpsAdapter review & merge', () => {
       },
     }))
     expect(await az.listComments(REPO, 7)).toEqual([
-      { id: '2:1', author: 'Dee', body: 'inline', createdAt: '2024-06-01T00:00:00Z', path: '/src/app.ts', line: 42 },
+      { id: '2:1', author: 'Dee', body: 'inline', createdAt: '2024-06-01T00:00:00Z', path: 'src/app.ts', line: 42 },
       { id: '1:1', author: 'a@contoso.com', body: 'general', createdAt: '2024-06-02T00:00:00Z' },
       { id: '1:2', author: 'b@contoso.com', body: 'reply', createdAt: '2024-06-03T00:00:00Z' },
     ])

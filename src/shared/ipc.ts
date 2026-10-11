@@ -247,6 +247,16 @@ export const ipcInputSchemas = {
   'provider:pr': z.object({ repoPath: absolutePath, number: prNumber }),
   'provider:pr-comments': z.object({ repoPath: absolutePath, number: prNumber }),
   'provider:pr-comment': z.object({ repoPath: absolutePath, number: prNumber, body: z.string().trim().min(1).max(65_536) }),
+  'provider:pr-line-comment': z.object({
+    repoPath: absolutePath,
+    number: prNumber,
+    path: z.string().min(1).max(4096),
+    oldPath: z.string().min(1).max(4096).optional(),
+    line: z.number().int().min(1).max(10_000_000),
+    side: z.enum(['old', 'new']),
+    body: z.string().trim().min(1).max(65_536),
+    headSha: shaSchema,
+  }),
   'provider:pr-review': z.object({
     repoPath: absolutePath,
     number: prNumber,

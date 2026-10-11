@@ -540,8 +540,22 @@ export interface PullRequestComment {
   createdAt: string
   /** File path for inline (diff) comments. */
   path?: string
-  /** Line in the new version of the file for inline comments. */
+  /** Line of an inline comment, in the new version (side 'new', default) or the old one. */
   line?: number
+  side?: 'old' | 'new'
+}
+
+/** Where to place an inline review comment: a line of the pull request's diff. */
+export interface LineCommentInput {
+  path: string
+  /** Old path of a renamed file (GitLab needs both). */
+  oldPath?: string
+  line: number
+  /** 'new': an added or unchanged line (numbered in the new file); 'old': a removed line. */
+  side: 'old' | 'new'
+  body: string
+  /** Head commit the comment refers to; must be the pull request's current head. */
+  headSha: string
 }
 
 export type ReviewEvent = 'approve' | 'comment' | 'request-changes'

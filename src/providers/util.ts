@@ -9,6 +9,7 @@ import {
   type RepoRef,
   type ReviewEvent,
   type ReviewerState,
+  type LineCommentInput,
 } from './types'
 
 // ---------------------------------------------------------------------------
@@ -263,6 +264,18 @@ export function summarizeChecks(items: CheckItem[]): CheckStatus {
   const pick = failed[0] ?? pending[0] ?? items[0]
   const url = [pick, ...items].map((i) => safeWebUrl(i?.url)).find(Boolean)
   return { state, total, failed: failed.length, pending: pending.length, ...(url ? { url } : {}) }
+}
+
+/** Validate an inline comment target (path inside the repository, positive line, sha). */
+export function validateLineComment(input: LineCommentInput, maxBody = MAX_BODY): LineCommentInput {
+  const okPath = (p: unknown): p is string =>
+    typeof p === 'string' && p.length > 0 && p.length <= 4096 && !p.startsWith('/') && !p.includes('\0') && !p.split('/').includes('..')
+  if (!okPath(input?.path) || (input.oldPath !== undefined && !okPath(input.oldPath))) {
+    throw new ProviderError('INVALID_ARGUMENT', 'Invalid file path.')
+  }
+  if (!Number.isInteger(input.line) || input.line < 1 || input.line > 10_000_000) throw new ProviderError('INVALID_ARGUMENT', 'Invalid line number.')
+  if (input.side !== 'old' && input.side !== 'new') throw new ProviderError('INVALID_ARGUMENT', 'Invalid diff side.')
+  return { ...input, headSha: assertSha(input.headSha), body: validateText(input.body, { max: maxBody }) }
 }
 
 /** An https(:) clone URL with any user info removed; null if it isn't one. */

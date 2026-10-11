@@ -1,5 +1,6 @@
-import type { DiffLine, DiffTarget, FileDiff, HunkSelection } from '@shared/types'
+import type { DiffLine, DiffTarget, FileDiff, HunkSelection, PullRequestComment } from '@shared/types'
 import { Fragment, lazy, Suspense, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { call } from '../lib/api'
 import { useFileContents, useFileDiff, useRepoMutation } from '../lib/queries'
 import { useUiStore } from '../state/ui'
@@ -140,8 +141,48 @@ function UnifiedDiff({ repoPath, target, diff }: { repoPath: string; target: Dif
   )
 }
 
+type Side = 'old' | 'new'
+const lineKey = (side: Side, line: number): string => `${side}:${line}`
+/** Where a diff line can carry a review comment: removed lines on the old side, others on the new side. */
+const lineAnchor = (l: DiffLine): { side: Side; line: number } | null =>
+  l.type === 'del' && l.oldLine != null ? { side: 'old', line: l.oldLine } : l.type !== 'no-newline' && l.newLine != null ? { side: 'new', line: l.newLine } : null
+
+/** Inline review comments of the open pull request for a range (pull request) diff. */
+function usePrReview(repoPath: string, target: DiffTarget) {
+  const prNumber = useAppStore((s) => s.prNumber)
+  const enabled = target.kind === 'range' && prNumber != null
+  const qc = useQueryClient()
+  const comments = useQuery({
+    queryKey: ['pr-comments', repoPath, prNumber],
+    queryFn: () => call('provider:pr-comments', { repoPath, number: prNumber! }),
+    enabled,
+  })
+  const add = useMutation({
+    mutationFn: (v: { side: Side; line: number; body: string }) =>
+      call('provider:pr-line-comment', {
+        repoPath,
+        number: prNumber!,
+        path: target.path,
+        ...(target.kind === 'range' && target.oldPath ? { oldPath: target.oldPath } : {}),
+        ...v,
+        headSha: target.kind === 'range' ? target.head : '',
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['pr-comments', repoPath, prNumber] }),
+  })
+  if (!enabled) return null
+  const byLine = new Map<string, PullRequestComment[]>()
+  for (const c of comments.data ?? []) {
+    if (c.line == null || (c.path !== target.path && !(c.side === 'old' && target.kind === 'range' && c.path === target.oldPath))) continue
+    const k = lineKey(c.side ?? 'new', c.line)
+    byLine.set(k, [...(byLine.get(k) ?? []), c])
+  }
+  return { byLine, add }
+}
+
 function HunkTable({ repoPath, target, data }: { repoPath: string; target: DiffTarget; data: FileDiff }) {
   const [selected, setSelected] = useState<Map<number, Set<number>>>(new Map())
+  const [drafting, setDrafting] = useState<string | null>(null)
+  const review = usePrReview(repoPath, target)
   const showError = useUiStore((s) => s.showError)
   const apply = useRepoMutation(
     repoPath,
@@ -216,10 +257,13 @@ function HunkTable({ repoPath, target, data }: { repoPath: string; target: DiffT
               {h.lines.map((l, i) => {
                 const selectable = editable && (l.type === 'add' || l.type === 'del')
                 const isSel = sel?.has(i) ?? false
+                const anchor = review ? lineAnchor(l) : null
+                const key = anchor ? lineKey(anchor.side, anchor.line) : null
+                const thread = key ? (review?.byLine.get(key) ?? []) : []
                 return (
+                  <Fragment key={i}>
                   <tr
-                    key={i}
-                    className={`${lineCls[l.type]} ${isSel ? 'outline outline-1 -outline-offset-1 outline-accent' : ''} ${
+                    className={`group ${lineCls[l.type]} ${isSel ? 'outline outline-1 -outline-offset-1 outline-accent' : ''} ${
                       selectable ? 'cursor-pointer' : ''
                     }`}
                     data-line-type={l.type}
@@ -231,11 +275,54 @@ function HunkTable({ repoPath, target, data }: { repoPath: string; target: DiffT
                       {isSel ? '✓' : (l.oldLine ?? '')}
                     </td>
                     <td className="w-12 border-r border-border px-2 text-right text-muted select-none">{l.newLine ?? ''}</td>
-                    <td className="px-2 whitespace-pre">
+                    <td className="relative px-2 whitespace-pre">
+                      {anchor && (
+                        <button
+                          type="button"
+                          aria-label={`Comment on line ${anchor.line}`}
+                          data-testid="add-line-comment"
+                          onClick={() => setDrafting(key)}
+                          className="absolute top-0 -left-2.5 z-10 h-4 w-4 rounded bg-accent text-[11px] leading-4 font-bold text-on-accent opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        >
+                          +
+                        </button>
+                      )}
                       <span className="select-none text-muted">{prefix[l.type]}</span>
                       {l.content}
                     </td>
                   </tr>
+                  {(thread.length > 0 || drafting === key) && anchor && review && (
+                    <tr data-testid="line-comments" data-line={key}>
+                      <td colSpan={3} className="border-y border-border bg-panel px-3 py-2 font-sans">
+                        {thread.map((c) => (
+                          <div key={c.id} className="mb-2 max-w-3xl" data-testid="line-comment">
+                            <div className="text-xs text-muted">
+                              <strong className="text-fg">{c.author}</strong> · {new Date(c.createdAt).toLocaleString()}
+                            </div>
+                            <div className="whitespace-pre-wrap">{c.body}</div>
+                          </div>
+                        ))}
+                        {drafting === key ? (
+                          <LineCommentForm
+                            line={anchor.line}
+                            busy={review.add.isPending}
+                            onCancel={() => setDrafting(null)}
+                            onSubmit={(body) =>
+                              review.add.mutate(
+                                { ...anchor, body },
+                                { onError: (e) => showError(e), onSuccess: () => setDrafting(null) },
+                              )
+                            }
+                          />
+                        ) : (
+                          <button className="text-xs text-accent hover:underline" onClick={() => setDrafting(key)}>
+                            Add a comment
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 )
               })}
             </Fragment>
@@ -243,6 +330,41 @@ function HunkTable({ repoPath, target, data }: { repoPath: string; target: DiffT
         })}
       </tbody>
     </table>
+  )
+}
+
+function LineCommentForm({ line, busy, onSubmit, onCancel }: { line: number; busy: boolean; onSubmit: (body: string) => void; onCancel: () => void }) {
+  const [body, setBody] = useState('')
+  return (
+    <form
+      className="max-w-3xl"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (body.trim()) onSubmit(body.trim())
+      }}
+    >
+      <textarea
+        autoFocus
+        rows={3}
+        value={body}
+        aria-label={`Your comment on line ${line}`}
+        placeholder="Leave a comment on this line"
+        onChange={(e) => setBody(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onCancel()
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && body.trim()) onSubmit(body.trim())
+        }}
+        className="w-full resize-y rounded border border-border bg-bg px-2 py-1 text-sm outline-none focus:border-accent"
+      />
+      <div className="mt-1 flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="rounded border border-border px-2 py-0.5 text-sm hover:bg-panel-2">
+          Cancel
+        </button>
+        <button type="submit" disabled={busy || !body.trim()} className="rounded bg-accent px-2 py-0.5 text-sm font-medium text-on-accent disabled:opacity-40">
+          Comment
+        </button>
+      </div>
+    </form>
   )
 }
 

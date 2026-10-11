@@ -18,6 +18,7 @@ interface Recorded {
 async function fakeGitHub(pr: { head: string; base: string }) {
   const requests: Recorded[] = []
   let polls = 0
+  const inline: Record<string, unknown>[] = []
   const readBody = (req: IncomingMessage) =>
     new Promise<string>((r) => {
       let b = ''
@@ -56,7 +57,14 @@ async function fakeGitHub(pr: { head: string; base: string }) {
     if (p === '/repos/acme/widgets/pulls/12/reviews' && req.method === 'POST') return json(200, { id: 2 })
     if (p === '/repos/acme/widgets/issues/12/comments' && req.method === 'GET') return json(200, [{ id: 7, user: { login: 'maya' }, body: 'Looks great!', created_at: '2026-10-02T09:00:00Z' }])
     if (p === '/repos/acme/widgets/issues/12/comments' && req.method === 'POST') return json(201, { id: 8, user: { login: 'octo' }, body: (body as { body: string }).body, created_at: '2026-10-03T09:00:00Z' })
-    if (p === '/repos/acme/widgets/pulls/12/comments') return json(200, [])
+    if (p === '/repos/acme/widgets/pulls/12/comments' && req.method === 'GET')
+      return json(200, [{ id: 31, user: { login: 'maya' }, body: 'Why uppercase?', created_at: '2026-10-02T09:30:00Z', path: 'a.txt', line: 2, side: 'RIGHT' }, ...inline])
+    if (p === '/repos/acme/widgets/pulls/12/comments' && req.method === 'POST') {
+      const b = body as { body: string; path: string; line: number; side: string }
+      const created = { id: 32 + inline.length, user: { login: 'octo' }, body: b.body, created_at: '2026-10-03T09:00:00Z', path: b.path, line: b.line, side: b.side }
+      inline.push(created)
+      return json(201, created)
+    }
     if (p === '/repos/acme/widgets/pulls/12/merge') return json(200, { merged: true, sha: 'b'.repeat(40), message: 'Pull Request successfully merged' })
     if (p.includes('/commits/')) return json(200, p.endsWith('/status') ? { state: 'success', statuses: [{ state: 'success', context: 'ci', target_url: 'https://ci.example/1' }] } : { total_count: 0, check_runs: [] })
     json(404, { message: 'Not Found' })
@@ -127,6 +135,18 @@ test('sign in with GitHub, review a pull request, see its files and merge it', a
     await expect(view.getByTestId('pr-file')).toHaveCount(2)
     await view.getByTestId('pr-file').filter({ hasText: 'a.txt' }).click()
     await expect(page.getByTestId('diff-table')).toContainText('TWO')
+    // Existing review comment under its line; add one on the removed line.
+    await expect(page.locator('[data-testid="line-comments"][data-line="new:2"]')).toContainText('Why uppercase?')
+    const removed = page.locator('[data-line-type="del"]').first()
+    await removed.hover()
+    await removed.getByRole('button', { name: 'Comment on line 2' }).click()
+    await page.getByLabel('Your comment on line 2').fill('Old value was fine')
+    await page.locator('[data-testid="line-comments"][data-line="old:2"]').getByRole('button', { name: 'Comment', exact: true }).click()
+    await expect(page.locator('[data-testid="line-comments"][data-line="old:2"] [data-testid="line-comment"]')).toContainText('Old value was fine')
+    await expect(page.getByLabel('Your comment on line 2')).toHaveCount(0)
+    expect(api.requests.find((r) => r.method === 'POST' && r.path.endsWith('/pulls/12/comments'))?.body).toEqual({
+      body: 'Old value was fine', commit_id: head, path: 'a.txt', line: 2, side: 'LEFT',
+    })
     await page.getByTestId('diff-view').getByRole('button', { name: 'Close' }).click()
     await expect(page.getByTestId('pr-view')).toBeVisible()
     expect(work.git(['rev-parse', 'refs/gitbob/pr/12'])).toBe(head)

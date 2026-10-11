@@ -18,6 +18,7 @@ import {
   type ReviewEvent,
   type ReviewerState,
   type HostedRepository,
+  type LineCommentInput,
 } from './types'
 import {
   MERGE_METHODS,
@@ -50,6 +51,7 @@ import {
   repoLimit,
   safeCloneUrl,
   safeSshUrl,
+  validateLineComment,
 } from './util'
 
 const LABEL = 'GitHub'
@@ -210,6 +212,17 @@ export class GitHubAdapter implements ProviderAdapter {
     const text = validateText(body)
     const { data } = await this.req(`${base}/issues/${n}/comments`, { method: 'POST', body: { body: text } })
     return mapComment(expectObject(data, LABEL), 'issue')!
+  }
+
+  async addLineComment(repo: RepoRef, number: number, input: LineCommentInput): Promise<PullRequestComment> {
+    const base = this.repoPath(repo)
+    const n = assertNumber(number)
+    const v = validateLineComment(input)
+    const { data } = await this.req(`${base}/pulls/${n}/comments`, {
+      method: 'POST',
+      body: { body: v.body, commit_id: v.headSha, path: v.path, line: v.line, side: v.side === 'old' ? 'LEFT' : 'RIGHT' },
+    })
+    return mapComment(expectObject(data, LABEL), 'review-comment')!
   }
 
   async submitReview(repo: RepoRef, number: number, event: ReviewEvent, body: string): Promise<void> {
@@ -395,6 +408,7 @@ function mapComment(raw: unknown, kind: 'issue' | 'review-comment'): PullRequest
     const line = typeof c.line === 'number' ? c.line : typeof c.original_line === 'number' ? c.original_line : undefined
     if (path) out.path = path
     if (line !== undefined) out.line = line
+    if (c.side === 'LEFT') out.side = 'old'
   }
   return out
 }

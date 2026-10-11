@@ -18,6 +18,7 @@ import {
   type ReviewEvent,
   type ReviewerState,
   type HostedRepository,
+  type LineCommentInput,
 } from './types'
 import {
   MERGE_METHODS,
@@ -48,6 +49,7 @@ import {
   repoLimit,
   safeCloneUrl,
   safeSshUrl,
+  validateLineComment,
 } from './util'
 
 const LABEL = 'Azure DevOps'
@@ -225,6 +227,24 @@ export class AzureDevOpsAdapter implements ProviderAdapter {
     return c
   }
 
+  async addLineComment(repo: RepoRef, number: number, input: LineCommentInput): Promise<PullRequestComment> {
+    const base = this.repoPath(repo)
+    const id = assertNumber(number)
+    const v = validateLineComment(input, AZURE_MAX_COMMENT)
+    const pos = { line: v.line, offset: 1 }
+    const threadContext =
+      v.side === 'old'
+        ? { filePath: `/${v.path}`, leftFileStart: pos, leftFileEnd: pos }
+        : { filePath: `/${v.path}`, rightFileStart: pos, rightFileEnd: pos }
+    const { data } = await this.req(`${base}/pullRequests/${id}/threads?${API_VERSION}`, {
+      method: 'POST',
+      body: { comments: [{ parentCommentId: 0, content: v.body, commentType: 1 }], status: 1, threadContext },
+    })
+    const c = mapThread(data)[0]
+    if (!c) throw new ProviderError('BAD_RESPONSE', `${LABEL} returned an unexpected response.`)
+    return c
+  }
+
   /** Id of the identity behind the PAT in this organization (GET /{org}/_apis/connectionData). */
   private async currentUserId(repo: RepoRef): Promise<string> {
     const org = repo.owner
@@ -382,7 +402,8 @@ function mapThread(raw: unknown): PullRequestComment[] {
   const t = obj(raw)
   if (t.isDeleted === true) return []
   const ctx = obj(t.threadContext)
-  const path = optStr(ctx.filePath)
+  // Azure paths are repository-absolute ("/src/a.ts").
+  const path = optStr(ctx.filePath)?.replace(/^\//, '') || null
   const right = obj(ctx.rightFileStart)
   const left = obj(ctx.leftFileStart)
   const line = typeof right.line === 'number' ? right.line : typeof left.line === 'number' ? left.line : undefined
@@ -399,6 +420,7 @@ function mapThread(raw: unknown): PullRequestComment[] {
     }
     if (path) comment.path = path
     if (path && line !== undefined) comment.line = line
+    if (path && typeof right.line !== 'number' && typeof left.line === 'number') comment.side = 'old'
     out.push(comment)
   }
   return out

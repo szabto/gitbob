@@ -1,6 +1,7 @@
 import type {
   CheckStatus,
   HostedRepository,
+  LineCommentInput,
   MergeMethod,
   MergeableState,
   ProviderKind,
@@ -16,6 +17,7 @@ import type {
 export type {
   CheckStatus,
   HostedRepository,
+  LineCommentInput,
   MergeMethod,
   MergeableState,
   ProviderKind,
@@ -97,6 +99,8 @@ export interface ProviderAdapter {
   /** General and inline comments, oldest first (at most 3 pages per comment source). */
   listComments(repo: RepoRef, number: number): Promise<PullRequestComment[]>
   addComment(repo: RepoRef, number: number, body: string): Promise<PullRequestComment>
+  /** Comment on one line of the pull request's diff. */
+  addLineComment(repo: RepoRef, number: number, input: LineCommentInput): Promise<PullRequestComment>
   /** `body` is required for 'comment' and 'request-changes', optional for 'approve'. */
   submitReview(repo: RepoRef, number: number, event: ReviewEvent, body: string): Promise<void>
   mergePullRequest(repo: RepoRef, number: number, opts: MergePullRequestOptions): Promise<MergePullRequestResult>

@@ -18,6 +18,7 @@ import {
   type ReviewEvent,
   type ReviewerState,
   type HostedRepository,
+  type LineCommentInput,
 } from './types'
 import {
   MERGE_METHODS,
@@ -48,6 +49,7 @@ import {
   repoLimit,
   safeCloneUrl,
   safeSshUrl,
+  validateLineComment,
 } from './util'
 
 const LABEL = 'Bitbucket'
@@ -212,6 +214,17 @@ export class BitbucketAdapter implements ProviderAdapter {
     const id = assertNumber(number)
     const text = validateText(body)
     const { data } = await this.req(`${base}/pullrequests/${id}/comments`, { method: 'POST', body: { content: { raw: text } } })
+    const c = mapComment(data)
+    if (!c) throw new ProviderError('BAD_RESPONSE', `${LABEL} returned an unexpected response.`)
+    return c
+  }
+
+  async addLineComment(repo: RepoRef, number: number, input: LineCommentInput): Promise<PullRequestComment> {
+    const base = this.repoPath(repo)
+    const id = assertNumber(number)
+    const v = validateLineComment(input)
+    const inline = v.side === 'old' ? { path: v.path, from: v.line } : { path: v.path, to: v.line }
+    const { data } = await this.req(`${base}/pullrequests/${id}/comments`, { method: 'POST', body: { content: { raw: v.body }, inline } })
     const c = mapComment(data)
     if (!c) throw new ProviderError('BAD_RESPONSE', `${LABEL} returned an unexpected response.`)
     return c
@@ -401,6 +414,7 @@ function mapComment(raw: unknown): PullRequestComment | null {
   const line = typeof inline.to === 'number' ? inline.to : typeof inline.from === 'number' ? inline.from : undefined
   if (path) out.path = path
   if (line !== undefined) out.line = line
+  if (typeof inline.to !== 'number' && typeof inline.from === 'number') out.side = 'old'
   return out
 }
 

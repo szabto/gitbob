@@ -18,6 +18,7 @@ import {
   type ReviewEvent,
   type ReviewerState,
   type HostedRepository,
+  type LineCommentInput,
 } from './types'
 import {
   MERGE_METHODS,
@@ -49,6 +50,7 @@ import {
   repoLimit,
   safeCloneUrl,
   safeSshUrl,
+  validateLineComment,
 } from './util'
 
 const LABEL = 'GitLab'
@@ -205,6 +207,34 @@ export class GitLabAdapter implements ProviderAdapter {
     const text = validateText(body, { max: 1_000_000 })
     const { data } = await this.req(`${base}/merge_requests/${iid}/notes`, { method: 'POST', body: { body: text } })
     const c = mapNote(data)
+    if (!c) throw new ProviderError('BAD_RESPONSE', `${LABEL} returned an unexpected response.`)
+    return c
+  }
+
+  /** A diff discussion positioned with the merge request's current diff_refs. */
+  async addLineComment(repo: RepoRef, number: number, input: LineCommentInput): Promise<PullRequestComment> {
+    const base = this.projectPath(repo)
+    const iid = assertNumber(number)
+    const v = validateLineComment(input, 1_000_000)
+    const mr = expectObject((await this.req(`${base}/merge_requests/${iid}`)).data, LABEL)
+    const refs = obj(mr.diff_refs)
+    const head = str(refs.head_sha)
+    if (!head || !str(refs.base_sha) || !str(refs.start_sha)) throw new ProviderError('BAD_RESPONSE', `${LABEL} returned an unexpected response.`)
+    if (head.toLowerCase() !== v.headSha.toLowerCase()) {
+      throw new ProviderError('CONFLICT', 'The merge request has new commits. Reload it before commenting on lines.')
+    }
+    const position = {
+      position_type: 'text',
+      base_sha: str(refs.base_sha),
+      start_sha: str(refs.start_sha),
+      head_sha: head,
+      old_path: v.oldPath ?? v.path,
+      new_path: v.path,
+      ...(v.side === 'old' ? { old_line: v.line } : { new_line: v.line }),
+    }
+    const { data } = await this.req(`${base}/merge_requests/${iid}/discussions`, { method: 'POST', body: { body: v.body, position } })
+    const note = Array.isArray(obj(data).notes) ? (obj(data).notes as unknown[])[0] : undefined
+    const c = mapNote(note)
     if (!c) throw new ProviderError('BAD_RESPONSE', `${LABEL} returned an unexpected response.`)
     return c
   }
@@ -385,6 +415,7 @@ function mapNote(raw: unknown): PullRequestComment | null {
   const line = typeof pos.new_line === 'number' ? pos.new_line : typeof pos.old_line === 'number' ? pos.old_line : undefined
   if (path) out.path = path
   if (line !== undefined) out.line = line
+  if (typeof pos.new_line !== 'number' && typeof pos.old_line === 'number') out.side = 'old'
   return out
 }
 

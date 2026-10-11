@@ -139,6 +139,7 @@ export interface IpcOutputs {
   'provider:pr': PullRequestDetail
   'provider:pr-comments': PullRequestComment[]
   'provider:pr-comment': PullRequestComment
+  'provider:pr-line-comment': PullRequestComment
   'provider:pr-review': void
   /** done: false if the user declined the confirmation. */
   'provider:pr-merge': { done: boolean; merged: boolean; message: string }

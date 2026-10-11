@@ -2,6 +2,7 @@ import type {
   CheckStatus,
   FileChange,
   HostedRepository,
+  LineCommentInput,
   ProviderAccount,
   MergeMethod,
   ProviderKind,
@@ -183,6 +184,11 @@ export class ProviderService {
   async addComment(repoPath: string, number: number, body: string): Promise<PullRequestComment> {
     const { ref, adapter } = await this.connected(repoPath)
     return mapErrors(() => adapter.addComment(ref, number, body))
+  }
+
+  async addLineComment(repoPath: string, number: number, input: LineCommentInput): Promise<PullRequestComment> {
+    const { ref, adapter } = await this.connected(repoPath)
+    return mapErrors(() => adapter.addLineComment(ref, number, input))
   }
 
   async review(repoPath: string, number: number, event: ReviewEvent, body: string): Promise<void> {

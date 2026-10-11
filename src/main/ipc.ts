@@ -44,6 +44,7 @@ import { getSignature } from '@git-core/signatures'
 import type { RecentRepositoryStore } from './recent'
 import type { UndoJournal } from './undo'
 import { getOperation } from '@git-core/status'
+import { resolveRepoPath } from '@git-core/paths'
 import { headSnapshot, readRef, type HeadSnapshot, type UndoStep } from '@git-core/undo'
 import { z } from 'zod'
 
@@ -541,6 +542,13 @@ export function registerIpc(ctx: IpcContext): void {
     'provider:pr': ({ repoPath, number }) => ctx.providers.pullRequest(requireOpened(repoPath), number),
     'provider:pr-comments': ({ repoPath, number }) => ctx.providers.comments(requireOpened(repoPath), number),
     'provider:pr-comment': ({ repoPath, number, body }) => ctx.providers.addComment(requireOpened(repoPath), number, body),
+    'provider:pr-line-comment': ({ repoPath, number, ...input }) => {
+      requireOpened(repoPath)
+      // Paths must name a file inside the repository (also validated by the adapter).
+      resolveRepoPath(repoPath, input.path)
+      if (input.oldPath) resolveRepoPath(repoPath, input.oldPath)
+      return ctx.providers.addLineComment(repoPath, number, input)
+    },
     'provider:pr-review': ({ repoPath, number, event, body }) => ctx.providers.review(requireOpened(repoPath), number, event, body),
     'provider:pr-merge': async ({ repoPath, number, method, expectedHeadSha, deleteSourceBranch }, event) => {
       requireOpened(repoPath)

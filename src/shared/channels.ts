@@ -89,6 +89,7 @@ export const IPC_CHANNELS = [
   'provider:pr',
   'provider:pr-comments',
   'provider:pr-comment',
+  'provider:pr-line-comment',
   'provider:pr-review',
   'provider:pr-merge',
   'provider:pr-changes',

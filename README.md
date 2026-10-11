@@ -179,7 +179,7 @@ If the server needs a username and password (or token), GitBob asks for it in a 
 
 Working with GitHub, GitLab, Bitbucket or Azure DevOps? Open **Pull requests** in the sidebar and click **Connect**. GitBob opens the page where you create a personal access token; paste it, and GitBob stores it encrypted by your operating system. Once an account is connected, **Clone…** lists your repositories from it: start typing to search, pick one, and tick **Use SSH** if you prefer SSH URLs. Then you see the open pull requests of the repository, whether the selected commit's CI checks passed, and you can right-click a pushed branch → **Create pull request…**.
 
-Click a pull request to open it inside GitBob: read the description and comments, see who approved and whether CI passed, and switch to **Files** to read every change (GitBob downloads the pull request's commits, so diffs work offline afterwards). Leave a comment, **Approve** or **Request changes**, and when it's ready pick merge, squash or rebase and press **Merge pull request**. GitBob asks first, and refuses if someone pushed new commits since you looked.
+Click a pull request to open it inside GitBob: read the description and comments, see who approved and whether CI passed, and switch to **Files** to read every change (GitBob downloads the pull request's commits, so diffs work offline afterwards). Hover a line in a file's diff and click **+** to comment on that line; existing review comments appear right under their lines. Leave a general comment, **Approve** or **Request changes**, and when it's ready pick merge, squash or rebase and press **Merge pull request**. GitBob asks first, and refuses if someone pushed new commits since you looked.
 
 On GitHub you can also **Sign in with GitHub** instead of pasting a token: GitBob shows a short code, opens github.com in your browser, and you approve it there.
 
@@ -323,7 +323,7 @@ Every screenshot in this README is the real app working on a real Git repository
     </td>
     <td width="33%" valign="top">
       <h4>🔗 Hosting services</h4>
-      GitHub, GitLab, Bitbucket and Azure DevOps via personal access tokens (stored encrypted by the OS) · Sign in with GitHub (device flow) · clone from a searchable list of your repositories on every connected service · pull requests: list, view, files, comment, approve / request changes, merge / squash / rebase · CI status per commit · create pull requests, also as drafts
+      GitHub, GitLab, Bitbucket and Azure DevOps via personal access tokens (stored encrypted by the OS) · Sign in with GitHub (device flow) · clone from a searchable list of your repositories on every connected service · pull requests: list, view, files, line comments, comment, approve / request changes, merge / squash / rebase · CI status per commit · create pull requests, also as drafts
     </td>
   </tr>
   <tr>
@@ -336,7 +336,7 @@ Every screenshot in this README is the real app working on a real Git repository
 
 ### On the roadmap
 
-Sign-in with OAuth for GitLab, Bitbucket and Azure DevOps, line comments in pull request reviews, and installers signed with developer certificates (which also brings automatic updates to macOS).
+Sign-in with OAuth for GitLab, Bitbucket and Azure DevOps, and installers signed with developer certificates (which also brings automatic updates to macOS).
 
 <br>
 
