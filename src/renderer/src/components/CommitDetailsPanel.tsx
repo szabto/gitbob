@@ -39,7 +39,7 @@ export function CommitDetailsPanel({
   const changes = (status.data?.entries ?? []).filter((e) => e.kind !== 'ignored').length
 
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col border-l border-border bg-panel" data-testid="commit-details">
+    <aside className="flex w-full min-w-0 flex-col border-l border-border bg-panel" data-testid="commit-details">
       <div className="flex h-7 shrink-0 items-center justify-between border-b border-border px-3 text-xs font-semibold text-muted">
         <span>Commit</span>
         <button onClick={() => select(null)} aria-label="Close details" className="hover:text-fg">

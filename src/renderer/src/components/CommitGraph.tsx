@@ -8,7 +8,7 @@ import { GraphCell, LANE_WIDTH, ROW_HEIGHT } from './GraphCell'
 import { RefLabelPill } from './RefLabelPill'
 import { ResizeHandle } from './ResizeHandle'
 import { buildRefLabels, type RefLabel } from '../lib/ref-labels'
-import { clampWidth, useGraphColumns, type GraphColumns } from '../lib/graph-columns'
+import { DEFAULT_COLUMNS, clampGraphWidth, clampWidth, useGraphColumns, type GraphColumns } from '../lib/graph-columns'
 import { initials, nameHue, useAvatarSource, useEmailAvatar, type AvatarSource } from '../lib/avatars'
 import { useCommitCount, useRemotes } from '../lib/queries'
 import { useUiStore } from '../state/ui'
@@ -75,17 +75,26 @@ export function CommitGraph({
       resizeStart.current = cols
     },
     onResize: (dx: number) => setCols((c) => ({ ...c, [key]: clampWidth(resizeStart.current[key] + sign * dx) })),
+    onReset: () => setCols((c) => ({ ...c, [key]: DEFAULT_COLUMNS[key] })),
   })
   const columnMenu = (e: React.MouseEvent): void => {
     const toggle = (k: keyof GraphColumns['show'], label: string) => ({
       label: `${cols.show[k] ? '✓ ' : '\u2003'}${label}`,
       onSelect: () => setCols((c) => ({ ...c, show: { ...c.show, [k]: !c.show[k] } })),
     })
-    openMenu(e.clientX, e.clientY, [toggle('refs', 'Branch / Tag'), toggle('author', 'Author'), toggle('date', 'Date'), toggle('sha', 'SHA'), 'separator', { label: 'Reset columns', onSelect: () => setCols(() => ({ refs: 180, author: 150, date: 110, sha: 80, show: { refs: true, author: true, date: true, sha: true } })) }])
+    openMenu(e.clientX, e.clientY, [toggle('refs', 'Branch / Tag'), toggle('author', 'Author'), toggle('date', 'Date'), toggle('sha', 'SHA'), 'separator', { label: 'Reset columns', onSelect: () => setCols(() => DEFAULT_COLUMNS) }])
   }
   const indexBySha = useMemo(() => new Map(commits.map((c, i) => [c.sha, i])), [commits])
   const graphLanes = Math.min(layout.width, MAX_GRAPH_LANES)
-  const graphColumnWidth = Math.max(graphLanes * LANE_WIDTH + 12, 64)
+  const autoGraphWidth = Math.max(graphLanes * LANE_WIDTH + 12, 64)
+  const graphColumnWidth = cols.graph ?? autoGraphWidth
+  const graphResizer = {
+    onStart: () => {
+      resizeStart.current = cols
+    },
+    onResize: (dx: number) => setCols((c) => ({ ...c, graph: clampGraphWidth((resizeStart.current.graph ?? autoGraphWidth) + dx) })),
+    onReset: () => setCols((c) => ({ ...c, graph: null })),
+  }
 
   const virtualizer = useVirtualizer({
     count: commits.length,
@@ -138,8 +147,9 @@ export function CommitGraph({
             <ResizeHandle edge="right" label="Resize Branch / Tag column" {...resizer('refs', 1)} />
           </div>
         )}
-        <div style={{ width: graphColumnWidth }} className="shrink-0 pl-3">
+        <div style={{ width: graphColumnWidth }} className="relative shrink-0 truncate pl-3" data-testid="graph-column-header">
           Graph
+          <ResizeHandle edge="right" label="Resize Graph column" {...graphResizer} />
         </div>
         <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
           <span className="shrink-0">Message</span>

@@ -87,7 +87,7 @@ export function StagingPanel({
     !!diffTarget && diffTarget.kind === t.kind && diffTarget.path === t.path
 
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col border-l border-border bg-panel" data-testid="staging-panel">
+    <aside className="flex w-full min-w-0 flex-col border-l border-border bg-panel" data-testid="staging-panel">
       <div className="flex h-7 shrink-0 items-center border-b border-border px-3 text-xs font-semibold text-muted">
         Working changes
         {status.data?.branch.head && <span className="ml-1 font-normal">on {status.data.branch.head}</span>}

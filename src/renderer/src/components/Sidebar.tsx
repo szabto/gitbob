@@ -70,7 +70,7 @@ export function Sidebar({
   }, [])
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-panel py-2" data-testid="sidebar">
+    <aside className="flex w-full min-w-0 flex-col overflow-y-auto border-r border-border bg-panel py-2" data-testid="sidebar">
       <div className="mb-1 px-3" style={{ order: -1 }}>
         <div className="mb-1 flex items-center text-xs text-muted" data-testid="viewing">
           <span>

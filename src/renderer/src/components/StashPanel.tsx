@@ -22,7 +22,7 @@ export function StashPanel({
   const showDiff = useAppStore((s) => s.showDiff)
 
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col border-l border-border bg-panel" data-testid="stash-panel">
+    <aside className="flex w-full min-w-0 flex-col border-l border-border bg-panel" data-testid="stash-panel">
       <div className="flex h-7 shrink-0 items-center justify-between border-b border-border px-3 text-xs font-semibold text-muted">
         <span>Stash {stash.ref}</span>
         <button onClick={() => selectStash(null)} aria-label="Close stash" className="hover:text-fg">

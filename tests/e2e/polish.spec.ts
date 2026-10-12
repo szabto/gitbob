@@ -443,3 +443,68 @@ test('long context menus fit in a small window and scroll', async () => {
     await app.close()
   }
 })
+
+test('graph column, sidebar and details pane can be resized and remember their width', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': '1' })
+  const userData = makeTempDir('gitbob-ud-')
+  const drag = async (page: Awaited<ReturnType<typeof launch>>['page'], label: string, dx: number) => {
+    const box = (await page.getByRole('separator', { name: label }).boundingBox())!
+    const x = box.x + box.width / 2
+    const y = box.y + Math.min(box.height / 2, 10)
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x + dx / 2, y)
+    await page.mouse.move(x + dx, y)
+    await page.mouse.up()
+  }
+  const width = async (page: Awaited<ReturnType<typeof launch>>['page'], testId: string) => (await page.getByTestId(testId).boundingBox())!.width
+
+  let { app, page } = await launch(repo.dir, userData)
+  try {
+    await page.getByTestId('commit-row').first().click()
+    await expect(page.getByTestId('commit-details')).toBeVisible()
+    const graph0 = await width(page, 'graph-column-header')
+    const sidebar0 = await width(page, 'sidebar-pane')
+    const details0 = await width(page, 'details-pane')
+    expect(Math.round(sidebar0)).toBe(240)
+    expect(Math.round(details0)).toBe(380)
+
+    await drag(page, 'Resize Graph column', 100)
+    await drag(page, 'Resize sidebar', 60)
+    await drag(page, 'Resize details panel', -80) // the details pane grows leftwards
+    await expect.poll(() => width(page, 'graph-column-header')).toBeCloseTo(graph0 + 100, 0)
+    await expect.poll(() => width(page, 'sidebar-pane')).toBeCloseTo(sidebar0 + 60, 0)
+    await expect.poll(() => width(page, 'details-pane')).toBeCloseTo(details0 + 80, 0)
+
+    // Clamped to the pane's minimum.
+    await drag(page, 'Resize sidebar', -1000)
+    await expect.poll(() => width(page, 'sidebar-pane')).toBeCloseTo(160, 0)
+    await drag(page, 'Resize sidebar', 60)
+  } finally {
+    await app.close()
+  }
+
+  // Widths survive a restart.
+  ;({ app, page } = await launch(repo.dir, userData))
+  try {
+    await page.getByTestId('commit-row').first().click()
+    await expect.poll(() => width(page, 'sidebar-pane')).toBeCloseTo(220, 0)
+    await expect.poll(() => width(page, 'details-pane')).toBeCloseTo(460, 0)
+
+    // The staging panel shares the details pane's width.
+    repo.write('a.txt', '2')
+    await page.getByTestId('wip-row').click()
+    await expect(page.getByTestId('staging-panel')).toBeVisible()
+    await expect.poll(() => width(page, 'details-pane')).toBeCloseTo(460, 0)
+
+    // Double-click resets: panes to their default, the graph column back to fit its lanes.
+    const graphWide = await width(page, 'graph-column-header')
+    await page.getByRole('separator', { name: 'Resize Graph column' }).dblclick()
+    await page.getByRole('separator', { name: 'Resize details panel' }).dblclick()
+    await expect.poll(() => width(page, 'graph-column-header')).toBeCloseTo(graphWide - 100, 0)
+    await expect.poll(() => width(page, 'details-pane')).toBeCloseTo(380, 0)
+  } finally {
+    await app.close()
+  }
+})

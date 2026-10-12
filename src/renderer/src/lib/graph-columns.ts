@@ -5,11 +5,13 @@ export interface GraphColumns {
   author: number
   date: number
   sha: number
+  /** Graph column width; null sizes it to the visible lanes. */
+  graph: number | null
   show: { refs: boolean; author: boolean; date: boolean; sha: boolean }
 }
 
 const KEY = 'gitbob.graphColumns'
-export const DEFAULT_COLUMNS: GraphColumns = { refs: 180, author: 150, date: 110, sha: 80, show: { refs: true, author: true, date: true, sha: true } }
+export const DEFAULT_COLUMNS: GraphColumns = { refs: 180, author: 150, date: 110, sha: 80, graph: null, show: { refs: true, author: true, date: true, sha: true } }
 const clamp = (n: unknown, d: number): number => (typeof n === 'number' && Number.isFinite(n) ? Math.min(600, Math.max(48, Math.round(n))) : d)
 
 function load(): GraphColumns {
@@ -22,6 +24,7 @@ function load(): GraphColumns {
       author: clamp(v.author, DEFAULT_COLUMNS.author),
       date: clamp(v.date, DEFAULT_COLUMNS.date),
       sha: clamp(v.sha, DEFAULT_COLUMNS.sha),
+      graph: typeof v.graph === 'number' ? clampGraphWidth(v.graph) : null,
       show: { refs: show.refs !== false, author: show.author !== false, date: show.date !== false, sha: show.sha !== false },
     }
   } catch {
@@ -48,4 +51,9 @@ export function useGraphColumns(): [GraphColumns, (update: (c: GraphColumns) => 
 
 export function clampWidth(n: number): number {
   return clamp(n, 120)
+}
+
+/** The graph column can go narrower than the others: one lane plus padding. */
+export function clampGraphWidth(n: number): number {
+  return Number.isFinite(n) ? Math.min(800, Math.max(32, Math.round(n))) : 32
 }

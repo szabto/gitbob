@@ -7,6 +7,7 @@ import { call, subscribe } from '../lib/api'
 import { groupStatus } from '../lib/status'
 import { useAppStore } from '../state/store'
 import { Sidebar } from './Sidebar'
+import { ResizablePane } from './ResizeHandle'
 import { CommitGraph } from './CommitGraph'
 import { CommitDetailsPanel } from './CommitDetailsPanel'
 import { Logo } from './Welcome'
@@ -376,17 +377,19 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
         </header>
 
         <div className="flex min-h-0 flex-1">
-          <Sidebar
-            refs={refs.data ?? []}
-            currentRef={head.data?.ref ?? null}
-            remotes={remoteNames}
-            stashes={stashes.data ?? []}
-            actions={actions}
-            repoPath={repo.root}
-            currentBranch={currentBranch}
-            provider={provider.data ?? null}
-            refMenu={refMenu}
-          />
+          <ResizablePane pane="sidebar" label="Resize sidebar" testId="sidebar-pane">
+            <Sidebar
+              refs={refs.data ?? []}
+              currentRef={head.data?.ref ?? null}
+              remotes={remoteNames}
+              stashes={stashes.data ?? []}
+              actions={actions}
+              repoPath={repo.root}
+              currentBranch={currentBranch}
+              provider={provider.data ?? null}
+              refMenu={refMenu}
+            />
+          </ResizablePane>
           <main className="flex min-w-0 flex-1 flex-col">
             {status.data && <OperationBanner status={status.data} actions={actions} />}
             <SpeedUpBanner repoPath={repo.root} historyLoaded={!!history.data} />
@@ -444,12 +447,16 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
             />
           )}
           {rebaseBase && <RebaseDialog repoPath={repo.root} base={rebaseBase} onClose={() => openRebase(null)} />}
-          {wipSelected && !repo.bare ? (
-            <StagingPanel repo={repo} onStash={() => void actions.stash()} onStashFiles={(paths) => void actions.stashFiles(paths)} />
-          ) : stashEntry ? (
-            <StashPanel repoPath={repo.root} stash={stashEntry} actions={actions} />
-          ) : (
-            selectedSha && <CommitDetailsPanel repoPath={repo.root} sha={selectedSha} refsBySha={refsBySha} />
+          {((wipSelected && !repo.bare) || stashEntry || selectedSha) && (
+            <ResizablePane pane="details" label="Resize details panel" testId="details-pane">
+              {wipSelected && !repo.bare ? (
+                <StagingPanel repo={repo} onStash={() => void actions.stash()} onStashFiles={(paths) => void actions.stashFiles(paths)} />
+              ) : stashEntry ? (
+                <StashPanel repoPath={repo.root} stash={stashEntry} actions={actions} />
+              ) : (
+                selectedSha && <CommitDetailsPanel repoPath={repo.root} sha={selectedSha} refsBySha={refsBySha} />
+              )}
+            </ResizablePane>
           )}
         </div>
       </div>
