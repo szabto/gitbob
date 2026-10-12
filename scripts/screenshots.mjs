@@ -70,7 +70,7 @@ const userData = mkdtempSync(join(tmpdir(), 'gitbob-shot-ud-'))
 // Initials instead of avatars: deterministic pictures and no requests to GitHub while shooting.
 writeFileSync(join(userData, 'settings.json'), JSON.stringify({ theme: 'dark', avatars: 'off' }))
 
-async function launch(args) {
+async function launch(args, home = demo.home) {
   const app = await electron.launch({
     args: [appDir, ...args],
     env: {
@@ -80,9 +80,9 @@ async function launch(args) {
       GITBOB_HIDDEN: '1',
       GITBOB_EPHEMERAL_TOKENS: '1',
       GITBOB_TEST_PROVIDER_API_GITHUB: fake.url,
-      HOME: demo.home,
+      HOME: home,
       GIT_CONFIG_NOSYSTEM: '1',
-      GIT_CONFIG_GLOBAL: join(demo.home, '.gitconfig'),
+      GIT_CONFIG_GLOBAL: join(home, '.gitconfig'),
     },
   })
   const page = await app.firstWindow()
@@ -270,7 +270,7 @@ try {
   // Conflict editor on a repository stopped in a merge.
   const conflict = buildConflictRepo()
   try {
-    ;({ app, page } = await launch([conflict.dir]))
+    ;({ app, page } = await launch([conflict.dir], conflict.home))
     await page.getByTestId('wip-row').click()
     await page.locator('[data-testid="conflicted-files"] [data-path="settings.ts"]').click()
     await page.getByTestId('conflict-result').locator('.monaco-editor').waitFor()

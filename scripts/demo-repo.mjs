@@ -18,7 +18,8 @@ export function buildDemoRepo() {
   const home = join(root, 'home')
   mkdirSync(home)
   const origin = join(root, 'origin.git')
-  const dir = join(root, 'aurora')
+  // Inside the fake HOME so the toolbar shows ~/Projects/aurora rather than a temp path.
+  const dir = join(home, 'Projects', 'aurora')
   let clock = Date.UTC(2026, 7, 3, 9, 0) / 1000
   let who = PEOPLE[0]
 
@@ -57,7 +58,7 @@ export function buildDemoRepo() {
   }
 
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin], { env: env() })
-  mkdirSync(dir)
+  mkdirSync(dir, { recursive: true })
   git('init', '-q', '-b', 'main')
   git('remote', 'add', 'origin', origin)
 
@@ -135,8 +136,9 @@ export function buildConflictRepo() {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'gitbob-conflict-')))
   const home = join(root, 'home')
   mkdirSync(home)
-  const dir = join(root, 'aurora')
-  mkdirSync(dir)
+  // Inside the fake HOME so the toolbar shows ~/Projects/aurora rather than a temp path.
+  const dir = join(home, 'Projects', 'aurora')
+  mkdirSync(dir, { recursive: true })
   let clock = Date.UTC(2026, 8, 1, 9, 0) / 1000
   let who = PEOPLE[0]
   const env = () => ({
