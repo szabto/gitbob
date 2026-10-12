@@ -52,6 +52,7 @@ import { openTerminal } from './terminal'
 import { writeCommitGraph } from '@git-core/maintenance'
 import { getFileHistory } from '@git-core/file-history'
 import { getWorktreeCompareFiles, saveCommitPatch } from '@git-core/compare'
+import { combineCommits } from '@git-core/combine'
 import { readFileForEdit, saveEditedFile } from '@git-core/worktree-file'
 import { getOperation } from '@git-core/status'
 import { resolveRepoPath } from '@git-core/paths'
@@ -293,6 +294,7 @@ export function registerIpc(ctx: IpcContext): void {
       return fastForwardBranch(repoPath, branch, local.upstream)
     },
     'compare:files': ({ repoPath, sha }) => getWorktreeCompareFiles(requireOpened(repoPath), sha),
+    'commits:combine': ({ repoPath, shas, wholeRange }) => combineCommits(requireOpened(repoPath), shas, { wholeRange: !!wholeRange }),
     'commit:save-patch': async ({ repoPath, sha }, event) => {
       requireOpened(repoPath)
       const subject = (await getCommitDetails(repoPath, sha)).subject

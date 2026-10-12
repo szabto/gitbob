@@ -54,6 +54,10 @@ export function CommitGraph({
   const selectedSha = useAppStore((s) => s.selectedSha)
   const revealSha = useAppStore((s) => s.revealSha)
   const select = useAppStore((s) => s.select)
+  const selectedShas = useAppStore((s) => s.selectedShas)
+  const toggleSelect = useAppStore((s) => s.toggleSelect)
+  const selectMany = useAppStore((s) => s.selectMany)
+  const multi = useMemo(() => (selectedShas.length ? new Set(selectedShas) : null), [selectedShas])
   const selectWip = useAppStore((s) => s.selectWip)
   const wipSelected = useAppStore((s) => s.wipSelected)
   const hasWip = !!wip && wip.unstaged + wip.staged > 0
@@ -85,6 +89,16 @@ export function CommitGraph({
     openMenu(e.clientX, e.clientY, [toggle('refs', 'Branch / Tag'), toggle('author', 'Author'), toggle('date', 'Date'), toggle('sha', 'SHA'), 'separator', { label: 'Reset columns', onSelect: () => setCols(() => DEFAULT_COLUMNS) }])
   }
   const indexBySha = useMemo(() => new Map(commits.map((c, i) => [c.sha, i])), [commits])
+  // ⌘/Ctrl-click adds or removes a commit; Shift-click selects everything from the anchor to here.
+  const onRowClick = (e: React.MouseEvent, sha: string): void => {
+    if (e.metaKey || e.ctrlKey) return toggleSelect(sha)
+    const anchor = selectedSha !== null ? indexBySha.get(selectedSha) : undefined
+    const at = indexBySha.get(sha)
+    if (e.shiftKey && anchor !== undefined && at !== undefined) {
+      return selectMany(commits.slice(Math.min(anchor, at), Math.max(anchor, at) + 1).map((c) => c.sha))
+    }
+    select(sha)
+  }
   const graphLanes = Math.min(layout.width, MAX_GRAPH_LANES)
   const autoGraphWidth = Math.max(graphLanes * LANE_WIDTH + 12, 64)
   const graphColumnWidth = cols.graph ?? autoGraphWidth
@@ -243,7 +257,7 @@ export function CommitGraph({
           {items.map((item) => {
             const commit = commits[item.index]!
             const row = layout.rows[item.index]!
-            const selected = commit.sha === selectedSha
+            const selected = multi ? multi.has(commit.sha) : commit.sha === selectedSha
             const dimmed = matches !== null && !matches.has(commit.sha)
             return (
               <div
@@ -255,7 +269,11 @@ export function CommitGraph({
                 draggable
                 onDragStart={(e) => startDrag(e, { kind: 'commit', sha: commit.sha, subject: commit.subject })}
                 onDragEnd={endDrag}
-                onClick={() => select(commit.sha)}
+                onClick={(e) => onRowClick(e, commit.sha)}
+                // Shift-click selects commits, not text.
+                onMouseDown={(e) => {
+                  if (e.shiftKey) e.preventDefault()
+                }}
                 onContextMenu={(e) => {
                   e.preventDefault()
                   select(commit.sha)

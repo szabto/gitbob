@@ -46,6 +46,9 @@ export function DiffView({
   const showDiff = useAppStore((s) => s.showDiff)
   const openBlame = useAppStore((s) => s.openBlame)
   const openFileHistory = useAppStore((s) => s.openFileHistory)
+  // A range diff is either a pull request or several selected commits combined, whose head may be
+  // a helper commit that isn't in the history (so no ids and no blame for it).
+  const combined = useAppStore((s) => target.kind === 'range' && s.prNumber == null)
   const mode = useUiStore((s) => s.diffMode)
   const setMode = useUiStore((s) => s.setDiffMode)
   const contents = useFileContents(repoPath, target, mode === 'split')
@@ -62,9 +65,9 @@ export function DiffView({
     <div className="flex min-h-0 flex-1 flex-col" data-testid="diff-view">
       <div className="flex h-9 shrink-0 items-center gap-3 border-b border-border bg-panel px-3">
         <span className="rounded bg-panel-2 px-1.5 py-0.5 text-xs text-muted">
-          {targetLabel[target.kind]}
+          {combined ? 'Selected commits' : targetLabel[target.kind]}
           {target.kind === 'commit' ? ` ${target.sha.slice(0, 7)}` : ''}
-          {target.kind === 'range' ? ` ${target.base.slice(0, 7)}…${target.head.slice(0, 7)}` : ''}
+          {target.kind === 'range' && !combined ? ` ${target.base.slice(0, 7)}…${target.head.slice(0, 7)}` : ''}
           {target.kind === 'worktree-compare' ? `: ${target.sha.slice(0, 7)}` : ''}
         </span>
         <span className="truncate font-mono text-xs" data-testid="diff-path">
@@ -83,7 +86,7 @@ export function DiffView({
             </button>
           ))}
         </div>
-        {target.kind !== 'untracked' && !diff.data?.isDeleted && (
+        {target.kind !== 'untracked' && !combined && !diff.data?.isDeleted && (
           <button
             className="rounded border border-border px-2 py-0.5 text-xs hover:bg-panel-2"
             title="Show who last changed each line"

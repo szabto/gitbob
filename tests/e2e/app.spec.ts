@@ -430,3 +430,71 @@ test('sidebar: hide a branch from the graph, filter branches, and collapsed sect
     await app.close()
   }
 })
+
+test('select several commits and see all their changes together', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': 'a0\n', 'b.txt': 'b0\n' })
+  repo.commit('change a', { 'a.txt': 'a1\n' })
+  repo.commit('change b', { 'b.txt': 'b1\n' })
+  repo.commit('add c', { 'c.txt': 'c\n' })
+  const { app, page } = await launch({ repo: repo.dir, userData: makeTempDir('gitbob-ud-') })
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
+  const row = (subject: string) => page.getByTestId('commit-row').filter({ hasText: subject })
+  const files = () => page.getByTestId('multi-commit').getByTestId('details-file')
+  try {
+    // Scattered commits: only their own changes, not b.txt from the commit between them.
+    await row('add c').click()
+    await row('change a').click({ modifiers: [mod] })
+    await expect(page.getByTestId('multi-commit-count')).toHaveText('2 commits selected')
+    await expect(row('add c')).toHaveAttribute('aria-selected', 'true')
+    await expect(row('change b')).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByTestId('multi-commit-mode')).toContainText('left out')
+    await expect(files()).toHaveCount(2)
+    await expect(page.locator('[data-testid="multi-commit"] [data-path="b.txt"]')).toHaveCount(0)
+
+    // Opening a file shows the combined diff.
+    await page.locator('[data-testid="multi-commit"] [data-path="a.txt"]').click()
+    await expect(page.getByTestId('diff-path')).toContainText('a.txt')
+    await expect(page.getByTestId('diff-table')).toContainText('a1')
+    await expect(page.getByTestId('diff-view')).toContainText('Selected commits')
+    await expect(page.getByTestId('diff-view').getByRole('button', { name: 'Blame' })).toHaveCount(0)
+
+    // Shift-click: an unbroken range from the anchor.
+    await page.getByTestId('diff-view').getByRole('button', { name: /close/i }).first().click()
+    await row('add c').click()
+    await row('change a').click({ modifiers: ['Shift'] })
+    await expect(page.getByTestId('multi-commit-count')).toHaveText('3 commits selected')
+    await expect(page.getByTestId('multi-commit-mode')).toContainText('All changes')
+    await expect(files()).toHaveCount(3)
+
+    // ⌘/Ctrl-click takes one out again; a plain click goes back to one commit.
+    await row('change b').click({ modifiers: [mod] })
+    await expect(page.getByTestId('multi-commit-count')).toHaveText('2 commits selected')
+    await row('base').click()
+    await expect(page.getByTestId('multi-commit')).toHaveCount(0)
+    await expect(page.getByTestId('commit-details')).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
+test('commits that only make sense with the ones between them offer the whole range', async () => {
+  const repo = createFixtureRepo()
+  repo.commit('base', { 'a.txt': 'line\n' })
+  repo.commit('middle', { 'a.txt': 'middle\n' })
+  repo.commit('builds on middle', { 'a.txt': 'last\n' })
+  const { app, page } = await launch({ repo: repo.dir, userData: makeTempDir('gitbob-ud-') })
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
+  try {
+    await page.getByTestId('commit-row').filter({ hasText: 'builds on middle' }).click()
+    await page.getByTestId('commit-row').filter({ hasText: 'base' }).click({ modifiers: [mod] })
+    const error = page.getByTestId('multi-commit-error')
+    await expect(error).toContainText("can't be combined")
+    await expect(error).toContainText('a.txt')
+    await error.getByRole('button', { name: 'Show the whole range instead' }).click()
+    await expect(page.getByTestId('multi-commit-mode')).toContainText('including commits between them')
+    await expect(page.getByTestId('multi-commit').getByTestId('details-file')).toHaveCount(1)
+  } finally {
+    await app.close()
+  }
+})

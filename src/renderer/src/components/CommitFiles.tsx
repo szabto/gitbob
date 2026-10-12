@@ -64,8 +64,23 @@ function compact(node: TreeNode): TreeNode {
   return node
 }
 
-/** Changed files of a commit as a path list or a folder tree, optionally with every file in it. */
-export function CommitFiles({ repoPath, sha, files, isMerge = false }: { repoPath: string; sha: string; files: FileChange[]; isMerge?: boolean }) {
+/**
+ * Changed files of a commit as a path list or a folder tree, optionally with every file in it.
+ * With `range`, the files changed between two commits (several selected commits combined).
+ */
+export function CommitFiles({
+  repoPath,
+  sha,
+  files,
+  isMerge = false,
+  range,
+}: {
+  repoPath: string
+  sha: string
+  files: FileChange[]
+  isMerge?: boolean
+  range?: { base: string; head: string }
+}) {
   const [mode, setModeState] = useState<Mode>(loadMode)
   const [allFiles, setAllFiles] = useState(false)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -92,20 +107,25 @@ export function CommitFiles({ repoPath, sha, files, isMerge = false }: { repoPat
   }, [files, allFiles, tree.data])
 
   const open = (e: Entry): void => {
-    if (e.change) showDiff({ kind: 'commit', sha, path: e.path, ...(e.change.oldPath ? { oldPath: e.change.oldPath } : {}) })
+    const oldPath = e.change?.oldPath ? { oldPath: e.change.oldPath } : {}
+    if (e.change && range) showDiff({ kind: 'range', base: range.base, head: range.head, path: e.path, ...oldPath })
+    else if (e.change) showDiff({ kind: 'commit', sha, path: e.path, ...oldPath })
     else openBlame({ path: e.path, rev: sha })
   }
   const menu = (ev: React.MouseEvent, e: Entry): void => {
     ev.preventDefault()
     useUiStore.getState().openMenu(ev.clientX, ev.clientY, [
       { label: 'File history', onSelect: () => openFileHistory(e.path) },
-      ...(e.change?.status === 'D' ? [] : [{ label: 'Blame', onSelect: () => openBlame({ path: e.path, rev: sha }) }]),
+      ...(e.change?.status === 'D' || range ? [] : [{ label: 'Blame', onSelect: () => openBlame({ path: e.path, rev: sha }) }]),
     ])
   }
 
   const fileRow = (e: Entry, depth: number, nameOnly: boolean) => {
     const f = e.change
-    const active = !!f && diffTarget?.kind === 'commit' && diffTarget.sha === sha && diffTarget.path === e.path
+    const active =
+      !!f &&
+      diffTarget?.path === e.path &&
+      (range ? diffTarget.kind === 'range' && diffTarget.base === range.base && diffTarget.head === range.head : diffTarget.kind === 'commit' && diffTarget.sha === sha)
     const slash = e.path.lastIndexOf('/')
     const dir = slash >= 0 ? e.path.slice(0, slash + 1) : ''
     const name = e.path.slice(slash + 1)
@@ -182,10 +202,12 @@ export function CommitFiles({ repoPath, sha, files, isMerge = false }: { repoPat
             </button>
           ))}
         </div>
-        <label className="flex items-center gap-1 text-muted" title="Also list files this commit didn't change">
-          <input type="checkbox" checked={allFiles} onChange={(e) => setAllFiles(e.target.checked)} />
-          All files
-        </label>
+        {!range && (
+          <label className="flex items-center gap-1 text-muted" title="Also list files this commit didn't change">
+            <input type="checkbox" checked={allFiles} onChange={(e) => setAllFiles(e.target.checked)} />
+            All files
+          </label>
+        )}
       </div>
       {allFiles && tree.data?.truncated && <p className="text-xs text-warn">Showing the first 50,000 files.</p>}
       <ul data-testid="details-files" className="font-mono text-xs">

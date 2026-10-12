@@ -10,6 +10,15 @@ interface AppState {
   newTab: () => void
   closeTab: (root: string) => void
   selectedSha: string | null
+  /**
+   * Commits selected together (⌘/Ctrl-click, Shift-click); empty unless two or more are selected.
+   * `selectedSha` stays the anchor for Shift-click ranges.
+   */
+  selectedShas: string[]
+  /** ⌘/Ctrl-click: add a commit to the selection or take it out. */
+  toggleSelect: (sha: string) => void
+  /** Shift-click: select these commits, keeping the anchor. */
+  selectMany: (shas: string[]) => void
   /** True when the working-tree (WIP) entry is selected instead of a commit. */
   wipSelected: boolean
   /** Commit the graph should scroll into view (set by sidebar navigation). */
@@ -50,6 +59,7 @@ interface AppState {
 
 const RESET = {
   selectedSha: null,
+  selectedShas: [] as string[],
   wipSelected: false,
   revealSha: null,
   diffTarget: null,
@@ -67,6 +77,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   tabs: [],
   repo: null,
   selectedSha: null,
+  selectedShas: [],
   wipSelected: false,
   revealSha: null,
   diffTarget: null,
@@ -79,7 +90,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   compareSha: null,
   openCompare: (compareSha) => set({ compareSha, fileHistory: null, diffTarget: null, blame: null, conflictPath: null }),
   historyFilter: null,
-  setHistoryFilter: (historyFilter) => set({ historyFilter, selectedSha: null }),
+  setHistoryFilter: (historyFilter) => set({ historyFilter, selectedSha: null, selectedShas: [] }),
   blame: null,
   openBlame: (blame) => set({ blame, diffTarget: null, conflictPath: null, fileHistory: null, compareSha: null }),
   rebaseBase: null,
@@ -110,10 +121,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ tabs: next })
     }
   },
-  select: (sha) => set({ selectedSha: sha, wipSelected: false, diffTarget: null, selectedStash: null }),
-  selectWip: () => set({ selectedSha: null, wipSelected: true, diffTarget: null, selectedStash: null }),
-  selectStash: (stash) => set({ selectedStash: stash, selectedSha: null, wipSelected: false, diffTarget: null }),
-  reveal: (sha) => set({ selectedSha: sha, wipSelected: false, revealSha: sha, diffTarget: null, selectedStash: null, fileHistory: null, compareSha: null, blame: null }),
+  select: (sha) => set({ selectedSha: sha, selectedShas: [], wipSelected: false, diffTarget: null, selectedStash: null }),
+  toggleSelect: (sha) => {
+    const { selectedSha, selectedShas } = get()
+    const current = selectedShas.length ? selectedShas : selectedSha ? [selectedSha] : []
+    const next = current.includes(sha) ? current.filter((s) => s !== sha) : [...current, sha]
+    if (next.length <= 1) return get().select(next[0] ?? null)
+    const anchor = next.includes(sha) ? sha : selectedSha && next.includes(selectedSha) ? selectedSha : next[0]!
+    set({ selectedSha: anchor, selectedShas: next, wipSelected: false, diffTarget: null, selectedStash: null })
+  },
+  selectMany: (shas) => {
+    if (shas.length <= 1) return get().select(shas[0] ?? null)
+    set({ selectedShas: shas, wipSelected: false, diffTarget: null, selectedStash: null })
+  },
+  selectWip: () => set({ selectedSha: null, selectedShas: [], wipSelected: true, diffTarget: null, selectedStash: null }),
+  selectStash: (stash) => set({ selectedStash: stash, selectedSha: null, selectedShas: [], wipSelected: false, diffTarget: null }),
+  reveal: (sha) => set({ selectedSha: sha, selectedShas: [], wipSelected: false, revealSha: sha, diffTarget: null, selectedStash: null, fileHistory: null, compareSha: null, blame: null }),
   clearReveal: () => set({ revealSha: null }),
   showDiff: (target) => set({ diffTarget: target, conflictPath: null, blame: null, fileHistory: null, compareSha: null }),
 }))

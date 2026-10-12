@@ -58,6 +58,21 @@ export interface CommitPage {
 
 export type FileChangeStatus = 'A' | 'M' | 'D' | 'R' | 'C' | 'T' | 'U' | 'X'
 
+/** Changes of several selected commits taken together, as a diffable base..head pair. */
+export interface CombinedChanges {
+  /** The oldest selected commit's parent (or an empty commit when it is a root commit). */
+  base: string
+  /** The newest selected commit, or a helper commit holding the combined result. */
+  head: string
+  /**
+   * 'contiguous': the commits form an unbroken stretch of history (an exact range diff).
+   * 'combined': only the selected commits' own changes, merged in order.
+   * 'range': everything from the oldest one's parent to the newest one, as asked.
+   */
+  mode: 'contiguous' | 'combined' | 'range'
+  files: FileChange[]
+}
+
 export interface FileChange {
   status: FileChangeStatus
   path: string

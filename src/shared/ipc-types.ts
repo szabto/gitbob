@@ -20,6 +20,7 @@ import type {
   WorktreeInfo,
   ConflictVersions,
   FileContents,
+  CombinedChanges,
   FileChange,
   ReflogEntry,
   ResetResult,
@@ -62,6 +63,7 @@ export interface IpcOutputs {
   /** Fetch the branch's upstream and fast-forward it (it isn't checked out). */
   'branch:pull-other': { moved: boolean }
   'compare:files': FileChange[]
+  'commits:combine': CombinedChanges
   /** null if the save dialog was cancelled. */
   'commit:save-patch': { path: string } | null
   'profile:list': { active: string; profiles: ProfileInfo[] }

@@ -80,6 +80,7 @@ export const ipcInputSchemas = {
   'branch:fast-forward': z.object({ repoPath: absolutePath, branch: branchName, to: z.string().min(1).max(1024) }),
   'branch:pull-other': z.object({ repoPath: absolutePath, branch: branchName }),
   'compare:files': z.object({ repoPath: absolutePath, sha: shaSchema }),
+  'commits:combine': z.object({ repoPath: absolutePath, shas: z.array(shaSchema).min(1).max(5000), wholeRange: z.boolean().optional() }),
   'commit:save-patch': z.object({ repoPath: absolutePath, sha: shaSchema }),
   'profile:list': z.object({}).strict(),
   'profile:create': z.object({ name: z.string().trim().min(1).max(60) }),

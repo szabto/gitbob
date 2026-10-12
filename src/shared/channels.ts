@@ -16,6 +16,7 @@ export const IPC_CHANNELS = [
   'branch:fast-forward',
   'branch:pull-other',
   'compare:files',
+  'commits:combine',
   'commit:save-patch',
   'profile:list',
   'profile:create',

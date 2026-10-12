@@ -10,6 +10,7 @@ import { Sidebar } from './Sidebar'
 import { ResizablePane } from './ResizeHandle'
 import { CommitGraph } from './CommitGraph'
 import { CommitDetailsPanel } from './CommitDetailsPanel'
+import { MultiCommitPanel } from './MultiCommitPanel'
 import { Logo } from './Welcome'
 import { StagingPanel } from './StagingPanel'
 import { DiffView } from './DiffView'
@@ -53,6 +54,7 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
   const history = useHistory(repo.root, historyFilter)
   const status = useStatus(repo.root)
   const selectedSha = useAppStore((s) => s.selectedSha)
+  const selectedShas = useAppStore((s) => s.selectedShas)
   const wipSelected = useAppStore((s) => s.wipSelected)
   const diffTarget = useAppStore((s) => s.diffTarget)
   const conflictPath = useAppStore((s) => s.conflictPath)
@@ -107,6 +109,12 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
   }, [status.data])
 
   const commits = useMemo(() => history.data?.pages.flatMap((p) => p.commits) ?? [], [history.data])
+  // The multi-selection in graph order (newest first), as combining the changes expects.
+  const selectedCommits = useMemo(() => {
+    if (selectedShas.length < 2) return []
+    const wanted = new Set(selectedShas)
+    return commits.filter((c) => wanted.has(c.sha))
+  }, [selectedShas, commits])
 
   const refsBySha = useMemo(() => {
     const map = new Map<string, GitRef[]>()
@@ -447,12 +455,14 @@ export function RepositoryView({ repo, onOpen, onClose, onClone, onInit }: Props
             />
           )}
           {rebaseBase && <RebaseDialog repoPath={repo.root} base={rebaseBase} onClose={() => openRebase(null)} />}
-          {((wipSelected && !repo.bare) || stashEntry || selectedSha) && (
+          {((wipSelected && !repo.bare) || stashEntry || selectedSha || selectedCommits.length > 1) && (
             <ResizablePane pane="details" label="Resize details panel" testId="details-pane">
               {wipSelected && !repo.bare ? (
                 <StagingPanel repo={repo} onStash={() => void actions.stash()} onStashFiles={(paths) => void actions.stashFiles(paths)} />
               ) : stashEntry ? (
                 <StashPanel repoPath={repo.root} stash={stashEntry} actions={actions} />
+              ) : selectedCommits.length > 1 ? (
+                <MultiCommitPanel key={selectedCommits.map((c) => c.sha).join()} repoPath={repo.root} commits={selectedCommits} />
               ) : (
                 selectedSha && <CommitDetailsPanel repoPath={repo.root} sha={selectedSha} refsBySha={refsBySha} />
               )}
