@@ -17,6 +17,20 @@ export function updateMode(opts: { platform: NodeJS.Platform; isPackaged: boolea
 }
 
 type AutoUpdater = typeof import('electron-updater').autoUpdater
+type UpdaterModule = typeof import('electron-updater')
+
+/**
+ * electron-updater (CommonJS) defines `autoUpdater` with a lazy getter, which Node's ES-module
+ * import of CommonJS can't detect as a named export: in the packaged app it is only on `default`.
+ */
+export async function loadAutoUpdater(
+  load: () => Promise<Partial<UpdaterModule> & { default?: Partial<UpdaterModule> }> = () => import('electron-updater'),
+): Promise<AutoUpdater> {
+  const mod = await load()
+  const updater = mod.autoUpdater ?? mod.default?.autoUpdater
+  if (!updater) throw new Error('The updater is not available in this build')
+  return updater
+}
 
 /** Update checks only happen on request (or when the user opted into checking at startup). */
 export class Updater {
@@ -29,7 +43,7 @@ export class Updater {
 
   private async auto(): Promise<AutoUpdater> {
     if (this.updater) return this.updater
-    const { autoUpdater } = await import('electron-updater')
+    const autoUpdater = await loadAutoUpdater()
     autoUpdater.autoDownload = false
     autoUpdater.autoInstallOnAppQuit = false
     autoUpdater.on('download-progress', (p) => this.broadcast('app:update-progress', { percent: Math.round(p.percent) }))

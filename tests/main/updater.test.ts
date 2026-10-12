@@ -24,3 +24,25 @@ describe('isNewer', () => {
     expect(isNewer('0.2.0', '0.2.0-beta')).toBe(true)
   })
 })
+
+describe('loadAutoUpdater', () => {
+  it('finds autoUpdater as a named export or on the CommonJS default export', async () => {
+    const { loadAutoUpdater } = await import('../../src/main/updater')
+    const fake = { checkForUpdates: () => null } as never
+    await expect(loadAutoUpdater(async () => ({ autoUpdater: fake }))).resolves.toBe(fake)
+    await expect(loadAutoUpdater(async () => ({ default: { autoUpdater: fake } }))).resolves.toBe(fake)
+    await expect(loadAutoUpdater(async () => ({}))).rejects.toThrow('not available')
+  })
+
+  it('electron-updater only exposes autoUpdater on default when Node imports it as ESM (like the packaged app)', async () => {
+    const { execFileSync } = await import('node:child_process')
+    // Inspect the property without triggering its getter, which needs a running Electron app.
+    const out = execFileSync(
+      process.execPath,
+      ['--input-type=module', '-e', "const m = await import('electron-updater'); console.log(JSON.stringify({ named: 'autoUpdater' in m, onDefault: !!Object.getOwnPropertyDescriptor(m.default, 'autoUpdater') }))"],
+      { encoding: 'utf8' },
+    )
+    const { named, onDefault } = JSON.parse(out.trim().split('\n').pop()!) as { named: boolean; onDefault: boolean }
+    expect(named || onDefault).toBe(true)
+  })
+})
