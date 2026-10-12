@@ -1,7 +1,7 @@
 {
   "name": "gitbob",
   "productName": "GitBob",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Cross-platform Git desktop client",
   "private": true,
   "type": "module",
